@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pase de Lista</title>
+  <meta name="theme-color" content="#1f7a4d">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <!-- Pantalla inicial: subir Excel -->
+  <section id="screen-upload" class="screen" hidden>
+    <div class="upload-card">
+      <div class="logo">✓</div>
+      <h1>Pase de Lista</h1>
+      <p>Sube el Excel con la lista de alumnos. Cada hoja del archivo se toma como un grupo.</p>
+      <label class="btn primary big">
+        Subir archivo Excel
+        <input type="file" id="file-input" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+      </label>
+      <p class="hint">Formato .xlsx · La columna “NOMBRE” se detecta sola.</p>
+    </div>
+  </section>
+
+  <!-- Pantalla principal: pasar lista -->
+  <section id="screen-main" class="screen" hidden>
+    <header class="topbar">
+      <div class="topbar-row">
+        <select id="group-select" aria-label="Grupo"></select>
+        <button class="icon-btn" id="menu-btn" aria-label="Menú">⋮</button>
+      </div>
+      <div class="topbar-row">
+        <button class="icon-btn" id="prev-day" aria-label="Día anterior">‹</button>
+        <input type="date" id="date-input" aria-label="Fecha">
+        <button class="icon-btn" id="next-day" aria-label="Día siguiente">›</button>
+      </div>
+      <div class="summary" id="summary"></div>
+    </header>
+
+    <!-- Vista de un alumno a la vez -->
+    <div id="card-view">
+      <div class="progress">
+        <div class="progress-text"><span id="card-pos"></span><button class="link-btn" id="to-list">Ver lista completa</button></div>
+        <div class="progress-bar"><div id="progress-fill"></div></div>
+      </div>
+
+      <div id="card" class="card">
+        <div class="card-no" id="card-no"></div>
+        <div class="card-name" id="card-name"></div>
+        <div class="card-status" id="card-status"></div>      </div>
+
+      <div class="big-choices" id="big-choices">
+        <button class="big-choice" data-s="A"><b>A</b>Asistencia</button>
+        <button class="big-choice" data-s="F"><b>F</b>Falta</button>
+        <button class="big-choice" data-s="R"><b>R</b>Retardo</button>
+        <button class="big-choice" data-s="J"><b>J</b>Justificado</button>
+      </div>
+
+      <div class="card-nav">
+        <button class="btn" id="card-prev">‹ Anterior</button>
+        <button class="btn" id="card-next">Saltar ›</button>
+      </div>
+
+      <div id="done" class="done" hidden>
+        <div class="logo">✓</div>
+        <h2>Lista terminada</h2>
+        <div class="summary" id="done-summary"></div>
+        <p class="hint" id="done-pending"></p>
+        <button class="btn primary big" id="done-export">Exportar Excel</button>
+        <button class="btn big" id="done-preview">Vista previa del Excel</button>
+        <div class="row">
+          <button class="btn" id="done-review">Revisar lista</button>
+          <button class="btn" id="done-restart">Volver al inicio</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vista de lista (para revisar y corregir) -->
+    <div id="list-view" hidden>
+      <div class="toolbar">
+        <button class="btn" id="to-card">‹ Uno por uno</button>
+        <input type="search" id="search" placeholder="Buscar alumno…">
+      </div>
+      <div class="toolbar">
+        <button class="btn" id="list-add">+ Agregar alumno</button>
+        <button class="btn" id="list-remove">− Quitar alumno</button>
+      </div>
+      <p class="hint list-hint">Toca un nombre para pasar lista desde ese alumno.</p>
+      <ol class="students" id="students"></ol>
+
+      <footer class="bottombar">
+        <button class="btn" id="list-preview">Vista previa</button>
+        <button class="btn primary" id="export-btn">Exportar Excel</button>
+      </footer>
+    </div>
+  </section>
+
+  <!-- Menú -->
+  <dialog id="menu">
+    <h2>Opciones</h2>
+    <button class="menu-item" data-action="add-student">Agregar alumno al grupo</button>
+    <button class="menu-item" data-action="preview">Vista previa del Excel</button>
+    <button class="menu-item" data-action="export">Exportar Excel</button>
+    <button class="menu-item" data-action="history">Historial de fechas</button>
+    <button class="menu-item" data-action="settings">Valores de cada estado</button>
+    <button class="menu-item" data-action="clear-day">Borrar el pase de este día</button>
+    <button class="menu-item danger" data-action="new-file">Cargar otro archivo</button>
+    <button class="btn" data-action="close">Cerrar</button>
+  </dialog>
+
+  <dialog id="history">
+    <h2>Historial</h2>
+    <ul id="history-list"></ul>
+    <button class="btn" data-action="close">Cerrar</button>
+  </dialog>
+
+  <dialog id="settings">
+    <h2>Valor en el Excel</h2>
+    <p class="hint">Lo que se escribe en la celda de cada fecha.</p>
+    <form id="settings-form" method="dialog">
+      <label><span class="pill A">A</span> Asistencia <input name="A" maxlength="4"></label>
+      <label><span class="pill F">F</span> Falta <input name="F" maxlength="4"></label>
+      <label><span class="pill R">R</span> Retardo <input name="R" maxlength="4"></label>
+      <label><span class="pill J">J</span> Justificado <input name="J" maxlength="4"></label>
+      <div class="row">
+        <button class="btn" value="cancel">Cancelar</button>
+        <button class="btn primary" value="save">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Vista previa del Excel que se va a exportar -->
+  <dialog id="preview" class="fullscreen">
+    <div class="preview-head">
+      <div>
+        <h2 id="preview-title">Vista previa</h2>
+        <p class="hint" id="preview-sub"></p>
+      </div>
+      <button class="icon-btn" data-action="close" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="preview-legend" id="preview-legend"></div>
+    <div class="preview-scroll"><table class="sheet" id="preview-table"></table></div>
+    <div class="row">
+      <button class="btn" data-action="close">Cerrar</button>
+      <button class="btn primary" id="preview-export">Exportar Excel</button>
+    </div>
+  </dialog>
+
+  <!-- Agregar alumno nuevo -->
+  <dialog id="add-student">
+    <h2>Agregar alumno</h2>
+    <p class="hint" id="add-group"></p>
+    <form id="add-form" method="dialog">
+      <label class="field">Nombre completo
+        <input name="name" id="add-name" autocomplete="off" autocapitalize="characters" placeholder="APELLIDOS NOMBRE(S)" required>
+      </label>
+      <label class="field">Número de lista
+        <input name="no" id="add-no" inputmode="numeric" maxlength="4">
+      </label>
+      <p class="hint">Se agrega al final de la lista del grupo, igual que en el Excel.</p>
+      <p class="form-error" id="add-error"></p>
+      <div class="row">
+        <button class="btn" value="cancel" formnovalidate>Cancelar</button>
+        <button class="btn primary" value="ok">Agregar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Quitar alumno agregado -->
+  <dialog id="remove-student">
+    <h2>Quitar alumno</h2>
+    <p class="hint">Solo aparecen los alumnos agregados desde la app. Elige uno y confirma.</p>
+    <input type="search" id="remove-search" class="dialog-search" placeholder="Buscar alumno…">
+    <ul id="remove-list" class="pick-list"></ul>
+    <div class="row">
+      <button class="btn" data-action="close">Cancelar</button>
+      <button class="btn danger" id="remove-ok" disabled>Quitar</button>
+    </div>
+  </dialog>
+
+  <!-- Confirmación al cambiar una marca existente -->
+  <dialog id="confirm-change">
+    <h2>¿Cambiar la marca?</h2>
+    <p class="confirm-name" id="confirm-name"></p>
+    <div class="confirm-from-to">
+      <span class="pill-lg" id="confirm-from"></span>
+      <span class="arrow">→</span>
+      <span class="pill-lg" id="confirm-to"></span>
+    </div>
+    <form method="dialog" class="row">
+      <button class="btn" value="cancel">Cancelar</button>
+      <button class="btn primary" value="ok" id="confirm-ok">Sí, cambiar</button>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="vendor/exceljs.min.js"></script>
+  <script src="js/excel-core.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
