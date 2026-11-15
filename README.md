@@ -2,6 +2,8 @@
 
 App web instalable (PWA) para pasar lista desde un Excel. Funciona en computadora y en celular.
 
+**App publicada:** https://pase-de-lista-omega.vercel.app (cada push a `main` se publica solo en Vercel)
+
 ## Funciones
 - **Subir Excel**: cada hoja es un grupo; la columna **NOMBRE** se detecta sola.
 - **Pase de lista uno por uno**: un alumno en pantalla con 4 opciones —
