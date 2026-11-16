@@ -1349,7 +1349,7 @@
   function openGrades() {
     const f = $('#grades-form');
     gradeDraft = JSON.parse(JSON.stringify(group().grading));
-    $('#grades-scope').textContent = `¿Cuánto vale cada apartado en ${gname(group())}? Cada grupo tiene sus propios porcentajes y se guardan todo el semestre.`;
+    $('#grades-scope').textContent = `¿Cuánto vale cada apartado en ${gname(group())}? Cada grupo tiene sus propios porcentajes.`;
     const gr = gradeDraft;
     GRADE_PARTS.forEach((p) => (f.elements[p.key].value = gr.w[p.key] || ''));
     f.elements.retardo.value = String(gr.retardo);
