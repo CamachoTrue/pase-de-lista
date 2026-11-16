@@ -1,5 +1,5 @@
 // Service worker: guarda la app para que funcione sin internet.
-const CACHE = 'pase-de-lista-v24';
+const CACHE = 'pase-de-lista-v25';
 const ASSETS = [
   './',
   'index.html',
@@ -7,6 +7,8 @@ const ASSETS = [
   'js/app.js',
   'js/excel-core.js',
   'vendor/exceljs.min.js',
+  'vendor/pdfjs/pdf.min.js',
+  'vendor/pdfjs/pdf.worker.min.js',
   'manifest.json',
   'icons/icon-192.png',
   'icons/icon-512.png',

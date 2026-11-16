@@ -23,6 +23,9 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
   sin datos aún no cuenta y su peso se reparte. En el Excel van al final, por apartado y total (sobre 10 o 100).
 - **Resumen por alumno** (⋮ → Resumen por alumno): se busca al alumno y se ve su calificación, cada apartado
   y el detalle día por día. *Exportar Excel* genera un archivo solo de ese alumno (para quejas o padres de familia).
+- **Cuadernillo del grupo** (⋮ → Cuadernillo del grupo): el maestro sube un PDF por grupo y lo lee en el celular
+  (página, zoom, recuerda dónde se quedó). Se guarda en el dispositivo (IndexedDB), funciona sin internet y
+  se conserva aunque se vuelva a subir el Excel. Visor: PDF.js 3.11.174 en `vendor/pdfjs/`.
 - **Confirmación de cambios**: si un alumno ya tenía marca y se elige otra, se pide confirmar.
 - **Vista de lista** para revisar y corregir; tocar un nombre regresa al pase uno por uno desde ahí.
 - **Agregar / quitar alumnos**: los nuevos se agregan al final de la lista del grupo.

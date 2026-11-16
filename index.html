@@ -142,6 +142,7 @@
     <h2>Opciones</h2>
     <button class="menu-item" data-action="grades">Calificaciones y porcentajes</button>
     <button class="menu-item" data-action="student">Resumen por alumno</button>
+    <button class="menu-item" data-action="book">Cuadernillo del grupo (PDF)</button>
     <button class="menu-item" data-action="add-student">Agregar alumno al grupo</button>
     <button class="menu-item" data-action="preview">Vista previa del Excel</button>
     <button class="menu-item" data-action="export">Exportar Excel</button>
@@ -252,6 +253,37 @@
       <button class="btn" data-action="close" id="student-close">Cerrar</button>
       <button class="btn primary" id="student-export" hidden>Exportar Excel</button>
     </div>
+  </dialog>
+
+  <!-- Cuadernillo: un PDF por grupo, guardado en el dispositivo, para leerlo en el celular -->
+  <dialog id="book" class="fullscreen">
+    <div class="preview-head">
+      <div>
+        <h2>Cuadernillo</h2>
+        <p class="hint" id="book-sub"></p>
+      </div>
+      <button class="icon-btn" data-action="close" aria-label="Cerrar">✕</button>
+    </div>
+    <div id="book-empty" class="book-empty" hidden>
+      <p id="book-empty-text"></p>
+      <button class="btn primary" id="book-upload">Subir PDF</button>
+      <p class="hint">Se guarda solo en este dispositivo. Cada grupo tiene su propio cuadernillo.</p>
+    </div>
+    <div id="book-bar" class="book-bar" hidden>
+      <label class="book-page">Pág. <input id="book-page" inputmode="numeric" maxlength="4"> de <span id="book-total"></span></label>
+      <div class="book-zoom">
+        <button class="icon-btn" id="book-zoom-out" aria-label="Alejar">−</button>
+        <span id="book-zoom-val">100 %</span>
+        <button class="icon-btn" id="book-zoom-in" aria-label="Acercar">+</button>
+      </div>
+    </div>
+    <div id="book-pages" class="book-pages" hidden></div>
+    <p id="book-loading" class="hint book-loading" hidden>Abriendo cuadernillo…</p>
+    <div class="row" id="book-actions" hidden>
+      <button class="btn" id="book-change">Cambiar PDF</button>
+      <button class="btn danger" id="book-remove">Quitar</button>
+    </div>
+    <input type="file" id="book-file" accept="application/pdf,.pdf" hidden>
   </dialog>
 
   <!-- Agregar alumno nuevo -->
