@@ -660,7 +660,6 @@
     ok.textContent = sel ? 'Quitar alumno elegido' : 'Elige un alumno';
   }
 
-  $('#list-remove').addEventListener('click', openRemoveStudent);
   $('#remove-search').addEventListener('input', renderRemoveList);
   $('#remove-list').addEventListener('click', (e) => {
     const li = e.target.closest('li[data-row]');
@@ -754,7 +753,6 @@
   $('#list-preview').addEventListener('click', openPreview);
 
   // ---------- Agregar alumno ----------
-  $('#list-add').addEventListener('click', openAddStudent);
 
   function openAddStudent() {
     const g = group();
@@ -1295,6 +1293,7 @@
     if (action === 'export') doExport(null);
     if (action === 'preview') openPreview();
     if (action === 'add-student') openAddStudent();
+    if (action === 'remove-student') openRemoveStudent();
     if (action === 'grades') openGrades();
     if (action === 'student') openStudent();
     if (action === 'book') openBook();

@@ -31,7 +31,7 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
 - **Confirmación de cambios**: si un alumno ya tenía marca y se elige otra, se pide confirmar.
 - **Vista de lista** para revisar y corregir; tocar un nombre regresa al pase uno por uno desde ahí.
 - **Agregar / quitar alumnos**: los nuevos se agregan al final de la lista del grupo.
-  Solo se pueden quitar los agregados desde la app (con buscador y confirmación).
+  Desde ⋮ → Agregar alumno al grupo y ⋮ → Quitar alumno agregado; solo se pueden quitar los agregados desde la app (con buscador y confirmación).
 - **Vista previa del Excel** dentro de la app, igual a lo que se exporta.
 - **Exportar Excel**: copia del archivo original; por fecha van juntas Asistencia y Lectura, y Trabajos va aparte
   en un bloque a la derecha (separado por una columna vacía), todo
