@@ -271,7 +271,9 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .cb:active { transform: scale(.95); }
 @media (min-width: 600px) { .cname { font-size: .9rem; } .cb { min-width: 52px; } }
 .sheet td.date-h { line-height: 1.25; font-size: 11px; }
-.sheet td.day-start { border-left: 2px solid #9fb0a7; }
+.sheet td.day-start { border-left: 2px solid #555; }
+.sheet td.block-end { border-right: 2px solid #555; }
+.sheet td.lect-col { background: #ededed; }
 #history-list .counts { text-align: right; }
 .crow { min-height: 40px; padding-top: 3px; padding-bottom: 3px; }
 .cb { height: 32px; }

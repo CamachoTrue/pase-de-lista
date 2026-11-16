@@ -234,14 +234,26 @@
         hr.height = Math.max(hr.height || 15, 30); // dos renglones: fecha + categoría
       }
 
-      columnLayout(g).forEach(({ col, date, cat }) => {
+      // Línea gruesa al inicio de cada día (y al final de cada bloque); Lectura con gris claro.
+      const thick = { style: 'medium', color: { argb: 'FF555555' } };
+      const lectFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDEDED' } };
+      const layout = columnLayout(g);
+      layout.forEach(({ col, date, cat, block }, i) => {
+        const next = layout[i + 1];
+        const leftThick = cat === 'records' || (cat === 'trab' && layout[i].first);
+        const rightThick = !next || next.block !== block;
+        const cellBorder = Object.assign({}, border, leftThick ? { left: thick } : {}, rightThick ? { right: thick } : {});
         const [y, m, d] = date.split('-');
         const label = CATS.find((c) => c.key === cat).label;
         const h = ws.getCell(g.headerRow, col);
         h.value = `${d}/${m}/${y.slice(-2)}\n${label}`;
-        h.font = Object.assign({}, headerSrc.font, { bold: true });
-        h.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-        h.border = border;
+        // Estilo completo y propio de cada celda (ExcelJS comparte objetos de estilo entre celdas).
+        h.style = {
+          font: Object.assign({}, headerSrc.font, { bold: true }),
+          alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+          border: cellBorder,
+          ...(cat === 'lect' ? { fill: lectFill } : {}),
+        };
         ws.getColumn(col).width = 11;
 
         const day = (g[cat] || {})[date] || {};
@@ -250,8 +262,12 @@
           const cell = ws.getCell(s.row, col);
           if (v == null) cell.value = null;
           else cell.value = cat === 'trab' ? Number(v) : codeValue(v, codes);
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-          cell.border = border;
+          cell.style = {
+            font: Object.assign({}, ws.getCell(s.row, g.nameCol).font || {}),
+            alignment: { horizontal: 'center', vertical: 'middle' },
+            border: cellBorder,
+            ...(cat === 'lect' ? { fill: lectFill } : {}),
+          };
         }
       });
     }

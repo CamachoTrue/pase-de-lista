@@ -572,6 +572,8 @@
         if (isDateCol && isHdr) cls.push('date-h');
         if (isDateCol && !isHdr) cls.push('v', colorOf(c, r));
         if (isDateCol && byCol.get(c).first) cls.push('day-start');
+        if (isDateCol && byCol.get(c).cat === 'lect') cls.push('lect-col');
+        if (isDateCol && !byCol.has(c + 1)) cls.push('block-end');
         if (isDateCol && isCur(c)) cls.push('cur');
         // El encabezado lleva fecha y apartado en dos renglones, como en el Excel.
         const shown = isHdr && isDateCol ? escapeHtml(ListaExcel.cellText(v)).replace(/\n/g, '<br>') : escapeHtml(t);
