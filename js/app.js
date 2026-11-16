@@ -506,7 +506,7 @@
       const pill = (sel, v) => {
         const el = $(sel);
         const o = optionOf(cat, v);
-        el.className = `pill-lg ${o ? o.color : 'none'}`;
+        el.className = `change-val ${o ? o.color : 'none'}`;
         el.textContent = o ? o.label : 'Sin marca';
       };
       $('#confirm-name').textContent = name;

@@ -53,7 +53,14 @@ button, input, select { font: inherit; color: inherit; }
 .topbar { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--border); padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); }
 .topbar-row { display: flex; align-items: center; gap: 6px; }
 .topbar-row + .topbar-row { margin-top: 4px; }
-#group-select { flex: 1; min-width: 0; font-weight: 700; font-size: 1.05rem; border: none; background: transparent; padding: 8px 0; }
+/* Selector de grupo: se ve como botón (borde, fondo, flecha y leyenda) */
+.group-picker { position: relative; flex: 1; min-width: 0; display: block; border: 1.5px solid var(--primary); border-radius: 12px; background: var(--A-soft); cursor: pointer; }
+.group-picker:active { filter: brightness(.96); }
+.gp-cap { position: absolute; top: 5px; left: 12px; font-size: .66rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--primary); pointer-events: none; }
+.gp-chev { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border-radius: 50%; background: var(--primary); color: var(--primary-text); display: grid; place-items: center; font-size: .9rem; pointer-events: none; }
+#group-select { appearance: none; -webkit-appearance: none; width: 100%; min-width: 0; font-weight: 700; font-size: 1.05rem; color: var(--text); border: none; background: transparent; padding: 21px 42px 6px 12px; cursor: pointer; text-overflow: ellipsis; }
+#group-select:focus-visible { outline: none; }
+.group-picker:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent); }
 #date-input { flex: 1; min-width: 0; text-align: center; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--bg); }
 .summary { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; font-size: .85rem; }
 .summary span { padding: 3px 8px; border-radius: 999px; background: var(--bg); }
@@ -162,12 +169,18 @@ dialog > .btn { margin-top: 14px; width: 100%; }
 
 /* ---------- Confirmar cambio ---------- */
 .confirm-name { font-weight: 700; margin: 0 0 14px; }
-.confirm-from-to { display: flex; align-items: center; justify-content: center; gap: 12px; }
-.confirm-from-to .arrow { font-size: 1.5rem; color: var(--muted); }
-.pill-lg { flex: 1; text-align: center; padding: 12px 6px; border-radius: 12px; color: #fff; font-weight: 700; }
-.pill-lg.A { background: var(--A); } .pill-lg.F { background: var(--F); }
-.pill-lg.R { background: var(--R); } .pill-lg.J { background: var(--J); }
-.pill-lg.none { background: var(--bg); color: var(--muted); border: 1px dashed var(--border); }
+/* Cambio que se hará: es información, no botones (sin relleno sólido, con leyenda) */
+.change-box { display: flex; align-items: center; gap: 10px; background: var(--bg); border-radius: 12px; padding: 12px 14px; margin-bottom: 4px; }
+.change-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.change-side + .arrow + .change-side { text-align: right; align-items: flex-end; }
+.change-cap { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.change-val { font-weight: 800; font-size: 1.05rem; display: inline-flex; align-items: center; gap: 6px; }
+.change-val::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex: none; }
+.change-val.A { color: var(--A); } .change-val.F { color: var(--F); } .change-val.R { color: var(--R); } .change-val.J { color: var(--J); }
+.change-val.N { color: var(--text); }
+.change-val.none { color: var(--muted); font-weight: 600; }
+.change-val.none::before { background: transparent; border: 1.5px dashed var(--muted); }
+.change-box .arrow { font-size: 1.4rem; color: var(--muted); }
 
 /* ---------- Vista previa ---------- */
 .bottombar { gap: 10px; }

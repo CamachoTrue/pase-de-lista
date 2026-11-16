@@ -30,7 +30,11 @@
   <section id="screen-main" class="screen" hidden>
     <header class="topbar">
       <div class="topbar-row">
-        <select id="group-select" aria-label="Grupo"></select>
+        <label class="group-picker">
+          <span class="gp-cap">Grupo · toca para cambiar</span>
+          <select id="group-select" aria-label="Grupo"></select>
+          <span class="gp-chev" aria-hidden="true">▾</span>
+        </label>
         <button class="icon-btn" id="menu-btn" aria-label="Menú">⋮</button>
       </div>
       <div class="topbar-row">
@@ -286,10 +290,10 @@
   <dialog id="confirm-change">
     <h2>¿Cambiar la marca?</h2>
     <p class="confirm-name" id="confirm-name"></p>
-    <div class="confirm-from-to">
-      <span class="pill-lg" id="confirm-from"></span>
-      <span class="arrow">→</span>
-      <span class="pill-lg" id="confirm-to"></span>
+    <div class="change-box" aria-label="Cambio que se hará">
+      <div class="change-side"><span class="change-cap">Ahora tiene</span><span class="change-val" id="confirm-from"></span></div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="change-side"><span class="change-cap">Quedará</span><span class="change-val" id="confirm-to"></span></div>
     </div>
     <form method="dialog" class="row">
       <button class="btn" value="cancel">Cancelar</button>
