@@ -252,7 +252,7 @@
     { key: 'disc', label: 'Disciplina' },
     { key: 'exam', label: 'Examen' },
   ];
-  const DEFAULT_GRADING = { w: { records: 0, lect: 0, trab: 0, disc: 0, exam: 0 }, retardo: 100, escala: 10 };
+  const DEFAULT_GRADING = { w: { records: 0, lect: 0, trab: 0, disc: 0, exam: 0 }, retardo: 100, escala: 10, lectMin: 4 };
   const round1 = (n) => Math.round(n * 10) / 10;
   const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
 
@@ -262,6 +262,10 @@
     grading = Object.assign({}, DEFAULT_GRADING, grading);
     const vals = (key) => Object.keys(g[key] || {}).map((d) => [d, g[key][d][row]]).filter(([, v]) => v != null);
     const att = vals('records');
+    // Lecturas: con el mínimo de "Sí" que defina el maestro (o más) tiene el 100 %; debajo, proporcional.
+    const lectVals = vals('lect');
+    const lectMin = Math.max(1, Math.round(Number(grading.lectMin) || DEFAULT_GRADING.lectMin));
+    const lectSi = lectVals.filter(([, v]) => v === 'S').length;
     // Asistencia y Justificado = 100 %, Retardo = lo que diga el maestro, Falta = 0 %.
     const attScore = { A: 100, J: 100, R: Number(grading.retardo) || 0, F: 0 };
     // Disciplina: días en que el alumno estuvo en clase (A o R) o tuvo reporte; 10 salvo los días con 0.
@@ -270,7 +274,7 @@
     zeros.forEach((d) => present.add(d));
     return {
       records: avg(att.map(([, v]) => attScore[v])),
-      lect: avg(vals('lect').map(([, v]) => (v === 'S' ? 100 : 0))),
+      lect: lectVals.length ? (100 * Math.min(lectSi, lectMin)) / lectMin : null,
       trab: avg(vals('trab').map(([, v]) => Number(v))),
       disc: present.size ? (100 * (present.size - zeros.length)) / present.size : null,
       exam: avg(vals('exam').map(([, v]) => Number(v))),

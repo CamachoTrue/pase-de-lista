@@ -863,6 +863,7 @@
     GRADE_PARTS.forEach((p) => (f.elements[p.key].value = gr.w[p.key] || ''));
     f.elements.retardo.value = String(gr.retardo);
     f.elements.escala.value = String(gr.escala);
+    f.elements.lectMin.value = gr.lectMin;
     renderGrades();
     $('#grades').showModal();
   }
@@ -874,6 +875,8 @@
     });
     gradeDraft.retardo = Number(f.elements.retardo.value);
     gradeDraft.escala = Number(f.elements.escala.value);
+    const lm = Math.round(Number(f.elements.lectMin.value));
+    gradeDraft.lectMin = Number.isFinite(lm) && lm >= 1 ? lm : state.grading.lectMin;
     renderGrades();
   });
   const draftTotal = () => round1(GRADE_PARTS.reduce((n, p) => n + (gradeDraft.w[p.key] || 0), 0));
@@ -912,7 +915,7 @@
     const fmt = (v) => (v == null ? '—' : round1(v));
     // La calificación final va junto al nombre para que se vea sin desplazar en el celular.
     let html = '<thead><tr><th class="stick">No.</th><th class="stick name">Nombre</th><th class="final">Calif.</th>' +
-      parts.map((p) => `<th>${p.label}<br><small>${gr.w[p.key]}%</small></th>`).join('') +
+      parts.map((p) => `<th>${p.label}<br><small>${gr.w[p.key]}%${p.key === 'lect' ? ` · mín. ${gr.lectMin}` : ''}</small></th>`).join('') +
       '</tr></thead><tbody>';
     for (const s of g.students) {
       const r = finalGrade(g, s.row, gr);
