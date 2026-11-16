@@ -222,16 +222,47 @@
     const day = dayData(tab(), false);
     return group().students.filter((s) => day[s.row] == null);
   };
+  // Lecturas: si todos tienen la misma marca, botón para cambiarlos todos a la otra.
+  const flipTarget = () => {
+    if (tab() !== 'lect') return null;
+    const day = dayData('lect', false);
+    const vals = new Set(group().students.map((s) => day[s.row]));
+    if (vals.size !== 1 || !group().students.length) return null;
+    const [only] = vals;
+    return only === 'S' ? 'N' : only === 'N' ? 'S' : null;
+  };
   function updateFillRest() {
     const cat = tab();
     const box = $('#fill-rest');
     const n = cat in FILL_REST ? pendingRows().length : 0;
-    box.hidden = n === 0;
+    const flip = n ? null : flipTarget();
+    box.hidden = !n && !flip;
+    if (flip) {
+      const total = group().students.length;
+      box.innerHTML = `<button class="btn fill-rest ${flip === 'S' ? 'yes' : ''}" data-all="${flip}">Cambiar a los ${total} a “${flip === 'S' ? 'Sí' : 'No'}”</button>`;
+      return;
+    }
     if (!n) return;
     const text = { S: `Poner “Sí” a los ${n} sin marcar`, N: `Poner “No” a los ${n} sin marcar`, 0: `Poner 0 a los ${n} sin calificar` };
     box.innerHTML = FILL_REST[cat].map((v) => `<button class="btn fill-rest ${v === 'S' ? 'yes' : ''}" data-v="${v}">${text[v]}</button>`).join('');
   }
   $('#fill-rest').addEventListener('click', async (e) => {
+    const all = e.target.closest('button[data-all]');
+    if (all) {
+      const to = all.dataset.all;
+      if (flipTarget() !== to) return;
+      const label = to === 'S' ? 'Sí' : 'No';
+      const students = group().students;
+      if (!(await confirmBulk(`¿Cambiar a los ${students.length} alumnos a “${label}”?`,
+        `Todos tienen “${to === 'S' ? 'No' : 'Sí'}” en este día y quedarán con “${label}”.`, 'Sí, cambiar'))) return;
+      const day = dayData('lect', true);
+      students.forEach((s) => (day[s.row] = to));
+      save();
+      if (navigator.vibrate) navigator.vibrate(15);
+      refresh();
+      toast(`${students.length} alumno(s) con ${label}`);
+      return;
+    }
     const btn = e.target.closest('button[data-v]');
     const cat = tab();
     const rows = pendingRows();
