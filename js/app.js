@@ -236,11 +236,14 @@
     refresh();
     toast(`${rows.length} alumno(s) con ${cat === 'lect' ? 'No' : '0'}`);
   });
-  function confirmBulk(title, text) {
+  // Confirmación propia de la app (los avisos del navegador pueden bloquearse en el celular).
+  function confirmBulk(title, text, okText = 'Sí, ponerlo', danger = false) {
     return new Promise((resolve) => {
       const d = $('#confirm-bulk');
       $('#bulk-title').textContent = title;
       $('#bulk-text').textContent = text;
+      $('#bulk-ok').textContent = okText;
+      $('#bulk-ok').className = `btn ${danger ? 'danger' : 'primary'}`;
       d.returnValue = '';
       d.addEventListener('close', () => resolve(d.returnValue === 'ok'), { once: true });
       d.showModal();
@@ -388,14 +391,18 @@
     save();
   });
   $('#work-title').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
-  $('#work-del').addEventListener('click', () => {
+  $('#work-del').addEventListener('click', async () => {
     const ws = works(false);
     const i = workIdx();
     const w = ws[i];
     if (!w) return;
     const n = Object.keys(w.vals).length;
     const name = w.title.trim() ? `“${w.title.trim()}”` : `Trabajo ${i + 1}`;
-    if (!confirm(`¿Eliminar ${name}${n ? ` y sus ${n} calificación(es)` : ''}?`)) return;
+    const ok = await confirmBulk(
+      `¿Seguro que quieres eliminar el trabajo ${name}?`,
+      n ? `Se borrarán también sus ${n} calificación(es) de este día. No se puede deshacer.` : 'Este trabajo no tiene calificaciones.',
+      'Sí, eliminar', true);
+    if (!ok) return;
     ws.splice(i, 1);
     if (!ws.length) delete group().trab[state.ui.date];
     goWork(Math.max(0, i - 1));
@@ -901,10 +908,13 @@
     if (action === 'history') openHistory();
     if (action === 'settings') openSettings();
     if (action === 'clear-day') {
-      if (confirm(`¿Borrar asistencia, lecturas, trabajos, disciplina y examen del ${fmtDate(state.ui.date)} en ${group().sheet}?`)) {
+      confirmBulk(`¿Borrar los registros del ${fmtDate(state.ui.date)}?`,
+        `Se borran asistencia, lecturas, trabajos, disciplina y examen de ese día en ${group().sheet}. No se puede deshacer.`,
+        'Sí, borrar', true).then((ok) => {
+        if (!ok) return;
         KEYS.forEach((k) => { if (group()[k]) delete group()[k][state.ui.date]; });
         changed();
-      }
+      });
     }
     if (action === 'new-file') {
       if (confirm('Se reemplazará la lista actual y su asistencia guardada. Exporta antes si la necesitas. ¿Continuar?')) {
