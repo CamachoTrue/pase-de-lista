@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates } = window.ListaExcel;
+  const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates, columnLayout } = window.ListaExcel;
   const LABELS = { A: 'Asistencia', F: 'Falta', R: 'Retardo', J: 'Justificado' };
   // Opciones de cada apartado: valor guardado, texto del botón, texto largo y color (clase A/F/R/J).
   const OPTIONS = {
@@ -536,16 +536,14 @@
     }
 
     const dates = groupDates(g);
-    const nCat = CATS.length;
-    const lastCol = Math.max(g.nameCol, g.startCol + dates.length * nCat - 1);
-    const curIdx = dates.indexOf(state.ui.date);
-    const isCur = (c) => curIdx >= 0 && Math.floor((c - g.startCol) / nCat) === curIdx;
+    const layout = columnLayout(g);
+    const byCol = new Map(layout.map((x) => [x.col, x]));
+    const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col));
+    const isCur = (c) => byCol.has(c) && byCol.get(c).date === state.ui.date;
     const colLetter = (c) => { let s = ''; for (; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + ((c - 1) % 26)) + s; return s; };
-    // Color de la celda según el apartado de su columna.
     // Se toma de lo capturado (no del número), porque A, R y J pueden tener el mismo valor.
     const colorOf = (c, r) => {
-      const cat = CATS[(c - g.startCol) % nCat].key;
-      const date = dates[Math.floor((c - g.startCol) / nCat)];
+      const { cat, date } = byCol.get(c);
       const v = ((g[cat] || {})[date] || {})[r];
       if (v == null) return '';
       if (cat === 'records') return v;
@@ -570,10 +568,10 @@
         const cls = [];
         if (c <= g.nameCol) cls.push('stick');
         if (c === g.nameCol) cls.push('name');
-        const isDateCol = c >= g.startCol && c < g.startCol + dates.length * nCat;
+        const isDateCol = byCol.has(c);
         if (isDateCol && isHdr) cls.push('date-h');
         if (isDateCol && !isHdr) cls.push('v', colorOf(c, r));
-        if (isDateCol && (c - g.startCol) % nCat === 0) cls.push('day-start');
+        if (isDateCol && byCol.get(c).first) cls.push('day-start');
         if (isDateCol && isCur(c)) cls.push('cur');
         // El encabezado lleva fecha y apartado en dos renglones, como en el Excel.
         const shown = isHdr && isDateCol ? escapeHtml(ListaExcel.cellText(v)).replace(/\n/g, '<br>') : escapeHtml(t);
@@ -586,7 +584,7 @@
 
     $('#preview-title').textContent = `Vista previa · ${g.sheet}`;
     $('#preview-sub').textContent = dates.length
-      ? `${g.students.length} alumnos · ${dates.length} día(s) · 3 columnas por día`
+      ? `${g.students.length} alumnos · ${dates.length} día(s) · Asistencia y Lectura juntas, Trabajos aparte a la derecha`
       : 'Aún no hay registros en este grupo.';
     $('#preview-legend').innerHTML =
       STATUSES.map((k) => `<span class="summary-${k}">${escapeHtml(String(state.codes[k]))} = ${LABELS[k]}</span>`).join('') +

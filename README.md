@@ -16,7 +16,8 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
 - **Agregar / quitar alumnos**: los nuevos se agregan al final de la lista del grupo.
   Solo se pueden quitar los agregados desde la app (con buscador y confirmación).
 - **Vista previa del Excel** dentro de la app, igual a lo que se exporta.
-- **Exportar Excel**: copia del archivo original con 3 columnas por día (Asistencia, Lectura, Trabajo),
+- **Exportar Excel**: copia del archivo original; por fecha van juntas Asistencia y Lectura, y Trabajos va aparte
+  en un bloque a la derecha (separado por una columna vacía), todo
   a partir de la primera columna libre después del nombre.
   Valores por defecto: A = 1, F = 0, R = 2, J = 3; Lectura Sí = 1, No = 0; Trabajo 0/50/100
   (configurables en ⋮ → Valores de cada estado).

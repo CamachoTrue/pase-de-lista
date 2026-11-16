@@ -2,7 +2,8 @@
  * Lógica de Excel: leer la lista del maestro y escribir las columnas de cada día.
  * Funciona en el navegador (window.ListaExcel) y en Node (module.exports) para pruebas.
  *
- * Por cada fecha se escriben 3 columnas: Asistencia, Lectura y Trabajo.
+ * Columnas por fecha: primero Asistencia + Lectura juntas (2 por día); después,
+ * separadas por una columna vacía, las de Trabajo (1 por día).
  *
  * Modelo de un grupo:
  * {
@@ -165,6 +166,25 @@
     return [...set].sort();
   }
 
+  const hasData = (g, key, date) => Object.keys(((g[key] || {})[date]) || {}).length > 0;
+
+  // Columnas que se escriben en el Excel, en orden: [{ col, date, cat, first, block }].
+  // block 'al' = Asistencia + Lectura; block 'trab' = Trabajos (a la derecha, tras una columna vacía).
+  function columnLayout(g) {
+    const all = groupDates(g);
+    const alDates = all.filter((d) => hasData(g, 'records', d) || hasData(g, 'lect', d));
+    const trDates = all.filter((d) => hasData(g, 'trab', d));
+    const out = [];
+    let col = g.startCol;
+    alDates.forEach((date) => {
+      out.push({ col: col++, date, cat: 'records', first: true, block: 'al' });
+      out.push({ col: col++, date, cat: 'lect', first: false, block: 'al' });
+    });
+    if (alDates.length && trDates.length) col++; // columna vacía de separación
+    trDates.forEach((date, i) => out.push({ col: col++, date, cat: 'trab', first: i === 0, block: 'trab' }));
+    return out;
+  }
+
   // Escribe los datos en una copia del Excel original y devuelve el buffer .xlsx
   async function exportWorkbook(ExcelJS, originalBuffer, groups, codes = DEFAULT_CODES) {
     codes = Object.assign({}, DEFAULT_CODES, codes);
@@ -179,8 +199,12 @@
 
       // Limpia columnas de día que traía el archivo original (se reescriben ordenadas).
       for (const c of g.dateCols || []) {
-        ws.getCell(g.headerRow, c).value = null;
-        for (const s of g.students) ws.getCell(s.row, c).value = null;
+        // Formato puesto por la app: se quita para que no queden bordes sueltos si cambia el acomodo.
+        for (const r of [g.headerRow, ...g.students.map((s) => s.row)]) {
+          const cell = ws.getCell(r, c);
+          cell.value = null;
+          cell.style = {};
+        }
       }
 
       // Alumnos agregados en la app: se escriben al final de la lista con el mismo formato
@@ -210,27 +234,25 @@
         hr.height = Math.max(hr.height || 15, 30); // dos renglones: fecha + categoría
       }
 
-      dates.forEach((date, i) => {
+      columnLayout(g).forEach(({ col, date, cat }) => {
         const [y, m, d] = date.split('-');
-        CATS.forEach((cat, j) => {
-          const col = g.startCol + i * CATS.length + j;
-          const h = ws.getCell(g.headerRow, col);
-          h.value = `${d}/${m}/${y.slice(-2)}\n${cat.label}`;
-          h.font = Object.assign({}, headerSrc.font, { bold: true });
-          h.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-          h.border = border;
-          ws.getColumn(col).width = 11;
+        const label = CATS.find((c) => c.key === cat).label;
+        const h = ws.getCell(g.headerRow, col);
+        h.value = `${d}/${m}/${y.slice(-2)}\n${label}`;
+        h.font = Object.assign({}, headerSrc.font, { bold: true });
+        h.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        h.border = border;
+        ws.getColumn(col).width = 11;
 
-          const day = (g[cat.key] || {})[date] || {};
-          for (const s of g.students) {
-            const v = day[s.row];
-            const cell = ws.getCell(s.row, col);
-            if (v == null) cell.value = null;
-            else cell.value = cat.key === 'trab' ? Number(v) : codeValue(v, codes);
-            cell.alignment = { horizontal: 'center', vertical: 'middle' };
-            cell.border = border;
-          }
-        });
+        const day = (g[cat] || {})[date] || {};
+        for (const s of g.students) {
+          const v = day[s.row];
+          const cell = ws.getCell(s.row, col);
+          if (v == null) cell.value = null;
+          else cell.value = cat === 'trab' ? Number(v) : codeValue(v, codes);
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = border;
+        }
       });
     }
     return wb.xlsx.writeBuffer();
@@ -238,6 +260,6 @@
 
   return {
     STATUSES, READ, WORK, CATS, DEFAULT_CODES,
-    parseWorkbook, exportWorkbook, groupDates, parseHeader, parseDateHeader, cellText,
+    parseWorkbook, exportWorkbook, groupDates, columnLayout, parseHeader, parseDateHeader, cellText,
   };
 });
