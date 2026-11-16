@@ -50,6 +50,17 @@
 
     <!-- Vista compacta: lecturas (Sí/No), trabajos (0/50/100) y disciplina (10/0), muchos alumnos por pantalla -->
     <div id="compact-view" hidden>
+      <!-- Trabajos: varios por día, cada uno con nombre -->
+      <div class="work-bar" id="work-bar" hidden>
+        <div class="work-nav">
+          <button class="icon-btn" id="work-prev" aria-label="Trabajo anterior">‹</button>
+          <span id="work-pos">Trabajo 1 de 1</span>
+          <button class="icon-btn" id="work-next" aria-label="Trabajo siguiente">›</button>
+          <button class="btn work-add" id="work-add">+ Otro trabajo</button>
+        </div>
+        <input id="work-title" class="work-title" maxlength="60" autocomplete="off" placeholder="Nombre del trabajo (ej. Ensayo cap. 3)">
+        <button class="link-btn work-del" id="work-del">Eliminar este trabajo</button>
+      </div>
       <div class="compact-search" id="compact-search-bar" hidden>
         <input type="search" id="compact-search" placeholder="Buscar alumno…" autocomplete="off">
         <p class="hint" id="compact-hint"></p>

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, examCols, shortDate,
-    GRADE_PARTS, DEFAULT_GRADING, finalGrade, gradeCols, round1 } = window.ListaExcel;
+    GRADE_PARTS, DEFAULT_GRADING, finalGrade, gradeCols, round1, worksOf, normalizeWorks } = window.ListaExcel;
   // Todos los apartados que se guardan por día (disciplina no lleva columna diaria en el Excel).
   const KEYS = [...CATS.map((c) => c.key), 'disc', 'exam'];
   const LABELS = { A: 'Asistencia', F: 'Falta', R: 'Retardo', J: 'Justificado' };
@@ -32,7 +32,22 @@
   };
   const tab = () => state.ui.tab || 'records';
   // Datos de un apartado para el día seleccionado.
+  // Trabajos: puede haber varios por día; se usa el trabajo seleccionado (state.ui.work).
+  const works = (create) => {
+    const g = group();
+    g.trab = g.trab || {};
+    if (!g.trab[state.ui.date] && create) g.trab[state.ui.date] = [];
+    return g.trab[state.ui.date] || [];
+  };
+  const workIdx = () => Math.max(0, Math.min(state.ui.work || 0, Math.max(works(false).length - 1, 0)));
+  const curWork = (create) => {
+    const ws = works(create);
+    const i = workIdx();
+    if (!ws[i] && create) ws[i] = { title: '', vals: {} };
+    return ws[i] || null;
+  };
   const dayData = (cat, create) => {
+    if (cat === 'trab') { const w = curWork(create); return w ? w.vals : {}; }
     const g = group();
     g[cat] = g[cat] || {};
     if (!g[cat][state.ui.date] && create) g[cat][state.ui.date] = {};
@@ -170,6 +185,7 @@
     const cat = tab();
     const day = dayData(cat, false);
     const att = dayData('records', false);
+    renderWorkBar();
     const disc = cat === 'disc';
     const exam = cat === 'exam';
     $('#compact-search-bar').hidden = !disc && !exam;
@@ -322,6 +338,70 @@
     const nxt = all[all.indexOf(e.target) + 1];
     if (nxt) nxt.focus(); else e.target.blur();
   });
+  // ---------- Varios trabajos por día ----------
+  function renderWorkBar() {
+    const bar = $('#work-bar');
+    bar.hidden = tab() !== 'trab';
+    if (bar.hidden) return;
+    const ws = works(false);
+    const total = Math.max(ws.length, 1);
+    const i = workIdx();
+    state.ui.work = i;
+    const w = ws[i];
+    $('#work-pos').textContent = `Trabajo ${i + 1} de ${total}`;
+    $('#work-prev').disabled = i === 0;
+    $('#work-next').disabled = i >= total - 1;
+    // El nombre se refresca al cambiar de trabajo o de día (no mientras se escribe en el mismo trabajo).
+    const title = $('#work-title');
+    const key = `${state.ui.group}|${state.ui.date}|${i}`;
+    if (title.dataset.key !== key || document.activeElement !== title) title.value = w ? w.title : '';
+    title.dataset.key = key;
+    $('#work-del').hidden = !w || (ws.length <= 1 && !Object.keys(w.vals).length && !w.title);
+  }
+  function goWork(i) {
+    // Siempre se muestra el nombre del trabajo al que se cambia.
+    $('#work-title').blur();
+    $('#work-title').dataset.key = '';
+    state.ui.work = i;
+    save();
+    refresh();
+  }
+  $('#work-prev').addEventListener('click', () => goWork(workIdx() - 1));
+  $('#work-next').addEventListener('click', () => goWork(workIdx() + 1));
+  $('#work-add').addEventListener('click', () => {
+    const ws = works(true);
+    const last = ws[ws.length - 1];
+    // Si el último trabajo sigue vacío no se crea otro: se usa ese.
+    if (last && !Object.keys(last.vals).length && !last.title.trim()) {
+      goWork(ws.length - 1);
+    } else {
+      if (!ws.length) ws.push({ title: '', vals: {} }); // el trabajo 1 que se estaba viendo
+      ws.push({ title: '', vals: {} });
+      goWork(ws.length - 1);
+      toast(`Trabajo ${ws.length} creado`);
+    }
+    $('#work-title').focus();
+  });
+  $('#work-title').addEventListener('input', (e) => {
+    const w = curWork(true);
+    w.title = e.target.value;
+    save();
+  });
+  $('#work-title').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+  $('#work-del').addEventListener('click', () => {
+    const ws = works(false);
+    const i = workIdx();
+    const w = ws[i];
+    if (!w) return;
+    const n = Object.keys(w.vals).length;
+    const name = w.title.trim() ? `“${w.title.trim()}”` : `Trabajo ${i + 1}`;
+    if (!confirm(`¿Eliminar ${name}${n ? ` y sus ${n} calificación(es)` : ''}?`)) return;
+    ws.splice(i, 1);
+    if (!ws.length) delete group().trab[state.ui.date];
+    goWork(Math.max(0, i - 1));
+    toast(`${name} eliminado`);
+  });
+
   $('#compact-preview').addEventListener('click', openPreview);
   $('#compact-export').addEventListener('click', () => doExport($('#compact-export')));
 
@@ -541,7 +621,10 @@
     if (idx < 0) return;
     const s = g.students[idx];
     g.students.splice(idx, 1);
-    KEYS.forEach((k) => Object.values(g[k] || {}).forEach((day) => delete day[s.row]));
+    KEYS.forEach((k) => Object.values(g[k] || {}).forEach((day) => {
+      if (Array.isArray(day)) day.forEach((w) => delete w.vals[s.row]); // trabajos
+      else delete day[s.row];
+    }));
     save();
     if (cardIdx > g.students.length) cardIdx = g.students.length;
     $('#remove-student').close();
@@ -584,6 +667,7 @@
 
   // Cambió el grupo o la fecha: vuelve a empezar desde el primer pendiente.
   function changed() {
+    state.ui.work = 0; // al cambiar de día o grupo se empieza en el primer trabajo
     save();
     startCard();
     refresh();
@@ -686,8 +770,8 @@
     const colLetter = (c) => { let s = ''; for (; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + ((c - 1) % 26)) + s; return s; };
     // Se toma de lo capturado (no del número), porque A, R y J pueden tener el mismo valor.
     const colorOf = (c, r) => {
-      const { cat, date } = byCol.get(c);
-      const v = ((g[cat] || {})[date] || {})[r];
+      const { cat, date, work } = byCol.get(c);
+      const v = cat === 'trab' ? (worksOf(g, date)[work].vals || {})[r] : ((g[cat] || {})[date] || {})[r];
       if (v == null) return '';
       if (cat === 'records') return v;
       const o = optionOf(cat, v);
@@ -831,13 +915,15 @@
 
   function openHistory() {
     const g = group();
-    const count = (cat, d) => Object.keys((g[cat] || {})[d] || {}).length;
+    const count = (cat, d) => (cat === 'trab'
+      ? worksOf(g, d).filter((w) => Object.keys(w.vals).length).length
+      : Object.keys((g[cat] || {})[d] || {}).length);
     const dates = [...new Set([...groupDates(g), ...['disc', 'exam'].flatMap((k) => Object.keys(g[k] || {}).filter((d) => count(k, d)))])].sort().reverse();
     $('#history-list').innerHTML = dates.length
       ? dates.map((d) => {
           const c = { A: 0, F: 0, R: 0, J: 0 };
           Object.values(g.records[d] || {}).forEach((s) => c[s]++);
-          return `<li data-date="${d}"><span>${fmtDate(d)}</span><span class="counts">A ${c.A} · F ${c.F} · R ${c.R} · J ${c.J}<br>Lecturas ${count('lect', d)} · Trabajos ${count('trab', d)}${count('disc', d) ? ` · Disciplina 0: ${count('disc', d)}` : ''}${count('exam', d) ? ` · Examen: ${count('exam', d)}` : ''}</span></li>`;
+          return `<li data-date="${d}"><span>${fmtDate(d)}</span><span class="counts">A ${c.A} · F ${c.F} · R ${c.R} · J ${c.J}<br>Lecturas ${count('lect', d)} · Trabajos ${count('trab', d)} (${worksOf(g, d).reduce((n, w) => n + Object.keys(w.vals).length, 0)} calif.)${count('disc', d) ? ` · Disciplina 0: ${count('disc', d)}` : ''}${count('exam', d) ? ` · Examen: ${count('exam', d)}` : ''}</span></li>`;
         }).join('')
       : '<li>Aún no hay registros en este grupo.</li>';
     $('#history').showModal();
@@ -981,7 +1067,7 @@
     if (!state.ui.tab) state.ui.tab = 'records';
     // Datos guardados con la versión anterior (solo asistencia).
     state.codes = { ...DEFAULT_CODES, ...state.codes };
-    state.groups.forEach((g) => { g.lect = g.lect || {}; g.trab = g.trab || {}; g.disc = g.disc || {}; g.exam = g.exam || {}; });
+    state.groups.forEach((g) => { g.lect = g.lect || {}; normalizeWorks(g); g.disc = g.disc || {}; g.exam = g.exam || {}; });
     state.grading = { ...DEFAULT_GRADING, ...state.grading, w: { ...DEFAULT_GRADING.w, ...(state.grading || {}).w } };
   }
   render();

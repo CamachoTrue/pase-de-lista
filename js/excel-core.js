@@ -12,7 +12,9 @@
  *   students: [{ row: 5, no: '1', name: 'ACOSTA SANCHEZ ...', added?: true }],
  *   records: { '2026-11-14': { 5: 'A', 6: 'F' } },   // asistencia: A/F/R/J
  *   lect:    { '2026-11-14': { 5: 'S', 6: 'N' } },   // lectura: S (sí) / N (no)
- *   trab:    { '2026-11-14': { 5: 100, 6: 50 } },    // trabajo: 0 / 50 / 100
+ *   trab:    { '2026-11-14': [                        // trabajos del día (puede haber varios)
+ *              { title: 'Ensayo', vals: { 5: 100, 6: 50 } },   // 0 / 50 / 100
+ *            ] },
  *   disc:    { '2026-11-14': { 6: 0 } },             // disciplina: solo se guardan los 0 (los demás tienen 10)
  *   exam:    { '2026-11-14': { 5: 60, 6: 100 } }     // examen: porcentaje 0-100
  * }
@@ -34,13 +36,13 @@
   const DEFAULT_CODES = { A: 1, F: 0, R: 2, J: 3, S: 1, N: 0 };
   // Categorías por día, en el orden de las columnas del Excel.
   const CATS = [
-    { key: 'records', label: 'Asistencia', match: /ASIST/i },
-    { key: 'lect', label: 'Lectura', match: /LECT/i },
-    { key: 'trab', label: 'Trabajo', match: /TRAB/i },
+    { key: 'records', label: 'Asistencia', match: /^ASIST/i },
+    { key: 'lect', label: 'Lectura', match: /^LECT/i },
+    { key: 'trab', label: 'Trabajo', match: /^TRAB/i },
   ];
 
   // Apartados que no van por día; sus encabezados también llevan fecha.
-  const EXAM = { key: 'exam', label: 'Examen', match: /EXAM/i };
+  const EXAM = { key: 'exam', label: 'Examen', match: /^EXAM/i };
 
   function cellText(v) {
     if (v == null) return '';
@@ -69,7 +71,31 @@
     let y = Number(m[3]);
     if (y < 100) y += 2000;
     const cat = [...CATS, EXAM].find((c) => c.match.test(m[4] || ''));
-    return { date: `${y}-${pad(m[2])}-${pad(m[1])}`, cat: cat ? cat.key : 'records' };
+    const out = { date: `${y}-${pad(m[2])}-${pad(m[1])}`, cat: cat ? cat.key : 'records' };
+    // Título del trabajo: "Trabajo: Ensayo" o "Trabajo 2: Ensayo" -> "Ensayo".
+    if (out.cat === 'trab') out.title = (m[4] || '').replace(/^TRABAJO\s*\d*\s*:?\s*/i, '').trim();
+    return out;
+  }
+
+  // ---------- Trabajos: varios por día, cada uno con título ----------
+  // g.trab[fecha] = [{ title, vals: { fila: 0|50|100 } }]
+  const worksOf = (g, date) => {
+    const w = (g.trab || {})[date];
+    if (Array.isArray(w)) return w;
+    return w && typeof w === 'object' ? [{ title: '', vals: w }] : []; // formato anterior: un trabajo por día
+  };
+  const workUsed = (w) => !!w && (Object.keys(w.vals || {}).length > 0 || !!(w.title || '').trim());
+  // Hay datos de un apartado en una fecha (para trabajos: algún trabajo con calificaciones).
+  function hasData(g, key, date) {
+    if (key === 'trab') return worksOf(g, date).some((w) => Object.keys(w.vals || {}).length);
+    return Object.keys(((g[key] || {})[date]) || {}).length > 0;
+  }
+  // Pasa datos de la versión anterior ({fecha: {fila: v}}) al formato de varios trabajos.
+  function normalizeWorks(g) {
+    const t = g.trab || {};
+    for (const d of Object.keys(t)) if (!Array.isArray(t[d])) t[d] = [{ title: '', vals: t[d] || {} }];
+    g.trab = t;
+    return g;
   }
   // Compatibilidad con pruebas/llamadas anteriores.
   const parseDateHeader = (v) => { const h = parseHeader(v); return h ? h.date : null; };
@@ -152,7 +178,13 @@
         const h = parseHeader(ws.getCell(hdr.row, c).value);
         if (!h) continue;
         dateCols.push(c);
-        const day = (data[h.cat][h.date] = data[h.cat][h.date] || {});
+        let day;
+        if (h.cat === 'trab') {
+          // Cada columna de trabajo es un trabajo distinto de esa fecha.
+          const w = { title: h.title || '', vals: {} };
+          (data.trab[h.date] = data.trab[h.date] || []).push(w);
+          day = w.vals;
+        } else day = (data[h.cat][h.date] = data[h.cat][h.date] || {});
         for (const s of students) {
           const v = valueFromCell(ws.getCell(s.row, c).value, h.cat, codes);
           if (v != null) day[s.row] = v;
@@ -161,7 +193,12 @@
 
       // Quita días sin ningún dato (p. ej. la columna de lectura vacía de un día).
       for (const k of Object.keys(data)) {
-        for (const d of Object.keys(data[k])) if (!Object.keys(data[k][d]).length) delete data[k][d];
+        for (const d of Object.keys(data[k])) {
+          if (k === 'trab') {
+            data.trab[d] = data.trab[d].filter(workUsed);
+            if (!data.trab[d].length) delete data.trab[d];
+          } else if (!Object.keys(data[k][d]).length) delete data[k][d];
+        }
       }
 
       // Primera columna libre después del nombre: encabezado vacío y sin datos de alumnos.
@@ -194,14 +231,11 @@
   // Fechas con al menos un dato en cualquiera de las 3 categorías, ordenadas.
   function groupDates(g) {
     const set = new Set();
-    for (const c of CATS) {
-      const m = g[c.key] || {};
-      Object.keys(m).forEach((d) => { if (Object.keys(m[d]).length) set.add(d); });
-    }
+    for (const c of CATS) Object.keys(g[c.key] || {}).forEach((d) => { if (hasData(g, c.key, d)) set.add(d); });
     return [...set].sort();
   }
 
-  const hasData = (g, key, date) => Object.keys(((g[key] || {})[date]) || {}).length > 0;
+
 
   // Columnas que se escriben en el Excel, en orden: [{ col, date, cat, first, block }].
   // block 'al' = Asistencia + Lectura; block 'trab' = Trabajos (a la derecha, tras una columna vacía).
@@ -216,7 +250,13 @@
       out.push({ col: col++, date, cat: 'lect', first: false, block: 'al' });
     });
     if (alDates.length && trDates.length) col++; // columna vacía de separación
-    trDates.forEach((date, i) => out.push({ col: col++, date, cat: 'trab', first: i === 0, block: 'trab' }));
+    // Una columna por trabajo (con calificaciones) de cada fecha.
+    let firstTr = true;
+    trDates.forEach((date) => worksOf(g, date).forEach((w, work) => {
+      if (!Object.keys(w.vals || {}).length) return;
+      out.push({ col: col++, date, cat: 'trab', work, first: firstTr, block: 'trab' });
+      firstTr = false;
+    }));
     return out;
   }
 
@@ -275,7 +315,8 @@
     return {
       records: avg(att.map(([, v]) => attScore[v])),
       lect: lectVals.length ? (100 * Math.min(lectSi, lectMin)) / lectMin : null,
-      trab: avg(vals('trab').map(([, v]) => Number(v))),
+      trab: avg(Object.keys(g.trab || {}).flatMap((d) => worksOf(g, d).map((w) => (w.vals || {})[row]))
+        .filter((v) => v != null).map(Number)),
       disc: present.size ? (100 * (present.size - zeros.length)) / present.size : null,
       exam: avg(vals('exam').map(([, v]) => Number(v))),
     };
@@ -320,6 +361,7 @@
     for (const g of groups) {
       const ws = wb.getWorksheet(g.sheet);
       if (!ws) continue;
+      normalizeWorks(g);
 
       // Limpia columnas de día que traía el archivo original (se reescriben ordenadas).
       for (const c of g.dateCols || []) {
@@ -362,13 +404,24 @@
       const thick = { style: 'medium', color: { argb: 'FF555555' } };
       const lectFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDEDED' } };
       const layout = columnLayout(g);
-      layout.forEach(({ col, date, cat, block }, i) => {
+      if (layout.some((x) => x.cat === 'trab' && (worksOf(g, x.date)[x.work].title || '').trim())) {
+        const hr = ws.getRow(g.headerRow);
+        hr.height = Math.max(hr.height || 15, 45); // fecha + "Trabajo: título" en varios renglones
+      }
+      layout.forEach(({ col, date, cat, block, work }, i) => {
         const next = layout[i + 1];
         const leftThick = cat === 'records' || (cat === 'trab' && layout[i].first);
         const rightThick = !next || next.block !== block;
         const cellBorder = Object.assign({}, border, leftThick ? { left: thick } : {}, rightThick ? { right: thick } : {});
         const [y, m, d] = date.split('-');
-        const label = CATS.find((c) => c.key === cat).label;
+        let label = CATS.find((c) => c.key === cat).label;
+        let wk = null;
+        if (cat === 'trab') {
+          wk = worksOf(g, date)[work];
+          const n = worksOf(g, date).filter((w) => Object.keys(w.vals || {}).length).indexOf(wk) + 1;
+          const title = (wk.title || '').trim();
+          label = title ? `Trabajo: ${title}` : n > 1 ? `Trabajo ${n}` : 'Trabajo';
+        }
         const h = ws.getCell(g.headerRow, col);
         h.value = `${d}/${m}/${y.slice(-2)}\n${label}`;
         // Estilo completo y propio de cada celda (ExcelJS comparte objetos de estilo entre celdas).
@@ -378,9 +431,9 @@
           border: cellBorder,
           ...(cat === 'lect' ? { fill: lectFill } : {}),
         };
-        ws.getColumn(col).width = 11;
+        ws.getColumn(col).width = wk && (wk.title || '').trim() ? 16 : 11;
 
-        const day = (g[cat] || {})[date] || {};
+        const day = wk ? wk.vals : (g[cat] || {})[date] || {};
         for (const s of g.students) {
           const v = day[s.row];
           const cell = ws.getCell(s.row, col);
@@ -482,7 +535,7 @@
 
   return {
     STATUSES, READ, WORK, CATS, DEFAULT_CODES,
-    parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, discDates, examCols, shortDate,
+    parseWorkbook, exportWorkbook, groupDates, columnLayout, worksOf, normalizeWorks, hasData, discCols, discDates, examCols, shortDate,
     GRADE_PARTS, DEFAULT_GRADING, gradeParts, finalGrade, gradeCols, gradingOn, round1, parseHeader, parseDateHeader, cellText,
   };
 });
