@@ -138,6 +138,7 @@
     <h2>Opciones</h2>
     <button class="menu-item" data-action="subject">Materia de este grupo</button>
     <button class="menu-item" data-action="grades">Calificaciones y porcentajes</button>
+    <button class="menu-item" data-action="group-report">Resumen del grupo (semáforo)</button>
     <button class="menu-item" data-action="student">Resumen por alumno</button>
     <button class="menu-item" data-action="book">Cuadernillo del grupo (PDF)</button>
     <button class="menu-item" data-action="add-student">Agregar alumno al grupo</button>
@@ -305,6 +306,27 @@
         <button type="submit" class="btn primary">Guardar</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Resumen del grupo: promedios, faltas y alumnos en riesgo (semáforo) -->
+  <dialog id="group-report" class="fullscreen">
+    <div class="preview-head">
+      <div>
+        <h2>Resumen del grupo</h2>
+        <p class="hint" id="gr-sub"></p>
+      </div>
+      <button class="icon-btn" data-action="close" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="gr-body">
+      <div class="gr-tiles" id="gr-tiles"></div>
+      <div class="gr-chips" id="gr-chips"></div>
+      <details class="gr-criteria"><summary>¿Cómo se decide el color?</summary><ul id="gr-criteria"></ul></details>
+      <ul class="gr-list" id="gr-list"></ul>
+    </div>
+    <div class="row">
+      <button class="btn" data-action="close">Cerrar</button>
+      <button class="btn primary" id="gr-export">Exportar Excel</button>
+    </div>
   </dialog>
 
   <!-- Agregar alumno nuevo -->

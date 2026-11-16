@@ -660,10 +660,150 @@
     return wb.xlsx.writeBuffer();
   }
 
+  // ---------- Resumen del grupo (semáforo) ----------
+  // Para el director: promedios, faltas y alumnos en riesgo. El estado de cada alumno sale de lo peor entre
+  // su calificación y su asistencia: rojo si está reprobando o falta mucho, amarillo si está cerca, verde si va bien.
+  const RISK = { failPct: 60, warnPct: 80, attRed: 80, attYellow: 90 };
+  const STATUS_TXT = { rojo: 'Rojo', amarillo: 'Amarillo', verde: 'Verde', none: 'Sin datos' };
+
+  function groupReport(g, grading) {
+    grading = Object.assign({}, DEFAULT_GRADING, grading);
+    const escala = Number(grading.escala) || 10;
+    const graded = gradingOn(grading);
+    let present = 0;
+    let taken = 0;
+    const rows = g.students.map((s) => {
+      const c = { A: 0, F: 0, R: 0, J: 0 };
+      Object.values(g.records || {}).forEach((day) => { const v = day[s.row]; if (v in c) c[v]++; });
+      const total = c.A + c.F + c.R + c.J;
+      present += total - c.F;
+      taken += total;
+      const att = total ? (100 * (total - c.F)) / total : null;
+      const { parts, final } = finalGrade(g, s.row, grading);
+      const fp = graded && final != null ? (100 * final) / escala : null;
+      const reasons = [];
+      let status = 'none';
+      const worse = (st) => { const o = ['none', 'verde', 'amarillo', 'rojo']; if (o.indexOf(st) > o.indexOf(status)) status = st; };
+      if (fp != null) {
+        if (fp < RISK.failPct) { worse('rojo'); reasons.push(`Calificación ${final} (reprobando)`); }
+        else if (fp < RISK.warnPct) { worse('amarillo'); reasons.push(`Calificación ${final}`); }
+        else worse('verde');
+      }
+      if (att != null) {
+        if (att < RISK.attRed) { worse('rojo'); reasons.push(`Asistencia ${round1(att)} %`); }
+        else if (att < RISK.attYellow) { worse('amarillo'); reasons.push(`Asistencia ${round1(att)} %`); }
+        else worse('verde');
+      }
+      return { student: s, counts: c, days: total, att, parts, final, status, reasons };
+    });
+    const finals = rows.map((r) => r.final).filter((v) => v != null);
+    const count = (st) => rows.filter((r) => r.status === st).length;
+    return {
+      rows, graded, escala, grading,
+      stats: {
+        alumnos: g.students.length,
+        asistencia: taken ? (100 * present) / taken : null,
+        promedio: graded && finals.length ? round1(finals.reduce((a, b) => a + b, 0) / finals.length) : null,
+        faltas: rows.reduce((n, r) => n + r.counts.F, 0),
+        rojo: count('rojo'), amarillo: count('amarillo'), verde: count('verde'), none: count('none'),
+      },
+      criteria: [
+        `Verde: calificación de ${round1((escala * RISK.warnPct) / 100)} o más y asistencia de ${RISK.attYellow} % o más.`,
+        `Amarillo: calificación de ${round1((escala * RISK.failPct) / 100)} a menos de ${round1((escala * RISK.warnPct) / 100)}, o asistencia de ${RISK.attRed} % a menos de ${RISK.attYellow} %.`,
+        `Rojo (en riesgo): calificación menor a ${round1((escala * RISK.failPct) / 100)} o asistencia menor a ${RISK.attRed} %.`,
+      ],
+    };
+  }
+
+  function exportGroupReport(ExcelJS, g, grading) {
+    const r = groupReport(g, grading);
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Resumen del grupo', { views: [{ showGridLines: false }] });
+    const parts = GRADE_PARTS.filter((p) => Number(r.grading.w[p.key]) > 0);
+    const head = ['No.', 'Nombre', 'Asistencias', 'Faltas', 'Retardos', 'Justificados', '% Asistencia',
+      ...parts.map((p) => `${p.label}\n${r.grading.w[p.key]}%`), `Calificación\nsobre ${r.escala}`, 'Estado', 'Motivo'];
+    ws.columns = head.map((h, i) => ({ width: i === 0 ? 6 : i === 1 ? 36 : h === 'Motivo' ? 34 : 12 }));
+    const thin = { style: 'thin', color: { argb: 'FF999999' } };
+    const border = { top: thin, left: thin, bottom: thin, right: thin };
+    const fill = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+    const SOFT = { verde: 'FFD9EAD3', amarillo: 'FFFFF2CC', rojo: 'FFF4CCCC', none: 'FFF2F2F2' };
+    const STRONG = { verde: 'FF38761D', amarillo: 'FFBF9000', rojo: 'FFCC0000', none: 'FF999999' };
+    const put = (row, col, v, o = {}) => {
+      const cell = ws.getCell(row, col);
+      cell.value = v;
+      cell.style = {
+        font: { name: 'Calibri', size: o.size || 11, bold: !!o.bold, color: o.color ? { argb: o.color } : undefined },
+        alignment: { vertical: 'middle', horizontal: o.align || 'left', wrapText: true },
+        ...(o.box ? { border } : {}),
+        ...(o.fill ? { fill: fill(o.fill) } : {}),
+      };
+      return cell;
+    };
+    let y = 1;
+    put(y, 1, 'Resumen del grupo', { bold: true, size: 16 });
+    y += 2;
+    const today = new Date();
+    const iso = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+    [['Grupo', g.title ? `${g.sheet} — ${g.title}` : g.sheet], ...(g.subject ? [['Materia', g.subject]] : []), ['Generado', longDate(iso)]]
+      .forEach(([k, v]) => { put(y, 1, k, { bold: true }); ws.mergeCells(y, 2, y, 4); put(y, 2, v); y++; });
+    y++;
+    // Indicadores
+    const st = r.stats;
+    const tiles = [
+      ['Alumnos', st.alumnos, 'FFD9E2F3'],
+      ['Asistencia promedio', st.asistencia == null ? 'Sin datos' : `${round1(st.asistencia)} %`, 'FFD9E2F3'],
+      ['Promedio general', st.promedio == null ? (r.graded ? 'Sin datos' : 'Sin porcentajes') : st.promedio, 'FFD9E2F3'],
+      ['Faltas en total', st.faltas, 'FFD9E2F3'],
+      ['En riesgo (rojo)', st.rojo, SOFT.rojo],
+      ['En observación (amarillo)', st.amarillo, SOFT.amarillo],
+      ['Bien (verde)', st.verde, SOFT.verde],
+    ];
+    tiles.forEach(([k, v, f]) => {
+      put(y, 1, k, { bold: true, box: true, fill: f });
+      ws.mergeCells(y, 1, y, 2);
+      put(y, 3, v, { bold: true, box: true, fill: f, align: 'center', size: 12 });
+      y++;
+    });
+    y++;
+    put(y, 1, 'Criterios del semáforo', { bold: true });
+    y++;
+    r.criteria.forEach((t, i) => {
+      ws.mergeCells(y, 1, y, Math.min(head.length, 8));
+      put(y, 1, t, { color: STRONG[['verde', 'amarillo', 'rojo'][i]] });
+      y++;
+    });
+    y++;
+    // Tabla por alumno
+    const hy = y;
+    head.forEach((h, i) => put(y, i + 1, h, { bold: true, box: true, fill: 'FFD9E2F3', align: 'center' }));
+    ws.getRow(y).height = 32;
+    y++;
+    for (const row of r.rows) {
+      const f = SOFT[row.status];
+      const vals = [row.student.no, row.student.name, row.counts.A, row.counts.F, row.counts.R, row.counts.J,
+        row.att == null ? '' : round1(row.att),
+        ...parts.map((p) => (row.parts[p.key] == null ? '' : round1(row.parts[p.key]))),
+        row.final == null ? '' : row.final, STATUS_TXT[row.status], row.reasons.join(' · ')];
+      vals.forEach((v, i) => {
+        const isState = i === vals.length - 2;
+        put(y, i + 1, v, {
+          box: true,
+          fill: isState ? STRONG[row.status] : f,
+          color: isState ? 'FFFFFFFF' : undefined,
+          bold: isState || i === vals.length - 3,
+          align: i === 1 || i === vals.length - 1 ? 'left' : 'center',
+        });
+      });
+      y++;
+    }
+    ws.autoFilter = { from: { row: hy, column: 1 }, to: { row: y - 1, column: head.length } };
+    return wb.xlsx.writeBuffer();
+  }
+
   return {
     STATUSES, READ, WORK, CATS, DEFAULT_CODES,
     parseWorkbook, exportWorkbook, groupDates, columnLayout, worksOf, normalizeWorks, hasData, discCols, discDates, examCols, shortDate,
     GRADE_PARTS, DEFAULT_GRADING, gradeParts, finalGrade, gradeCols, gradingOn, round1, parseHeader, parseDateHeader, cellText,
-    studentReport, exportStudent,
+    studentReport, exportStudent, groupReport, exportGroupReport,
   };
 });
