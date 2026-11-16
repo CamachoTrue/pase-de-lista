@@ -25,7 +25,7 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
   sin datos aún no cuenta y su peso se reparte. En el Excel van al final, por apartado y total (sobre 10 o 100).
 - **Resumen del grupo** (⋮ → Resumen del grupo): alumnos, asistencia promedio, promedio general, faltas y alumnos en riesgo,
   con semáforo por alumno (rojo: calificación < 60 % o asistencia < 80 %; amarillo: < 80 % o < 90 %; verde: lo demás).
-  *Exportar Excel* genera un archivo con los indicadores y cada alumno coloreado, para el director.
+  *Vista previa* muestra el Excel tal cual; *Exportar Excel* genera el archivo con los indicadores y cada alumno coloreado, para el director.
 - **Resumen por alumno** (⋮ → Resumen por alumno): se busca al alumno y se ve su calificación, cada apartado
   y el detalle día por día. *Exportar Excel* genera un archivo solo de ese alumno (para quejas o padres de familia).
 - **Cuadernillo del grupo** (⋮ → Cuadernillo del grupo): el maestro sube un PDF por grupo y lo lee en el celular

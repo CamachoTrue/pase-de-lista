@@ -424,3 +424,7 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .gr-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-num { text-align: center; min-width: 2.6em; }
 .gr-num b { font-size: .9rem; font-variant-numeric: tabular-nums; }
+
+/* Vista previa del resumen del grupo */
+.sheet.gr-sheet td { white-space: normal; vertical-align: middle; }
+.sheet.gr-sheet td[colspan] { white-space: nowrap; }

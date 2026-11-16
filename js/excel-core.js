@@ -741,6 +741,8 @@
     };
     let y = 1;
     put(y, 1, 'Resumen del grupo', { bold: true, size: 16 });
+    ws.mergeCells(y, 1, y, 6);
+    ws.getRow(y).height = 24;
     y += 2;
     const today = new Date();
     const iso = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
@@ -766,6 +768,7 @@
     });
     y++;
     put(y, 1, 'Criterios del semáforo', { bold: true });
+    ws.mergeCells(y, 1, y, 4);
     y++;
     r.criteria.forEach((t, i) => {
       ws.mergeCells(y, 1, y, Math.min(head.length, 8));

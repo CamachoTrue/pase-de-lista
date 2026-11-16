@@ -325,7 +325,24 @@
     </div>
     <div class="row">
       <button class="btn" data-action="close">Cerrar</button>
+      <button class="btn" id="gr-preview">Vista previa</button>
       <button class="btn primary" id="gr-export">Exportar Excel</button>
+    </div>
+  </dialog>
+
+  <!-- Vista previa del Excel del resumen del grupo (se dibuja desde el mismo archivo que se exporta) -->
+  <dialog id="gr-sheet" class="fullscreen">
+    <div class="preview-head">
+      <div>
+        <h2>Vista previa</h2>
+        <p class="hint" id="gr-sheet-sub"></p>
+      </div>
+      <button class="icon-btn" data-action="close" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="preview-scroll"><table class="sheet gr-sheet" id="gr-sheet-table"></table></div>
+    <div class="row">
+      <button class="btn" data-action="close">Cerrar</button>
+      <button class="btn primary" id="gr-sheet-export">Exportar Excel</button>
     </div>
   </dialog>
 

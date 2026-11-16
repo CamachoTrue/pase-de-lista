@@ -1249,6 +1249,75 @@
     studentRow = Number(li.dataset.row);
     renderStudent();
   });
+  // Vista previa: genera el mismo Excel que se exporta y lo dibuja celda por celda (colores, negritas, celdas unidas).
+  $('#gr-preview').addEventListener('click', async () => {
+    const g = group();
+    const btn = $('#gr-preview');
+    btn.disabled = true;
+    try {
+      const buf = await exportGroupReport(ExcelJS, g, g.grading);
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buf);
+      $('#gr-sheet-table').innerHTML = sheetToHtml(wb.worksheets[0]);
+      $('#gr-sheet-sub').textContent = `Resumen ${gname(g)}.xlsx`;
+      $('#gr-sheet').showModal();
+      $('#gr-sheet .preview-scroll').scrollTop = 0;
+    } catch (err) {
+      console.error(err);
+      toast('No se pudo generar la vista previa');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  $('#gr-sheet-export').addEventListener('click', () => $('#gr-export').click());
+  function sheetToHtml(ws) {
+    const nCols = ws.columnCount;
+    const nRows = ws.rowCount;
+    const colName = (c) => { let s = ''; for (let n = c; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s; return s; };
+    // Celdas unidas: la primera lleva colspan/rowspan y las demás no se dibujan.
+    const span = {};
+    const skip = new Set();
+    (ws.model.merges || []).forEach((rg) => {
+      const [a, b] = rg.split(':').map((ref) => ws.getCell(ref));
+      span[`${a.row},${a.col}`] = { cs: b.col - a.col + 1, rs: b.row - a.row + 1 };
+      for (let r = a.row; r <= b.row; r++) for (let c = a.col; c <= b.col; c++) if (r !== a.row || c !== a.col) skip.add(`${r},${c}`);
+    });
+    const argb = (x) => (x && x.argb ? `#${x.argb.slice(-6)}` : null);
+    const text = (v) => {
+      if (v == null) return '';
+      if (typeof v === 'object' && v.richText) return v.richText.map((t) => t.text).join('');
+      return String(v);
+    };
+    let html = '<thead><tr><th class="rownum"></th>';
+    for (let c = 1; c <= nCols; c++) {
+      // Ancho proporcional al de Excel, más compacto para que en celular se vean los números junto a los nombres.
+      const w = Math.min(Math.round((ws.getColumn(c).width || 10) * 5.5), 190);
+      html += `<th style="min-width:${w}px;max-width:${w}px">${colName(c)}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+    for (let r = 1; r <= nRows; r++) {
+      html += `<tr><td class="rownum">${r}</td>`;
+      for (let c = 1; c <= nCols; c++) {
+        const key = `${r},${c}`;
+        if (skip.has(key)) continue;
+        const cell = ws.getCell(r, c);
+        const st = [];
+        const bg = cell.fill && cell.fill.type === 'pattern' ? argb(cell.fill.fgColor) : null;
+        if (bg) st.push(`background:${bg}`);
+        const f = cell.font || {};
+        if (f.bold) st.push('font-weight:700');
+        if (f.color && argb(f.color)) st.push(`color:${argb(f.color)}`);
+        if (f.size && f.size > 12) st.push(`font-size:${f.size}px`);
+        const al = (cell.alignment || {}).horizontal;
+        if (al === 'center') st.push('text-align:center');
+        if (cell.border && cell.border.top) st.push('border:1px solid #999');
+        const sp = span[key];
+        html += `<td${sp ? ` colspan="${sp.cs}" rowspan="${sp.rs}"` : ''}${st.length ? ` style="${st.join(';')}"` : ''}>${escapeHtml(text(cell.value)).replace(/\n/g, '<br>')}</td>`;
+      }
+      html += '</tr>';
+    }
+    return html + '</tbody>';
+  }
   $('#gr-export').addEventListener('click', async () => {
     const g = group();
     const btn = $('#gr-export');
