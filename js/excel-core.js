@@ -12,8 +12,12 @@
  *   students: [{ row: 5, no: '1', name: 'ACOSTA SANCHEZ ...', added?: true }],
  *   records: { '2026-11-14': { 5: 'A', 6: 'F' } },   // asistencia: A/F/R/J
  *   lect:    { '2026-11-14': { 5: 'S', 6: 'N' } },   // lectura: S (sí) / N (no)
- *   trab:    { '2026-11-14': { 5: 100, 6: 50 } }     // trabajo: 0 / 50 / 100
+ *   trab:    { '2026-11-14': { 5: 100, 6: 50 } },    // trabajo: 0 / 50 / 100
+ *   disc:    { '2026-11-14': { 6: 0 } }              // disciplina: solo se guardan los 0 (los demás tienen 10)
  * }
+ *
+ * Disciplina no lleva una columna por día: al final van 2 columnas de resumen,
+ * "Días con 0" (cantidad) y "Fechas" (las fechas en que sacó 0).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -110,10 +114,26 @@
       if (!students.length) return;
 
       // Columnas de día ya existentes (por si suben un Excel exportado por la app).
-      const data = { records: {}, lect: {}, trab: {} };
+      const data = { records: {}, lect: {}, trab: {}, disc: {} };
       const dateCols = [];
       const lastCol = Math.max(ws.columnCount, hdr.col);
       for (let c = hdr.col + 1; c <= lastCol; c++) {
+        // Resumen de disciplina: de la columna "Fechas" se recuperan los días con 0.
+        const ht = clean(cellText(ws.getCell(hdr.row, c).value));
+        if (/DISCIPLINA/i.test(ht)) {
+          dateCols.push(c);
+          if (/FECHA/i.test(ht)) {
+            for (const s of students) {
+              const t = cellText(ws.getCell(s.row, c).value);
+              for (const m of t.matchAll(/(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})/g)) {
+                const y = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]);
+                const d = `${y}-${pad(m[2])}-${pad(m[1])}`;
+                (data.disc[d] = data.disc[d] || {})[s.row] = 0;
+              }
+            }
+          }
+          continue;
+        }
         const h = parseHeader(ws.getCell(hdr.row, c).value);
         if (!h) continue;
         dateCols.push(c);
@@ -143,7 +163,7 @@
 
       groups.push({
         sheet: ws.name, title, headerRow: hdr.row, nameCol: hdr.col, startCol, dateCols, students,
-        records: data.records, lect: data.lect, trab: data.trab,
+        records: data.records, lect: data.lect, trab: data.trab, disc: data.disc,
       });
     });
     return groups;
@@ -183,6 +203,21 @@
     if (alDates.length && trDates.length) col++; // columna vacía de separación
     trDates.forEach((date, i) => out.push({ col: col++, date, cat: 'trab', first: i === 0, block: 'trab' }));
     return out;
+  }
+
+  // Fechas (ordenadas) en que el alumno sacó 0 en disciplina.
+  function discDates(g, row) {
+    return Object.keys(g.disc || {}).filter((d) => g.disc[d][row] === 0).sort();
+  }
+  const shortDate = (iso) => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y.slice(-2)}`; };
+
+  // Columnas del resumen de disciplina: al final, tras una columna vacía. null si no hay nada que escribir.
+  function discCols(g) {
+    const layout = columnLayout(g);
+    const anyDisc = Object.values(g.disc || {}).some((day) => Object.keys(day).length);
+    if (!layout.length && !anyDisc) return null;
+    const count = layout.length ? layout[layout.length - 1].col + 2 : g.startCol;
+    return { count, dates: count + 1 };
   }
 
   // Escribe los datos en una copia del Excel original y devuelve el buffer .xlsx
@@ -270,12 +305,39 @@
           };
         }
       });
+
+      // Resumen de disciplina.
+      const dc = discCols(g);
+      if (dc) {
+        const thick = { style: 'medium', color: { argb: 'FF555555' } };
+        [['count', 'Disciplina\nDías con 0'], ['dates', 'Disciplina\nFechas']].forEach(([k, label]) => {
+          const col = dc[k];
+          const b = Object.assign({}, border, k === 'count' ? { left: thick } : { right: thick });
+          ws.getCell(g.headerRow, col).value = label;
+          ws.getCell(g.headerRow, col).style = {
+            font: Object.assign({}, headerSrc.font, { bold: true }),
+            alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+            border: b,
+          };
+          ws.getColumn(col).width = k === 'count' ? 11 : 24;
+          for (const s of g.students) {
+            const dates = discDates(g, s.row);
+            const cell = ws.getCell(s.row, col);
+            cell.value = k === 'count' ? dates.length : (dates.map(shortDate).join(', ') || null);
+            cell.style = {
+              font: Object.assign({}, ws.getCell(s.row, g.nameCol).font || {}),
+              alignment: { horizontal: k === 'count' ? 'center' : 'left', vertical: 'middle', wrapText: true },
+              border: b,
+            };
+          }
+        });
+      }
     }
     return wb.xlsx.writeBuffer();
   }
 
   return {
     STATUSES, READ, WORK, CATS, DEFAULT_CODES,
-    parseWorkbook, exportWorkbook, groupDates, columnLayout, parseHeader, parseDateHeader, cellText,
+    parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, discDates, shortDate, parseHeader, parseDateHeader, cellText,
   };
 });

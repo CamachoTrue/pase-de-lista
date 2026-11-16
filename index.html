@@ -42,13 +42,19 @@
         <button class="tab" role="tab" data-tab="records">Asistencia</button>
         <button class="tab" role="tab" data-tab="lect">Lecturas</button>
         <button class="tab" role="tab" data-tab="trab">Trabajos</button>
+        <button class="tab" role="tab" data-tab="disc">Disciplina</button>
       </div>
       <div class="summary" id="summary"></div>
     </header>
 
-    <!-- Vista compacta: lecturas (Sí/No) y trabajos (0/50/100), muchos alumnos por pantalla -->
+    <!-- Vista compacta: lecturas (Sí/No), trabajos (0/50/100) y disciplina (10/0), muchos alumnos por pantalla -->
     <div id="compact-view" hidden>
+      <div class="compact-search" id="compact-search-bar" hidden>
+        <input type="search" id="compact-search" placeholder="Buscar alumno…" autocomplete="off">
+        <p class="hint">Todos tienen 10. Busca al alumno y toca <b>0</b> si se portó mal.</p>
+      </div>
       <ul class="compact-list" id="compact-list"></ul>
+      <p class="hint compact-empty" id="compact-empty" hidden>Ningún alumno coincide.</p>
       <footer class="bottombar">
         <button class="btn" id="compact-preview">Vista previa</button>
         <button class="btn primary" id="compact-export">Exportar Excel</button>
@@ -144,7 +150,7 @@
       <p class="hint settings-sub">Lecturas</p>
       <label><span class="pill A">Sí</span> Sí leyó <input name="S" maxlength="4"></label>
       <label><span class="pill F">No</span> No leyó <input name="N" maxlength="4"></label>
-      <p class="hint">Trabajos se guardan como 0, 50 o 100.</p>
+      <p class="hint">Trabajos se guardan como 0, 50 o 100. Disciplina va al final: días con 0 y sus fechas.</p>
       <div class="row">
         <button class="btn" value="cancel">Cancelar</button>
         <button class="btn primary" value="save">Guardar</button>

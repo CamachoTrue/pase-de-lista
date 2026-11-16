@@ -11,6 +11,8 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
   Empieza en el primer alumno sin marcar; botones Anterior / Saltar.
 - **Lecturas y trabajos**: pestañas Asistencia / Lecturas / Trabajos. Lecturas es Sí/No y Trabajos 0/50/100,
   en una lista compacta (unos 13 alumnos por pantalla en celular).
+- **Disciplina**: todos tienen 10 sin capturar nada; el maestro busca al alumno y toca 0 si se portó mal.
+  En el Excel no hay una columna por día: al final van 2 columnas, *Días con 0* y *Fechas*.
 - **Confirmación de cambios**: si un alumno ya tenía marca y se elige otra, se pide confirmar.
 - **Vista de lista** para revisar y corregir; tocar un nombre regresa al pase uno por uno desde ahí.
 - **Agregar / quitar alumnos**: los nuevos se agregan al final de la lista del grupo.

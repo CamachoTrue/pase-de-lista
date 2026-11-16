@@ -1,6 +1,8 @@
 (function () {
   'use strict';
-  const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates, columnLayout } = window.ListaExcel;
+  const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, shortDate } = window.ListaExcel;
+  // Todos los apartados que se guardan por día (disciplina no lleva columna diaria en el Excel).
+  const KEYS = [...CATS.map((c) => c.key), 'disc'];
   const LABELS = { A: 'Asistencia', F: 'Falta', R: 'Retardo', J: 'Justificado' };
   // Opciones de cada apartado: valor guardado, texto del botón, texto largo y color (clase A/F/R/J).
   const OPTIONS = {
@@ -13,7 +15,13 @@
       { v: 50, btn: '50', label: 'Trabajo: 50', color: 'R' },
       { v: 100, btn: '100', label: 'Trabajo: 100', color: 'A' },
     ],
+    // Disciplina: todos tienen 10 sin capturar nada; solo se guarda el 0.
+    disc: [
+      { v: 10, btn: '10', label: 'Disciplina: 10', color: 'N' },
+      { v: 0, btn: '0', label: 'Disciplina: 0', color: 'F' },
+    ],
   };
+  const DISC_DEFAULT = 10;
   const optionOf = (cat, v) => (cat === 'records'
     ? (v ? { v, label: LABELS[v], color: v } : null)
     : OPTIONS[cat].find((o) => o.v === v) || null);
@@ -156,19 +164,35 @@
     const cat = tab();
     const day = dayData(cat, false);
     const att = dayData('records', false);
+    const disc = cat === 'disc';
+    $('#compact-search-bar').hidden = !disc;
     $('#compact-list').innerHTML = g.students.map((s) => {
-      const cur = optionOf(cat, day[s.row]);
+      const cur = optionOf(cat, disc ? (day[s.row] ?? DISC_DEFAULT) : day[s.row]);
       const a = att[s.row];
       const btns = OPTIONS[cat].map((o) => {
         const on = cur && cur.v === o.v;
         return `<button class="cb ${cat === 'trab' && o.v === 100 ? 'wide' : ''} ${on ? 'on c' + o.color : ''}" data-v="${o.v}" aria-pressed="${!!on}" aria-label="${escapeHtml(o.label)}">${o.btn}</button>`;
       }).join('');
-      return `<li class="crow ${cur ? 'c' + cur.color : ''} ${a === 'F' ? 'absent' : ''}" data-row="${s.row}">
+      return `<li class="crow ${cur ? 'c' + cur.color : ''} ${a === 'F' ? 'absent' : ''}" data-row="${s.row}" data-name="${escapeHtml(normalize(s.name))}">
         <span class="cno">${escapeHtml(s.no)}</span>
         <span class="cname">${a ? `<i class="att ${a}" title="${LABELS[a]}">${a}</i>` : ''}${escapeHtml(s.name)}</span>
         <span class="cbtns">${btns}</span></li>`;
     }).join('');
+    if (disc) filterCompact();
   }
+
+  // Buscador de la pestaña Disciplina.
+  function filterCompact() {
+    const q = normalize($('#compact-search').value);
+    let shown = 0;
+    document.querySelectorAll('#compact-list .crow').forEach((li) => {
+      const ok = !q || li.dataset.name.includes(q);
+      li.hidden = !ok;
+      if (ok) shown++;
+    });
+    $('#compact-empty').hidden = shown > 0;
+  }
+  $('#compact-search').addEventListener('input', filterCompact);
 
   $('#compact-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('.cb');
@@ -176,10 +200,20 @@
     const cat = tab();
     const li = btn.closest('.crow');
     const row = li.dataset.row;
-    const v = cat === 'trab' ? Number(btn.dataset.v) : btn.dataset.v;
-    const prev = dayData(cat, false)[row];
-    const next = prev === v ? undefined : v; // tocar la misma otra vez = quitar
-    if (prev != null) {
+    const disc = cat === 'disc';
+    const v = cat === 'lect' ? btn.dataset.v : Number(btn.dataset.v);
+    let prev = dayData(cat, false)[row];
+    let next = prev === v ? undefined : v; // tocar la misma otra vez = quitar
+    if (disc) {
+      // Sin captura = 10. Poner 0 no pide confirmación; regresar a 10 sí.
+      prev = prev ?? DISC_DEFAULT;
+      if (v === prev) return;
+      next = v === 0 ? 0 : undefined;
+      if (next == null) {
+        const name = group().students.find((x) => String(x.row) === row).name;
+        if (!(await confirmChange(name, prev, DISC_DEFAULT, cat))) return;
+      }
+    } else if (prev != null) {
       const name = group().students.find((x) => String(x.row) === row).name;
       if (!(await confirmChange(name, prev, next, cat))) return;
     }
@@ -188,13 +222,13 @@
     else delete day[row];
     save();
     if (navigator.vibrate) navigator.vibrate(10);
-    const cur = optionOf(cat, day[row]);
-    li.classList.remove('cA', 'cF', 'cR', 'cJ');
+    const cur = optionOf(cat, disc ? (day[row] ?? DISC_DEFAULT) : day[row]);
+    li.classList.remove('cA', 'cF', 'cR', 'cJ', 'cN');
     if (cur) li.classList.add('c' + cur.color);
     li.querySelectorAll('.cb').forEach((b) => {
       const o = OPTIONS[cat].find((x) => String(x.v) === b.dataset.v);
       const on = cur && cur.v === o.v;
-      b.classList.remove('on', 'cA', 'cF', 'cR');
+      b.classList.remove('on', 'cA', 'cF', 'cR', 'cN');
       if (on) b.classList.add('on', 'c' + o.color);
       b.setAttribute('aria-pressed', !!on);
     });
@@ -344,6 +378,13 @@
   function renderSummary() {
     const g = group();
     const cat = tab();
+    if (cat === 'disc') {
+      const day = dayData(cat, false);
+      const zeros = g.students.filter((s) => day[s.row] === 0).length;
+      $('#summary').innerHTML =
+        `<span>${fmtDate(state.ui.date)}</span><span class="F">Con 0: ${zeros}</span><span>Los demás: 10</span>`;
+      return;
+    }
     if (cat !== 'records') {
       const day = dayData(cat, false);
       const vals = g.students.map((s) => day[s.row]).filter((v) => v != null);
@@ -403,7 +444,7 @@
     if (idx < 0) return;
     const s = g.students[idx];
     g.students.splice(idx, 1);
-    CATS.forEach((c) => Object.values(g[c.key] || {}).forEach((day) => delete day[s.row]));
+    KEYS.forEach((k) => Object.values(g[k] || {}).forEach((day) => delete day[s.row]));
     save();
     if (cardIdx > g.students.length) cardIdx = g.students.length;
     $('#remove-student').close();
@@ -538,7 +579,8 @@
     const dates = groupDates(g);
     const layout = columnLayout(g);
     const byCol = new Map(layout.map((x) => [x.col, x]));
-    const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col));
+    const dc = discCols(g);
+    const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col), dc ? dc.dates : 0);
     const isCur = (c) => byCol.has(c) && byCol.get(c).date === state.ui.date;
     const colLetter = (c) => { let s = ''; for (; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + ((c - 1) % 26)) + s; return s; };
     // Se toma de lo capturado (no del número), porque A, R y J pueden tener el mismo valor.
@@ -575,8 +617,13 @@
         if (isDateCol && byCol.get(c).cat === 'lect') cls.push('lect-col');
         if (isDateCol && !byCol.has(c + 1)) cls.push('block-end');
         if (isDateCol && isCur(c)) cls.push('cur');
+        const isDisc = dc && (c === dc.count || c === dc.dates);
+        if (isDisc && isHdr) cls.push('date-h');
+        if (dc && c === dc.count) cls.push('day-start');
+        if (dc && c === dc.dates) cls.push('block-end', 'disc-dates');
+        if (dc && c === dc.count && !isHdr) cls.push('v', Number(t) > 0 ? 'F' : '');
         // El encabezado lleva fecha y apartado en dos renglones, como en el Excel.
-        const shown = isHdr && isDateCol ? escapeHtml(ListaExcel.cellText(v)).replace(/\n/g, '<br>') : escapeHtml(t);
+        const shown = isHdr && (isDateCol || isDisc) ? escapeHtml(ListaExcel.cellText(v)).replace(/\n/g, '<br>') : escapeHtml(t);
         html += `<td class="${cls.join(' ')}">${shown}</td>`;
       }
       html += '</tr>';
@@ -585,8 +632,8 @@
     $('#preview-table').innerHTML = html;
 
     $('#preview-title').textContent = `Vista previa · ${g.sheet}`;
-    $('#preview-sub').textContent = dates.length
-      ? `${g.students.length} alumnos · ${dates.length} día(s) · Asistencia y Lectura juntas, Trabajos aparte a la derecha`
+    $('#preview-sub').textContent = dates.length || dc
+      ? `${g.students.length} alumnos · ${dates.length} día(s) · Asistencia y Lectura juntas; Trabajos y Disciplina aparte a la derecha`
       : 'Aún no hay registros en este grupo.';
     $('#preview-legend').innerHTML =
       STATUSES.map((k) => `<span class="summary-${k}">${escapeHtml(String(state.codes[k]))} = ${LABELS[k]}</span>`).join('') +
@@ -652,8 +699,8 @@
     if (action === 'history') openHistory();
     if (action === 'settings') openSettings();
     if (action === 'clear-day') {
-      if (confirm(`¿Borrar asistencia, lecturas y trabajos del ${fmtDate(state.ui.date)} en ${group().sheet}?`)) {
-        CATS.forEach((c) => { if (group()[c.key]) delete group()[c.key][state.ui.date]; });
+      if (confirm(`¿Borrar asistencia, lecturas, trabajos y disciplina del ${fmtDate(state.ui.date)} en ${group().sheet}?`)) {
+        KEYS.forEach((k) => { if (group()[k]) delete group()[k][state.ui.date]; });
         changed();
       }
     }
@@ -666,13 +713,13 @@
 
   function openHistory() {
     const g = group();
-    const dates = groupDates(g).reverse();
     const count = (cat, d) => Object.keys((g[cat] || {})[d] || {}).length;
+    const dates = [...new Set([...groupDates(g), ...Object.keys(g.disc || {}).filter((d) => count('disc', d))])].sort().reverse();
     $('#history-list').innerHTML = dates.length
       ? dates.map((d) => {
           const c = { A: 0, F: 0, R: 0, J: 0 };
           Object.values(g.records[d] || {}).forEach((s) => c[s]++);
-          return `<li data-date="${d}"><span>${fmtDate(d)}</span><span class="counts">A ${c.A} · F ${c.F} · R ${c.R} · J ${c.J}<br>Lecturas ${count('lect', d)} · Trabajos ${count('trab', d)}</span></li>`;
+          return `<li data-date="${d}"><span>${fmtDate(d)}</span><span class="counts">A ${c.A} · F ${c.F} · R ${c.R} · J ${c.J}<br>Lecturas ${count('lect', d)} · Trabajos ${count('trab', d)}${count('disc', d) ? ` · Disciplina 0: ${count('disc', d)}` : ''}</span></li>`;
         }).join('')
       : '<li>Aún no hay registros en este grupo.</li>';
     $('#history').showModal();
@@ -734,7 +781,7 @@
     if (!state.ui.tab) state.ui.tab = 'records';
     // Datos guardados con la versión anterior (solo asistencia).
     state.codes = { ...DEFAULT_CODES, ...state.codes };
-    state.groups.forEach((g) => { g.lect = g.lect || {}; g.trab = g.trab || {}; });
+    state.groups.forEach((g) => { g.lect = g.lect || {}; g.trab = g.trab || {}; g.disc = g.disc || {}; });
   }
   render();
 
