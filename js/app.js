@@ -24,7 +24,7 @@
   };
   const DISC_DEFAULT = 10;
   // Valor del botón "restantes" en lecturas y trabajos.
-  const FILL_REST = { lect: 'N', trab: 0 };
+  const FILL_REST = { lect: ['S', 'N'], trab: [0] };
   const optionOf = (cat, v) => {
     if (cat === 'records') return v ? { v, label: LABELS[v], color: v } : null;
     if (cat === 'exam') return v != null ? { v, label: `Examen: ${v}`, color: 'N' } : null;
@@ -224,24 +224,27 @@
   };
   function updateFillRest() {
     const cat = tab();
-    const b = $('#fill-rest');
+    const box = $('#fill-rest');
     const n = cat in FILL_REST ? pendingRows().length : 0;
-    b.hidden = n === 0;
-    if (n) b.textContent = cat === 'lect' ? `Poner “No” a los ${n} sin marcar` : `Poner 0 a los ${n} sin calificar`;
+    box.hidden = n === 0;
+    if (!n) return;
+    const text = { S: `Poner “Sí” a los ${n} sin marcar`, N: `Poner “No” a los ${n} sin marcar`, 0: `Poner 0 a los ${n} sin calificar` };
+    box.innerHTML = FILL_REST[cat].map((v) => `<button class="btn fill-rest ${v === 'S' ? 'yes' : ''}" data-v="${v}">${text[v]}</button>`).join('');
   }
-  $('#fill-rest').addEventListener('click', async () => {
+  $('#fill-rest').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-v]');
     const cat = tab();
     const rows = pendingRows();
-    if (!(cat in FILL_REST) || !rows.length) return;
-    const v = FILL_REST[cat];
-    const what = cat === 'lect' ? '“No leyó”' : '0 de trabajo';
+    if (!btn || !(cat in FILL_REST) || !rows.length) return;
+    const v = cat === 'trab' ? Number(btn.dataset.v) : btn.dataset.v;
+    const what = { S: '“Sí leyó”', N: '“No leyó”' }[v] || '0 de trabajo';
     if (!(await confirmBulk(`¿Poner ${what} a ${rows.length} alumno(s)?`, 'Solo a los que siguen en blanco. Los que ya marcaste no cambian.'))) return;
     const day = dayData(cat, true);
     rows.forEach((s) => (day[s.row] = v));
     save();
     if (navigator.vibrate) navigator.vibrate(15);
     refresh();
-    toast(`${rows.length} alumno(s) con ${cat === 'lect' ? 'No' : '0'}`);
+    toast(`${rows.length} alumno(s) con ${{ S: 'Sí', N: 'No' }[v] || '0'}`);
   });
   // Confirmación propia de la app (los avisos del navegador pueden bloquearse en el celular).
   function confirmBulk(title, text, okText = 'Sí, ponerlo', danger = false) {
