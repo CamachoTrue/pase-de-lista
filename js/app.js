@@ -1,8 +1,8 @@
 (function () {
   'use strict';
-  const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, shortDate } = window.ListaExcel;
+  const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, examCols, shortDate } = window.ListaExcel;
   // Todos los apartados que se guardan por día (disciplina no lleva columna diaria en el Excel).
-  const KEYS = [...CATS.map((c) => c.key), 'disc'];
+  const KEYS = [...CATS.map((c) => c.key), 'disc', 'exam'];
   const LABELS = { A: 'Asistencia', F: 'Falta', R: 'Retardo', J: 'Justificado' };
   // Opciones de cada apartado: valor guardado, texto del botón, texto largo y color (clase A/F/R/J).
   const OPTIONS = {
@@ -22,9 +22,11 @@
     ],
   };
   const DISC_DEFAULT = 10;
-  const optionOf = (cat, v) => (cat === 'records'
-    ? (v ? { v, label: LABELS[v], color: v } : null)
-    : OPTIONS[cat].find((o) => o.v === v) || null);
+  const optionOf = (cat, v) => {
+    if (cat === 'records') return v ? { v, label: LABELS[v], color: v } : null;
+    if (cat === 'exam') return v != null ? { v, label: `Examen: ${v}`, color: 'N' } : null;
+    return OPTIONS[cat].find((o) => o.v === v) || null;
+  };
   const tab = () => state.ui.tab || 'records';
   // Datos de un apartado para el día seleccionado.
   const dayData = (cat, create) => {
@@ -165,11 +167,17 @@
     const day = dayData(cat, false);
     const att = dayData('records', false);
     const disc = cat === 'disc';
-    $('#compact-search-bar').hidden = !disc;
+    const exam = cat === 'exam';
+    $('#compact-search-bar').hidden = !disc && !exam;
+    $('#compact-hint').innerHTML = exam
+      ? 'Escribe el porcentaje del examen (0 a 100). Con <b>Enter</b> pasas al siguiente alumno.'
+      : 'Todos tienen 10. Busca al alumno y toca <b>0</b> si se portó mal.';
     $('#compact-list').innerHTML = g.students.map((s) => {
       const cur = optionOf(cat, disc ? (day[s.row] ?? DISC_DEFAULT) : day[s.row]);
       const a = att[s.row];
-      const btns = OPTIONS[cat].map((o) => {
+      const btns = exam
+        ? `<input class="exam-in" type="text" inputmode="decimal" enterkeyhint="next" maxlength="5" value="${day[s.row] ?? ''}" aria-label="Examen de ${escapeHtml(s.name)}" placeholder="—">`
+        : OPTIONS[cat].map((o) => {
         const on = cur && cur.v === o.v;
         return `<button class="cb ${cat === 'trab' && o.v === 100 ? 'wide' : ''} ${on ? 'on c' + o.color : ''}" data-v="${o.v}" aria-pressed="${!!on}" aria-label="${escapeHtml(o.label)}">${o.btn}</button>`;
       }).join('');
@@ -178,7 +186,7 @@
         <span class="cname">${a ? `<i class="att ${a}" title="${LABELS[a]}">${a}</i>` : ''}${escapeHtml(s.name)}</span>
         <span class="cbtns">${btns}</span></li>`;
     }).join('');
-    if (disc) filterCompact();
+    if (disc || exam) filterCompact();
   }
 
   // Buscador de la pestaña Disciplina.
@@ -233,6 +241,43 @@
       b.setAttribute('aria-pressed', !!on);
     });
     renderSummary();
+  });
+  // Examen: se guarda al salir del campo o con Enter.
+  $('#compact-list').addEventListener('change', async (e) => {
+    const inp = e.target.closest('.exam-in');
+    if (!inp || tab() !== 'exam') return;
+    const li = inp.closest('.crow');
+    const row = li.dataset.row;
+    const prev = dayData('exam', false)[row];
+    const txt = inp.value.trim().replace(',', '.');
+    let next;
+    if (txt !== '') {
+      next = Number(txt);
+      if (!Number.isFinite(next) || next < 0 || next > 100) {
+        toast('El examen va de 0 a 100');
+        inp.value = prev ?? '';
+        return;
+      }
+    }
+    if (next === prev) { inp.value = prev ?? ''; return; }
+    if (prev != null) {
+      const name = group().students.find((x) => String(x.row) === row).name;
+      if (!(await confirmChange(name, prev, next, 'exam'))) { inp.value = prev; return; }
+    }
+    const day = dayData('exam', true);
+    if (next != null) day[row] = next;
+    else delete day[row];
+    inp.value = next ?? '';
+    li.classList.toggle('cN', next != null);
+    save();
+    renderSummary();
+  });
+  $('#compact-list').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || !e.target.classList.contains('exam-in')) return;
+    e.preventDefault();
+    const all = [...document.querySelectorAll('#compact-list .crow:not([hidden]) .exam-in')];
+    const nxt = all[all.indexOf(e.target) + 1];
+    if (nxt) nxt.focus(); else e.target.blur();
   });
   $('#compact-preview').addEventListener('click', openPreview);
   $('#compact-export').addEventListener('click', () => doExport($('#compact-export')));
@@ -378,6 +423,15 @@
   function renderSummary() {
     const g = group();
     const cat = tab();
+    if (cat === 'exam') {
+      const day = dayData(cat, false);
+      const vals = g.students.map((s) => day[s.row]).filter((v) => v != null);
+      const avg = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
+      $('#summary').innerHTML =
+        `<span>${fmtDate(state.ui.date)}</span><span>${vals.length}/${g.students.length} capturados</span>` +
+        (avg != null ? `<span>Promedio: ${avg}</span>` : '');
+      return;
+    }
     if (cat === 'disc') {
       const day = dayData(cat, false);
       const zeros = g.students.filter((s) => day[s.row] === 0).length;
@@ -580,7 +634,9 @@
     const layout = columnLayout(g);
     const byCol = new Map(layout.map((x) => [x.col, x]));
     const dc = discCols(g);
-    const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col), dc ? dc.dates : 0);
+    const ex = examCols(g);
+    const exCol = new Map(ex.map((x, i) => [x.col, { ...x, first: i === 0, last: i === ex.length - 1 }]));
+    const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col), dc ? dc.dates : 0, ...ex.map((x) => x.col));
     const isCur = (c) => byCol.has(c) && byCol.get(c).date === state.ui.date;
     const colLetter = (c) => { let s = ''; for (; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + ((c - 1) % 26)) + s; return s; };
     // Se toma de lo capturado (no del número), porque A, R y J pueden tener el mismo valor.
@@ -617,7 +673,15 @@
         if (isDateCol && byCol.get(c).cat === 'lect') cls.push('lect-col');
         if (isDateCol && !byCol.has(c + 1)) cls.push('block-end');
         if (isDateCol && isCur(c)) cls.push('cur');
-        const isDisc = dc && (c === dc.count || c === dc.dates);
+        const isExam = exCol.has(c);
+        if (isExam) {
+          const x = exCol.get(c);
+          cls.push(isHdr ? 'date-h' : 'v');
+          if (x.first) cls.push('day-start');
+          if (x.last) cls.push('block-end');
+          if (x.date === state.ui.date) cls.push('cur');
+        }
+        const isDisc = (dc && (c === dc.count || c === dc.dates)) || isExam;
         if (isDisc && isHdr) cls.push('date-h');
         if (dc && c === dc.count) cls.push('day-start');
         if (dc && c === dc.dates) cls.push('block-end', 'disc-dates');
@@ -699,7 +763,7 @@
     if (action === 'history') openHistory();
     if (action === 'settings') openSettings();
     if (action === 'clear-day') {
-      if (confirm(`¿Borrar asistencia, lecturas, trabajos y disciplina del ${fmtDate(state.ui.date)} en ${group().sheet}?`)) {
+      if (confirm(`¿Borrar asistencia, lecturas, trabajos, disciplina y examen del ${fmtDate(state.ui.date)} en ${group().sheet}?`)) {
         KEYS.forEach((k) => { if (group()[k]) delete group()[k][state.ui.date]; });
         changed();
       }
@@ -714,12 +778,12 @@
   function openHistory() {
     const g = group();
     const count = (cat, d) => Object.keys((g[cat] || {})[d] || {}).length;
-    const dates = [...new Set([...groupDates(g), ...Object.keys(g.disc || {}).filter((d) => count('disc', d))])].sort().reverse();
+    const dates = [...new Set([...groupDates(g), ...['disc', 'exam'].flatMap((k) => Object.keys(g[k] || {}).filter((d) => count(k, d)))])].sort().reverse();
     $('#history-list').innerHTML = dates.length
       ? dates.map((d) => {
           const c = { A: 0, F: 0, R: 0, J: 0 };
           Object.values(g.records[d] || {}).forEach((s) => c[s]++);
-          return `<li data-date="${d}"><span>${fmtDate(d)}</span><span class="counts">A ${c.A} · F ${c.F} · R ${c.R} · J ${c.J}<br>Lecturas ${count('lect', d)} · Trabajos ${count('trab', d)}${count('disc', d) ? ` · Disciplina 0: ${count('disc', d)}` : ''}</span></li>`;
+          return `<li data-date="${d}"><span>${fmtDate(d)}</span><span class="counts">A ${c.A} · F ${c.F} · R ${c.R} · J ${c.J}<br>Lecturas ${count('lect', d)} · Trabajos ${count('trab', d)}${count('disc', d) ? ` · Disciplina 0: ${count('disc', d)}` : ''}${count('exam', d) ? ` · Examen: ${count('exam', d)}` : ''}</span></li>`;
         }).join('')
       : '<li>Aún no hay registros en este grupo.</li>';
     $('#history').showModal();
@@ -781,7 +845,7 @@
     if (!state.ui.tab) state.ui.tab = 'records';
     // Datos guardados con la versión anterior (solo asistencia).
     state.codes = { ...DEFAULT_CODES, ...state.codes };
-    state.groups.forEach((g) => { g.lect = g.lect || {}; g.trab = g.trab || {}; g.disc = g.disc || {}; });
+    state.groups.forEach((g) => { g.lect = g.lect || {}; g.trab = g.trab || {}; g.disc = g.disc || {}; g.exam = g.exam || {}; });
   }
   render();
 

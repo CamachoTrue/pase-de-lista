@@ -43,6 +43,7 @@
         <button class="tab" role="tab" data-tab="lect">Lecturas</button>
         <button class="tab" role="tab" data-tab="trab">Trabajos</button>
         <button class="tab" role="tab" data-tab="disc">Disciplina</button>
+        <button class="tab" role="tab" data-tab="exam">Examen</button>
       </div>
       <div class="summary" id="summary"></div>
     </header>
@@ -51,7 +52,7 @@
     <div id="compact-view" hidden>
       <div class="compact-search" id="compact-search-bar" hidden>
         <input type="search" id="compact-search" placeholder="Buscar alumno…" autocomplete="off">
-        <p class="hint">Todos tienen 10. Busca al alumno y toca <b>0</b> si se portó mal.</p>
+        <p class="hint" id="compact-hint"></p>
       </div>
       <ul class="compact-list" id="compact-list"></ul>
       <p class="hint compact-empty" id="compact-empty" hidden>Ningún alumno coincide.</p>
@@ -150,7 +151,7 @@
       <p class="hint settings-sub">Lecturas</p>
       <label><span class="pill A">Sí</span> Sí leyó <input name="S" maxlength="4"></label>
       <label><span class="pill F">No</span> No leyó <input name="N" maxlength="4"></label>
-      <p class="hint">Trabajos se guardan como 0, 50 o 100. Disciplina va al final: días con 0 y sus fechas.</p>
+      <p class="hint">Trabajos se guardan como 0, 50 o 100. Disciplina y Examen van al final del Excel.</p>
       <div class="row">
         <button class="btn" value="cancel">Cancelar</button>
         <button class="btn primary" value="save">Guardar</button>

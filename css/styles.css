@@ -243,8 +243,8 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .pick-list li.empty { cursor: default; font-weight: 400; color: var(--muted); }
 
 /* ---------- Pestañas: Asistencia / Lecturas / Trabajos ---------- */
-.tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; padding: 3px; background: var(--bg); border-radius: 10px; }
-.tab { border: none; background: transparent; border-radius: 8px; padding: 7px 2px; font-size: .8rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+.tabs { display: grid; grid-template-columns: repeat(5, auto); justify-content: space-between; gap: 4px; margin-top: 8px; padding: 3px; background: var(--bg); border-radius: 10px; }
+.tab { border: none; background: transparent; border-radius: 8px; padding: 7px 6px; font-size: .78rem; font-weight: 600; color: var(--muted); cursor: pointer; }
 .tab.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
 .settings-sub { margin: 14px 0 0; font-weight: 700; color: var(--text); }
 #settings-form .pill { width: auto; min-width: 28px; padding: 0 6px; }
@@ -288,3 +288,6 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .compact-empty { text-align: center; margin-top: 12px; }
 .cb.on.cN { background: var(--border); border-color: var(--border); color: var(--text); }
 .sheet td.disc-dates { text-align: left; min-width: 120px; white-space: normal; }
+.exam-in { width: 64px; height: 34px; box-sizing: border-box; text-align: center; font-size: 1rem; font-weight: 700; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.exam-in:focus { outline: 2px solid var(--primary, #1f7a4d); border-color: transparent; }
+.crow.cN .exam-in { background: var(--bg); }

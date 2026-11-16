@@ -13,6 +13,8 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
   en una lista compacta (unos 13 alumnos por pantalla en celular).
 - **Disciplina**: todos tienen 10 sin capturar nada; el maestro busca al alumno y toca 0 si se portó mal.
   En el Excel no hay una columna por día: al final van 2 columnas, *Días con 0* y *Fechas*.
+- **Examen**: se escribe el porcentaje (0 a 100) de cada alumno; Enter pasa al siguiente.
+  En el Excel solo hay columna en las fechas con examen, al final de todo.
 - **Confirmación de cambios**: si un alumno ya tenía marca y se elige otra, se pide confirmar.
 - **Vista de lista** para revisar y corregir; tocar un nombre regresa al pase uno por uno desde ahí.
 - **Agregar / quitar alumnos**: los nuevos se agregan al final de la lista del grupo.

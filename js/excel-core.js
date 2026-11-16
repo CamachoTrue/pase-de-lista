@@ -13,11 +13,13 @@
  *   records: { '2026-11-14': { 5: 'A', 6: 'F' } },   // asistencia: A/F/R/J
  *   lect:    { '2026-11-14': { 5: 'S', 6: 'N' } },   // lectura: S (sí) / N (no)
  *   trab:    { '2026-11-14': { 5: 100, 6: 50 } },    // trabajo: 0 / 50 / 100
- *   disc:    { '2026-11-14': { 6: 0 } }              // disciplina: solo se guardan los 0 (los demás tienen 10)
+ *   disc:    { '2026-11-14': { 6: 0 } },             // disciplina: solo se guardan los 0 (los demás tienen 10)
+ *   exam:    { '2026-11-14': { 5: 60, 6: 100 } }     // examen: porcentaje 0-100
  * }
  *
  * Disciplina no lleva una columna por día: al final van 2 columnas de resumen,
  * "Días con 0" (cantidad) y "Fechas" (las fechas en que sacó 0).
+ * Examen tampoco: solo hay columna en las fechas en que hubo examen, al final de todo.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -35,6 +37,9 @@
     { key: 'lect', label: 'Lectura', match: /LECT/i },
     { key: 'trab', label: 'Trabajo', match: /TRAB/i },
   ];
+
+  // Apartados que no van por día; sus encabezados también llevan fecha.
+  const EXAM = { key: 'exam', label: 'Examen', match: /EXAM/i };
 
   function cellText(v) {
     if (v == null) return '';
@@ -62,7 +67,7 @@
     if (!m) return null;
     let y = Number(m[3]);
     if (y < 100) y += 2000;
-    const cat = CATS.find((c) => c.match.test(m[4] || ''));
+    const cat = [...CATS, EXAM].find((c) => c.match.test(m[4] || ''));
     return { date: `${y}-${pad(m[2])}-${pad(m[1])}`, cat: cat ? cat.key : 'records' };
   }
   // Compatibilidad con pruebas/llamadas anteriores.
@@ -74,6 +79,10 @@
     if (cat === 'trab') {
       const n = Number(t);
       return WORK.includes(n) ? n : null;
+    }
+    if (cat === 'exam') {
+      const n = Number(t);
+      return Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
     }
     const keys = cat === 'lect' ? READ : STATUSES;
     return keys.find((k) => String(codes[k]).toUpperCase() === t) || null;
@@ -114,7 +123,7 @@
       if (!students.length) return;
 
       // Columnas de día ya existentes (por si suben un Excel exportado por la app).
-      const data = { records: {}, lect: {}, trab: {}, disc: {} };
+      const data = { records: {}, lect: {}, trab: {}, disc: {}, exam: {} };
       const dateCols = [];
       const lastCol = Math.max(ws.columnCount, hdr.col);
       for (let c = hdr.col + 1; c <= lastCol; c++) {
@@ -163,7 +172,7 @@
 
       groups.push({
         sheet: ws.name, title, headerRow: hdr.row, nameCol: hdr.col, startCol, dateCols, students,
-        records: data.records, lect: data.lect, trab: data.trab, disc: data.disc,
+        records: data.records, lect: data.lect, trab: data.trab, disc: data.disc, exam: data.exam,
       });
     });
     return groups;
@@ -212,12 +221,20 @@
   const shortDate = (iso) => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y.slice(-2)}`; };
 
   // Columnas del resumen de disciplina: al final, tras una columna vacía. null si no hay nada que escribir.
+  const datesWith = (g, key) => Object.keys(g[key] || {}).filter((d) => Object.keys(g[key][d]).length).sort();
+
   function discCols(g) {
     const layout = columnLayout(g);
-    const anyDisc = Object.values(g.disc || {}).some((day) => Object.keys(day).length);
-    if (!layout.length && !anyDisc) return null;
+    if (!layout.length && !datesWith(g, 'disc').length && !datesWith(g, 'exam').length) return null;
     const count = layout.length ? layout[layout.length - 1].col + 2 : g.startCol;
     return { count, dates: count + 1 };
+  }
+
+  // Columnas de examen: una por fecha con examen, después del resumen de disciplina.
+  function examCols(g) {
+    const dc = discCols(g);
+    if (!dc) return [];
+    return datesWith(g, 'exam').map((date, i) => ({ col: dc.dates + 2 + i, date }));
   }
 
   // Escribe los datos en una copia del Excel original y devuelve el buffer .xlsx
@@ -332,12 +349,37 @@
           }
         });
       }
+
+      // Exámenes.
+      const ex = examCols(g);
+      ex.forEach(({ col, date }, i) => {
+        const thick = { style: 'medium', color: { argb: 'FF555555' } };
+        const b = Object.assign({}, border, i === 0 ? { left: thick } : {}, i === ex.length - 1 ? { right: thick } : {});
+        const h = ws.getCell(g.headerRow, col);
+        h.value = `${shortDate(date)}\n${EXAM.label}`;
+        h.style = {
+          font: Object.assign({}, headerSrc.font, { bold: true }),
+          alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+          border: b,
+        };
+        ws.getColumn(col).width = 11;
+        for (const s of g.students) {
+          const v = g.exam[date][s.row];
+          const cell = ws.getCell(s.row, col);
+          cell.value = v == null ? null : Number(v);
+          cell.style = {
+            font: Object.assign({}, ws.getCell(s.row, g.nameCol).font || {}),
+            alignment: { horizontal: 'center', vertical: 'middle' },
+            border: b,
+          };
+        }
+      });
     }
     return wb.xlsx.writeBuffer();
   }
 
   return {
     STATUSES, READ, WORK, CATS, DEFAULT_CODES,
-    parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, discDates, shortDate, parseHeader, parseDateHeader, cellText,
+    parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, discDates, examCols, shortDate, parseHeader, parseDateHeader, cellText,
   };
 });
