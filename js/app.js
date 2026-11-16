@@ -23,6 +23,8 @@
     ],
   };
   const DISC_DEFAULT = 10;
+  // Valor del botón "restantes" en lecturas y trabajos.
+  const FILL_REST = { lect: 'N', trab: 0 };
   const optionOf = (cat, v) => {
     if (cat === 'records') return v ? { v, label: LABELS[v], color: v } : null;
     if (cat === 'exam') return v != null ? { v, label: `Examen: ${v}`, color: 'N' } : null;
@@ -189,6 +191,44 @@
         <span class="cbtns">${btns}</span></li>`;
     }).join('');
     if (disc || exam) filterCompact();
+    updateFillRest();
+  }
+
+  // ---------- Botón "restantes" (lecturas: No · trabajos: 0) ----------
+  const pendingRows = () => {
+    const day = dayData(tab(), false);
+    return group().students.filter((s) => day[s.row] == null);
+  };
+  function updateFillRest() {
+    const cat = tab();
+    const b = $('#fill-rest');
+    const n = cat in FILL_REST ? pendingRows().length : 0;
+    b.hidden = n === 0;
+    if (n) b.textContent = cat === 'lect' ? `Poner “No” a los ${n} sin marcar` : `Poner 0 a los ${n} sin calificar`;
+  }
+  $('#fill-rest').addEventListener('click', async () => {
+    const cat = tab();
+    const rows = pendingRows();
+    if (!(cat in FILL_REST) || !rows.length) return;
+    const v = FILL_REST[cat];
+    const what = cat === 'lect' ? '“No leyó”' : '0 de trabajo';
+    if (!(await confirmBulk(`¿Poner ${what} a ${rows.length} alumno(s)?`, 'Solo a los que siguen en blanco. Los que ya marcaste no cambian.'))) return;
+    const day = dayData(cat, true);
+    rows.forEach((s) => (day[s.row] = v));
+    save();
+    if (navigator.vibrate) navigator.vibrate(15);
+    refresh();
+    toast(`${rows.length} alumno(s) con ${cat === 'lect' ? 'No' : '0'}`);
+  });
+  function confirmBulk(title, text) {
+    return new Promise((resolve) => {
+      const d = $('#confirm-bulk');
+      $('#bulk-title').textContent = title;
+      $('#bulk-text').textContent = text;
+      d.returnValue = '';
+      d.addEventListener('close', () => resolve(d.returnValue === 'ok'), { once: true });
+      d.showModal();
+    });
   }
 
   // Buscador de la pestaña Disciplina.
@@ -242,6 +282,7 @@
       if (on) b.classList.add('on', 'c' + o.color);
       b.setAttribute('aria-pressed', !!on);
     });
+    updateFillRest();
     renderSummary();
   });
   // Examen: se guarda al salir del campo o con Enter.
