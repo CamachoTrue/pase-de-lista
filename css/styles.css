@@ -300,7 +300,7 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .weights label span { display: flex; align-items: center; gap: 3px; color: var(--muted); }
 .weights input { width: 56px; padding: 6px; text-align: center; font-size: 1rem; font-weight: 700; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
 .weights-total { margin: 8px 0 6px; font-weight: 700; font-size: .9rem; }
-.weights-total.ok { color: var(--A); } .weights-total.bad { color: var(--F); }
+.weights-total.ok { color: var(--A); } .weights-total.bad { color: var(--F); } .weights-total.warn { color: var(--R); }
 .grade-opts { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: .88rem; }
 .grade-opts label { display: flex; align-items: center; gap: 6px; }
 .grade-opts select { padding: 5px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: .9rem; }

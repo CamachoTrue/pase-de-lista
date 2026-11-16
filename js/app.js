@@ -853,9 +853,13 @@
 
   // ---------- Calificaciones ----------
   // Los porcentajes son del archivo (todos los grupos); la calificación se recalcula sola con cada dato.
+  // Lo que se escribe es un borrador: la tabla se actualiza al instante, pero solo se guarda con "Guardar".
+  let gradeDraft = null;
+  const sameGrading = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   function openGrades() {
     const f = $('#grades-form');
-    const gr = state.grading;
+    gradeDraft = JSON.parse(JSON.stringify(state.grading));
+    const gr = gradeDraft;
     GRADE_PARTS.forEach((p) => (f.elements[p.key].value = gr.w[p.key] || ''));
     f.elements.retardo.value = String(gr.retardo);
     f.elements.escala.value = String(gr.escala);
@@ -866,20 +870,39 @@
     const f = $('#grades-form');
     GRADE_PARTS.forEach((p) => {
       const n = Number(f.elements[p.key].value.replace(',', '.'));
-      state.grading.w[p.key] = Number.isFinite(n) && n > 0 ? n : 0;
+      gradeDraft.w[p.key] = Number.isFinite(n) && n > 0 ? n : 0;
     });
-    state.grading.retardo = Number(f.elements.retardo.value);
-    state.grading.escala = Number(f.elements.escala.value);
+    gradeDraft.retardo = Number(f.elements.retardo.value);
+    gradeDraft.escala = Number(f.elements.escala.value);
+    renderGrades();
+  });
+  const draftTotal = () => round1(GRADE_PARTS.reduce((n, p) => n + (gradeDraft.w[p.key] || 0), 0));
+  $('#grades-save').addEventListener('click', () => {
+    const total = draftTotal();
+    if (total !== 100) { toast(`Los porcentajes suman ${total} %; deben sumar 100 %`); return; }
+    state.grading = JSON.parse(JSON.stringify(gradeDraft));
     save();
     renderGrades();
+    toast('Porcentajes guardados. La calificación saldrá siempre en la vista previa y el Excel.');
+  });
+  // Al cerrar sin guardar se descartan los cambios (avisando).
+  $('#grades').addEventListener('close', () => {
+    if (gradeDraft && !sameGrading(gradeDraft, state.grading)) toast('No se guardaron los cambios en los porcentajes');
+    gradeDraft = null;
   });
   function renderGrades() {
     const g = group();
-    const gr = state.grading;
-    const total = round1(GRADE_PARTS.reduce((n, p) => n + (gr.w[p.key] || 0), 0));
+    const gr = gradeDraft;
+    const total = draftTotal();
+    const saved = sameGrading(gradeDraft, state.grading);
     const tot = $('#weights-total');
-    tot.textContent = total === 100 ? 'Total: 100 % ✓' : `Total: ${total} % — debe sumar 100 %`;
-    tot.className = 'weights-total ' + (total === 100 ? 'ok' : 'bad');
+    tot.textContent = total !== 100
+      ? `Total: ${total} % — debe sumar 100 %`
+      : saved ? 'Total: 100 % · Guardado ✓' : 'Total: 100 % · Falta guardar';
+    tot.className = 'weights-total ' + (total !== 100 ? 'bad' : saved ? 'ok' : 'warn');
+    const btn = $('#grades-save');
+    btn.disabled = saved;
+    btn.textContent = saved ? 'Guardado ✓' : 'Guardar porcentajes';
     $('#grades-sub').textContent = `${g.sheet} · ${g.students.length} alumnos · sobre ${gr.escala}`;
     const parts = GRADE_PARTS.filter((p) => gr.w[p.key] > 0);
     if (!parts.length) {
@@ -906,7 +929,6 @@
       tr.children[1].style.left = `${w}px`;
     });
   }
-  $('#grades-export').addEventListener('click', () => doExport($('#grades-export')));
 
   function openSettings() {
     const f = $('#settings-form');
