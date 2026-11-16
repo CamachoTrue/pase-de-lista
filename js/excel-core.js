@@ -533,9 +533,135 @@
     return wb.xlsx.writeBuffer();
   }
 
+  // ---------- Resumen de un alumno ----------
+  // Todo lo capturado de un alumno, día por día, más su calificación. Lo usan la pantalla
+  // "Resumen por alumno" y el Excel individual (para quejas del alumno o de los padres).
+  const STATUS_LABEL = { A: 'Asistencia', F: 'Falta', R: 'Retardo', J: 'Justificado' };
+  const WEEKDAY = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  const longDate = (iso) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    return `${WEEKDAY[new Date(y, m - 1, d).getDay()]} ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+  };
+  const workLabel = (w, i, n) => (w.title ? w.title : n > 1 ? `Trabajo ${i + 1}` : 'Trabajo');
+
+  function studentReport(g, row, grading) {
+    grading = Object.assign({}, DEFAULT_GRADING, grading);
+    const student = g.students.find((s) => s.row === row) || null;
+    const at = (key, d) => ((g[key] || {})[d] || {})[row];
+    const dates = new Set();
+    ['records', 'lect', 'disc', 'exam'].forEach((k) => Object.keys(g[k] || {}).forEach((d) => { if (at(k, d) != null) dates.add(d); }));
+    Object.keys(g.trab || {}).forEach((d) => { if (worksOf(g, d).some((w) => (w.vals || {})[row] != null)) dates.add(d); });
+    const counts = { A: 0, F: 0, R: 0, J: 0 };
+    const lect = { S: 0, N: 0 };
+    const works = [];
+    const exams = [];
+    const days = [...dates].sort().map((date) => {
+      const att = at('records', date) || null;
+      if (att) counts[att]++;
+      const l = at('lect', date) || null;
+      if (l) lect[l]++;
+      const ws = worksOf(g, date);
+      const dayWorks = ws.map((w, i) => ({ title: workLabel(w, i, ws.length), v: (w.vals || {})[row] }))
+        .filter((w) => w.v != null).map((w) => ({ title: w.title, v: Number(w.v) }));
+      dayWorks.forEach((w) => works.push({ date, ...w }));
+      const exam = at('exam', date);
+      if (exam != null) exams.push({ date, v: Number(exam) });
+      // Disciplina: 0 si tuvo reporte; 10 si estuvo en clase (A o R) sin reporte; vacío si no vino.
+      const disc = at('disc', date) === 0 ? 0 : att === 'A' || att === 'R' ? 10 : null;
+      return { date, label: longDate(date), att, lect: l, works: dayWorks, disc, exam: exam != null ? Number(exam) : null };
+    });
+    const zeros = discDates(g, row);
+    const { parts, final } = finalGrade(g, row, grading);
+    const lectMin = Math.max(1, Math.round(Number(grading.lectMin) || DEFAULT_GRADING.lectMin));
+    const detail = {
+      records: `Asistencias ${counts.A} · Faltas ${counts.F} · Retardos ${counts.R} · Justificados ${counts.J}`,
+      lect: lect.S + lect.N ? `Sí ${lect.S} de ${lect.S + lect.N} · mínimo para el 100 %: ${lectMin}` : 'Sin lecturas',
+      trab: works.length ? `${works.length} trabajo(s) calificado(s)` : 'Sin trabajos',
+      disc: zeros.length ? `${zeros.length} día(s) con 0: ${zeros.map(shortDate).join(', ')}` : 'Sin días con 0',
+      exam: exams.length ? exams.map((e) => `${shortDate(e.date)}: ${e.v}`).join(' · ') : 'Sin exámenes',
+    };
+    return { student, days, counts, lect, works, exams, zeros, parts, final, detail, grading, graded: gradingOn(grading) };
+  }
+
+  // Excel nuevo (no es copia del original) con el concentrado de un solo alumno.
+  function exportStudent(ExcelJS, g, row, grading) {
+    const r = studentReport(g, row, grading);
+    const s = r.student;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Resumen', { views: [{ showGridLines: false }] });
+    ws.columns = [{ width: 18 }, { width: 14 }, { width: 12 }, { width: 34 }, { width: 12 }, { width: 10 }];
+    const thin = { style: 'thin', color: { argb: 'FF999999' } };
+    const border = { top: thin, left: thin, bottom: thin, right: thin };
+    const fill = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+    const HEAD = fill('FFD9E2F3');
+    const RED = fill('FFF8D7D7');
+    const YEL = fill('FFFFF2CC');
+    const style = (cell, o = {}) => {
+      cell.style = {
+        font: { name: 'Calibri', size: 11, bold: !!o.bold, color: o.color ? { argb: o.color } : undefined },
+        alignment: { vertical: 'middle', horizontal: o.align || 'left', wrapText: true },
+        ...(o.box ? { border } : {}),
+        ...(o.fill ? { fill: o.fill } : {}),
+      };
+    };
+    const put = (r0, c, v, o) => { const cell = ws.getCell(r0, c); cell.value = v; style(cell, o); return cell; };
+
+    let y = 1;
+    put(y, 1, 'Resumen del alumno', { bold: true });
+    ws.getCell(y, 1).font = { name: 'Calibri', size: 16, bold: true };
+    y += 2;
+    const info = [['Alumno', s ? s.name : ''], ['No. de lista', s ? s.no : ''], ['Grupo', g.title ? `${g.sheet} — ${g.title}` : g.sheet],
+      ['Generado', longDate((() => { const t = new Date(); return `${t.getFullYear()}-${t.getMonth() + 1}-${t.getDate()}`; })())]];
+    info.forEach(([k, v]) => { put(y, 1, k, { bold: true }); ws.mergeCells(y, 2, y, 4); put(y, 2, v == null ? '' : String(v)); y++; });
+    y++;
+
+    // Calificación por apartado
+    put(y, 1, 'Calificación', { bold: true });
+    ws.getCell(y, 1).font = { name: 'Calibri', size: 13, bold: true };
+    y++;
+    ['Apartado', 'Vale', 'Resultado', 'Detalle'].forEach((t, i) => put(y, i + 1, t, { bold: true, box: true, fill: HEAD, align: i === 3 ? 'left' : 'center' }));
+    y++;
+    for (const p of GRADE_PARTS) {
+      const w = Number(r.grading.w[p.key]) || 0;
+      const v = r.parts[p.key];
+      put(y, 1, p.label, { box: true, bold: true });
+      put(y, 2, w ? `${w} %` : '—', { box: true, align: 'center' });
+      put(y, 3, v == null ? 'Sin datos' : `${round1(v)} %`, { box: true, align: 'center' });
+      put(y, 4, r.detail[p.key], { box: true });
+      y++;
+    }
+    put(y, 1, `Calificación final (sobre ${r.grading.escala})`, { bold: true, box: true, fill: YEL });
+    ws.mergeCells(y, 1, y, 2);
+    put(y, 3, r.final == null ? (r.graded ? 'Sin datos' : 'Sin porcentajes') : r.final, { bold: true, box: true, fill: YEL, align: 'center' });
+    put(y, 4, r.graded ? 'Los apartados sin datos aún no cuentan.' : 'El maestro aún no define cuánto vale cada apartado.', { box: true, fill: YEL });
+    y += 2;
+
+    // Detalle por día
+    put(y, 1, 'Detalle por día', { bold: true });
+    ws.getCell(y, 1).font = { name: 'Calibri', size: 13, bold: true };
+    y++;
+    ['Fecha', 'Asistencia', 'Lectura', 'Trabajos', 'Disciplina', 'Examen'].forEach((t, i) => put(y, i + 1, t, { bold: true, box: true, fill: HEAD, align: i === 3 ? 'left' : 'center' }));
+    y++;
+    if (!r.days.length) {
+      ws.mergeCells(y, 1, y, 6);
+      put(y, 1, 'Aún no hay datos capturados de este alumno.', { box: true });
+    }
+    for (const d of r.days) {
+      put(y, 1, d.label, { box: true });
+      put(y, 2, d.att ? STATUS_LABEL[d.att] : '', { box: true, align: 'center', fill: d.att === 'F' ? RED : undefined });
+      put(y, 3, d.lect ? (d.lect === 'S' ? 'Sí' : 'No') : '', { box: true, align: 'center', fill: d.lect === 'N' ? RED : undefined });
+      put(y, 4, d.works.map((w) => `${w.title}: ${w.v}`).join('\n'), { box: true, fill: d.works.some((w) => w.v === 0) ? RED : undefined });
+      put(y, 5, d.disc, { box: true, align: 'center', fill: d.disc === 0 ? RED : undefined });
+      put(y, 6, d.exam, { box: true, align: 'center' });
+      y++;
+    }
+    return wb.xlsx.writeBuffer();
+  }
+
   return {
     STATUSES, READ, WORK, CATS, DEFAULT_CODES,
     parseWorkbook, exportWorkbook, groupDates, columnLayout, worksOf, normalizeWorks, hasData, discCols, discDates, examCols, shortDate,
     GRADE_PARTS, DEFAULT_GRADING, gradeParts, finalGrade, gradeCols, gradingOn, round1, parseHeader, parseDateHeader, cellText,
+    studentReport, exportStudent,
   };
 });

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, examCols, shortDate,
-    GRADE_PARTS, DEFAULT_GRADING, finalGrade, gradeCols, round1, worksOf, normalizeWorks } = window.ListaExcel;
+    GRADE_PARTS, DEFAULT_GRADING, finalGrade, gradeCols, round1, worksOf, normalizeWorks, studentReport, exportStudent } = window.ListaExcel;
   // Todos los apartados que se guardan por día (disciplina no lleva columna diaria en el Excel).
   const KEYS = [...CATS.map((c) => c.key), 'disc', 'exam'];
   const LABELS = { A: 'Asistencia', F: 'Falta', R: 'Retardo', J: 'Justificado' };
@@ -866,19 +866,7 @@
     if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
     try {
       const out = await exportWorkbook(ExcelJS, b64ToBuf(state.fileB64), state.groups, state.codes, state.grading);
-      const name = state.fileName.replace(/\.xlsx$/i, '') + ' - asistencia.xlsx';
-      const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const file = new File([blob], name, { type: blob.type });
-      // En celular: menú de compartir (WhatsApp, correo, Drive…). En PC: descarga.
-      if (navigator.canShare && navigator.canShare({ files: [file] }) && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
-        await navigator.share({ files: [file], title: name }).catch(() => {});
-      } else {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = name;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      }
+      await deliverFile(out, state.fileName.replace(/\.xlsx$/i, '') + ' - asistencia.xlsx');
       toast('Excel generado');
     } catch (err) {
       console.error(err);
@@ -887,6 +875,102 @@
       if (btn) { btn.disabled = false; btn.textContent = 'Exportar Excel'; }
     }
   }
+
+  async function deliverFile(out, name) {
+    const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const file = new File([blob], name, { type: blob.type });
+    // En celular: menú de compartir (WhatsApp, correo, Drive…). En PC: descarga.
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && /Android|iPhone|iPad/i.test(navigator.userAgent)) {
+      await navigator.share({ files: [file], title: name }).catch(() => {});
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }
+  }
+
+  // ---------- Resumen por alumno ----------
+  // Para quejas o dudas del alumno o de los padres: todo lo capturado de un alumno y su Excel individual.
+  let studentRow = null;
+  function openStudent() {
+    studentRow = null;
+    $('#student-search').value = '';
+    renderStudent();
+    $('#student').showModal();
+  }
+  function renderStudent() {
+    const g = group();
+    const picked = g.students.find((s) => s.row === studentRow);
+    $('#student-pick').hidden = !!picked;
+    $('#student-report').hidden = !picked;
+    $('#student-back').hidden = !picked;
+    $('#student-export').hidden = !picked;
+    $('#student-close').hidden = !!picked;
+    if (!picked) {
+      $('#student-sub').textContent = `${g.sheet} · elige un alumno`;
+      const q = normalize($('#student-search').value);
+      const shown = g.students.filter((s) => !q || normalize(s.name).includes(q));
+      $('#student-list').innerHTML = shown.length
+        ? shown.map((s) => {
+            const f = finalGrade(g, s.row, state.grading).final;
+            return `<li data-row="${s.row}"><span class="no">${escapeHtml(s.no)}</span><span class="nm">${escapeHtml(s.name)}</span>${f != null ? `<span class="cal">${f}</span>` : ''}</li>`;
+          }).join('')
+        : '<li class="empty">Ningún alumno coincide con la búsqueda.</li>';
+      return;
+    }
+    const r = studentReport(g, studentRow, state.grading);
+    $('#student-sub').textContent = g.sheet;
+    const pct = (v) => (v == null ? 'Sin datos' : `${round1(v)} %`);
+    const cls = { A: 'A', F: 'F', R: 'R', J: 'J' };
+    $('#student-report').innerHTML =
+      `<div class="sr-head"><div><b>${escapeHtml(picked.name)}</b><small>No. ${escapeHtml(picked.no)} · ${escapeHtml(g.sheet)}</small></div>` +
+      `<div class="sr-final">${r.final == null ? '—' : r.final}<small>${r.graded ? `sobre ${r.grading.escala}` : 'sin porcentajes'}</small></div></div>` +
+      '<table class="sheet sr-parts"><thead><tr><th>Apartado</th><th>Vale</th><th>Resultado</th></tr></thead><tbody>' +
+      GRADE_PARTS.map((p) => `<tr><td><b>${p.label}</b><small>${escapeHtml(r.detail[p.key])}</small></td>` +
+        `<td class="v">${r.grading.w[p.key] ? `${r.grading.w[p.key]} %` : '—'}</td><td class="v">${pct(r.parts[p.key])}</td></tr>`).join('') +
+      '</tbody></table>' +
+      '<h3 class="sr-title">Detalle por día</h3>' +
+      (r.days.length
+        ? '<div class="preview-scroll"><table class="sheet sr-days"><thead><tr><th>Fecha</th><th>Asist.</th><th>Lect.</th><th>Trabajos</th><th>Disc.</th><th>Exam.</th></tr></thead><tbody>' +
+          r.days.map((d) => `<tr><td class="nowrap">${d.label.replace(/\/\d\d(\d\d)$/, '/$1')}</td>` +
+            `<td class="v ${d.att ? cls[d.att] : ''}">${d.att || ''}</td>` +
+            `<td class="v ${d.lect === 'N' ? 'F' : d.lect ? 'A' : ''}">${d.lect ? (d.lect === 'S' ? 'Sí' : 'No') : ''}</td>` +
+            `<td>${d.works.map((w) => `<span class="${w.v === 0 ? 'F' : ''}">${escapeHtml(w.title)}: ${w.v}</span>`).join('<br>')}</td>` +
+            `<td class="v ${d.disc === 0 ? 'F' : ''}">${d.disc ?? ''}</td><td class="v">${d.exam ?? ''}</td></tr>`).join('') +
+          '</tbody></table></div>'
+        : '<p class="hint">Aún no hay datos capturados de este alumno.</p>');
+  }
+  $('#student-search').addEventListener('input', renderStudent);
+  $('#student-list').addEventListener('click', (e) => {
+    const li = e.target.closest('li[data-row]');
+    if (!li) return;
+    studentRow = Number(li.dataset.row);
+    renderStudent();
+    $('#student-report').scrollTop = 0;
+  });
+  $('#student-back').addEventListener('click', () => { studentRow = null; renderStudent(); });
+  $('#student-export').addEventListener('click', async () => {
+    const g = group();
+    const s = g.students.find((x) => x.row === studentRow);
+    if (!s) return;
+    const btn = $('#student-export');
+    btn.disabled = true;
+    btn.textContent = 'Generando…';
+    try {
+      const out = await exportStudent(ExcelJS, g, s.row, state.grading);
+      const safe = (t) => String(t).replace(/[\\/:*?"<>|]+/g, ' ').trim();
+      await deliverFile(out, `${safe(s.name)} - ${safe(g.sheet)} - resumen.xlsx`);
+      toast('Excel del alumno generado');
+    } catch (err) {
+      console.error(err);
+      toast('Error al generar el Excel');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Exportar Excel';
+    }
+  });
 
   // ---------- Menú y diálogos ----------
   const menu = $('#menu');
@@ -905,6 +989,7 @@
     if (action === 'preview') openPreview();
     if (action === 'add-student') openAddStudent();
     if (action === 'grades') openGrades();
+    if (action === 'student') openStudent();
     if (action === 'history') openHistory();
     if (action === 'settings') openSettings();
     if (action === 'clear-day') {

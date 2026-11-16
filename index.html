@@ -137,6 +137,7 @@
   <dialog id="menu">
     <h2>Opciones</h2>
     <button class="menu-item" data-action="grades">Calificaciones y porcentajes</button>
+    <button class="menu-item" data-action="student">Resumen por alumno</button>
     <button class="menu-item" data-action="add-student">Agregar alumno al grupo</button>
     <button class="menu-item" data-action="preview">Vista previa del Excel</button>
     <button class="menu-item" data-action="export">Exportar Excel</button>
@@ -225,6 +226,27 @@
     <div class="row">
       <button class="btn" data-action="close">Cerrar</button>
       <button class="btn primary" id="grades-save">Guardar porcentajes</button>
+    </div>
+  </dialog>
+
+  <!-- Resumen de un alumno: para quejas del alumno o de los padres -->
+  <dialog id="student" class="fullscreen">
+    <div class="preview-head">
+      <div>
+        <h2>Resumen por alumno</h2>
+        <p class="hint" id="student-sub"></p>
+      </div>
+      <button class="icon-btn" data-action="close" aria-label="Cerrar">✕</button>
+    </div>
+    <div id="student-pick">
+      <input type="search" id="student-search" class="dialog-search" placeholder="Buscar alumno…">
+      <ul id="student-list" class="pick-list student-pick-list"></ul>
+    </div>
+    <div id="student-report" class="student-report" hidden></div>
+    <div class="row">
+      <button class="btn" id="student-back" hidden>← Otro alumno</button>
+      <button class="btn" data-action="close" id="student-close">Cerrar</button>
+      <button class="btn primary" id="student-export" hidden>Exportar Excel</button>
     </div>
   </dialog>
 

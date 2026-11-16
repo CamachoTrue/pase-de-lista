@@ -21,6 +21,8 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
   y la calificación se calcula sola. Asistencia: A y J = 100 %, F = 0 %, R configurable. Lecturas: con el mínimo de Sí que defina el maestro (p. ej. 4) o más = 100 %, debajo proporcional.
   Trabajos y Examen: promedio. Disciplina: % de días en clase sin 0. Solo cuenta lo capturado; un apartado
   sin datos aún no cuenta y su peso se reparte. En el Excel van al final, por apartado y total (sobre 10 o 100).
+- **Resumen por alumno** (⋮ → Resumen por alumno): se busca al alumno y se ve su calificación, cada apartado
+  y el detalle día por día. *Exportar Excel* genera un archivo solo de ese alumno (para quejas o padres de familia).
 - **Confirmación de cambios**: si un alumno ya tenía marca y se elige otra, se pide confirmar.
 - **Vista de lista** para revisar y corregir; tocar un nombre regresa al pase uno por uno desde ahí.
 - **Agregar / quitar alumnos**: los nuevos se agregan al final de la lista del grupo.

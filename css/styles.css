@@ -322,3 +322,26 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .work-add { padding: 6px 10px; font-size: .85rem; }
 .work-title { width: 100%; box-sizing: border-box; margin-top: 8px; padding: 9px 12px; font-size: 1rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }
 .work-del { display: block; margin: 4px 0 0 auto; color: var(--F); font-size: .82rem; padding: 4px 0; }
+
+/* Resumen por alumno */
+#student-pick { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.student-pick-list { max-height: none; flex: 1; }
+.student-pick-list li .nm { flex: 1; }
+.student-pick-list li .cal { background: #fff2cc; color: #5c4400; border-radius: 8px; padding: 0 8px; font-variant-numeric: tabular-nums; align-self: center; }
+.student-report { flex: 1; overflow: auto; min-height: 0; }
+.sr-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+.sr-head b { display: block; font-size: 1.05rem; }
+.sr-head small, .sr-parts small { display: block; color: var(--muted); font-size: .78rem; font-weight: 400; }
+.sr-final { background: #fff2cc; color: #5c4400; border-radius: 12px; padding: 6px 12px; font-size: 1.6rem; font-weight: 800; text-align: center; line-height: 1.1; }
+.sr-final small { color: #5c4400; }
+.student-report table.sheet { width: 100%; }
+.sr-parts td, .sr-days td { text-align: left; white-space: normal; }
+.sr-parts td.v, .sr-days td.v { text-align: center; white-space: nowrap; }
+.sr-days td.nowrap { white-space: nowrap; }
+.sr-days td.A { background: var(--A-soft); } .sr-days td.F { background: var(--F-soft); }
+.sr-days td.R { background: var(--R-soft); } .sr-days td.J { background: var(--J-soft); }
+.sr-days span.F { color: var(--F); font-weight: 700; }
+.student-report table.sheet td, .student-report table.sheet th { padding: 5px 6px; }
+.sr-days { font-size: .8rem; }
+.student-report table.sheet td, .student-report table.sheet th { min-width: 0; }
+.sr-title { font-size: 1rem; margin: 14px 0 6px; }
