@@ -542,15 +542,15 @@
     const isCur = (c) => curIdx >= 0 && Math.floor((c - g.startCol) / nCat) === curIdx;
     const colLetter = (c) => { let s = ''; for (; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + ((c - 1) % 26)) + s; return s; };
     // Color de la celda según el apartado de su columna.
-    const colorOf = (c, t) => {
-      if (t === '') return '';
+    // Se toma de lo capturado (no del número), porque A, R y J pueden tener el mismo valor.
+    const colorOf = (c, r) => {
       const cat = CATS[(c - g.startCol) % nCat].key;
-      const up = t.toUpperCase();
-      if (cat === 'trab') { const o = OPTIONS.trab.find((x) => String(x.v) === t); return o ? o.color : ''; }
-      const keys = cat === 'lect' ? READ : STATUSES;
-      const k = keys.find((x) => String(state.codes[x]).toUpperCase() === up);
-      if (!k) return '';
-      return cat === 'lect' ? optionOf('lect', k).color : k;
+      const date = dates[Math.floor((c - g.startCol) / nCat)];
+      const v = ((g[cat] || {})[date] || {})[r];
+      if (v == null) return '';
+      if (cat === 'records') return v;
+      const o = optionOf(cat, v);
+      return o ? o.color : '';
     };
     const text = (v) => {
       if (v instanceof Date) return `${String(v.getUTCDate()).padStart(2, '0')}/${String(v.getUTCMonth() + 1).padStart(2, '0')}/${String(v.getUTCFullYear()).slice(-2)}`;
@@ -572,7 +572,7 @@
         if (c === g.nameCol) cls.push('name');
         const isDateCol = c >= g.startCol && c < g.startCol + dates.length * nCat;
         if (isDateCol && isHdr) cls.push('date-h');
-        if (isDateCol && !isHdr) cls.push('v', colorOf(c, t));
+        if (isDateCol && !isHdr) cls.push('v', colorOf(c, r));
         if (isDateCol && (c - g.startCol) % nCat === 0) cls.push('day-start');
         if (isDateCol && isCur(c)) cls.push('cur');
         // El encabezado lleva fecha y apartado en dos renglones, como en el Excel.
@@ -694,12 +694,15 @@
   $('#settings').addEventListener('close', () => {
     if ($('#settings').returnValue !== 'save') return;
     const f = $('#settings-form');
-    const distinct = (keys) => {
-      const vals = keys.map((k) => f.elements[k].value.trim());
-      return !vals.some((v) => v === '') && new Set(vals.map((v) => v.toUpperCase())).size === vals.length;
-    };
-    if (!distinct(STATUSES) || !distinct(READ)) {
-      toast('Cada opción necesita un valor distinto');
+    const vals = (keys) => keys.map((k) => f.elements[k].value.trim());
+    if ([...vals(STATUSES), ...vals(READ)].some((v) => v === '')) {
+      toast('Ninguna opción puede quedar vacía');
+      return;
+    }
+    // Asistencia puede repetir valores (p. ej. A = R = J = 1); Sí y No deben ser distintos.
+    const [si, no] = vals(READ);
+    if (si.toUpperCase() === no.toUpperCase()) {
+      toast('Sí y No necesitan valores distintos');
       return;
     }
     [...STATUSES, ...READ].forEach((k) => (state.codes[k] = f.elements[k].value.trim()));

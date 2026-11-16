@@ -1,5 +1,5 @@
 // Service worker: guarda la app para que funcione sin internet.
-const CACHE = 'pase-de-lista-v8';
+const CACHE = 'pase-de-lista-v9';
 const ASSETS = [
   './',
   'index.html',
