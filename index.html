@@ -38,8 +38,22 @@
         <input type="date" id="date-input" aria-label="Fecha">
         <button class="icon-btn" id="next-day" aria-label="Día siguiente">›</button>
       </div>
+      <div class="tabs" role="tablist" id="tabs">
+        <button class="tab" role="tab" data-tab="records">Asistencia</button>
+        <button class="tab" role="tab" data-tab="lect">Lecturas</button>
+        <button class="tab" role="tab" data-tab="trab">Trabajos</button>
+      </div>
       <div class="summary" id="summary"></div>
     </header>
+
+    <!-- Vista compacta: lecturas (Sí/No) y trabajos (0/50/100), muchos alumnos por pantalla -->
+    <div id="compact-view" hidden>
+      <ul class="compact-list" id="compact-list"></ul>
+      <footer class="bottombar">
+        <button class="btn" id="compact-preview">Vista previa</button>
+        <button class="btn primary" id="compact-export">Exportar Excel</button>
+      </footer>
+    </div>
 
     <!-- Vista de un alumno a la vez -->
     <div id="card-view">
@@ -107,7 +121,7 @@
     <button class="menu-item" data-action="export">Exportar Excel</button>
     <button class="menu-item" data-action="history">Historial de fechas</button>
     <button class="menu-item" data-action="settings">Valores de cada estado</button>
-    <button class="menu-item" data-action="clear-day">Borrar el pase de este día</button>
+    <button class="menu-item" data-action="clear-day">Borrar los registros de este día</button>
     <button class="menu-item danger" data-action="new-file">Cargar otro archivo</button>
     <button class="btn" data-action="close">Cerrar</button>
   </dialog>
@@ -120,12 +134,16 @@
 
   <dialog id="settings">
     <h2>Valor en el Excel</h2>
-    <p class="hint">Lo que se escribe en la celda de cada fecha.</p>
+    <p class="hint">Lo que se escribe en las celdas de cada día.</p><p class="hint settings-sub">Asistencia</p>
     <form id="settings-form" method="dialog">
       <label><span class="pill A">A</span> Asistencia <input name="A" maxlength="4"></label>
       <label><span class="pill F">F</span> Falta <input name="F" maxlength="4"></label>
       <label><span class="pill R">R</span> Retardo <input name="R" maxlength="4"></label>
       <label><span class="pill J">J</span> Justificado <input name="J" maxlength="4"></label>
+      <p class="hint settings-sub">Lecturas</p>
+      <label><span class="pill A">Sí</span> Sí leyó <input name="S" maxlength="4"></label>
+      <label><span class="pill F">No</span> No leyó <input name="N" maxlength="4"></label>
+      <p class="hint">Trabajos se guardan como 0, 50 o 100.</p>
       <div class="row">
         <button class="btn" value="cancel">Cancelar</button>
         <button class="btn primary" value="save">Guardar</button>

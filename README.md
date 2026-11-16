@@ -9,14 +9,17 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
 - **Pase de lista uno por uno**: un alumno en pantalla con 4 opciones —
   **A** Asistencia, **F** Falta, **R** Retardo, **J** Justificado. Al elegir, pasa al siguiente.
   Empieza en el primer alumno sin marcar; botones Anterior / Saltar.
+- **Lecturas y trabajos**: pestañas Asistencia / Lecturas / Trabajos. Lecturas es Sí/No y Trabajos 0/50/100,
+  en una lista compacta (unos 13 alumnos por pantalla en celular).
 - **Confirmación de cambios**: si un alumno ya tenía marca y se elige otra, se pide confirmar.
 - **Vista de lista** para revisar y corregir; tocar un nombre regresa al pase uno por uno desde ahí.
 - **Agregar / quitar alumnos**: los nuevos se agregan al final de la lista del grupo.
   Solo se pueden quitar los agregados desde la app (con buscador y confirmación).
 - **Vista previa del Excel** dentro de la app, igual a lo que se exporta.
-- **Exportar Excel**: copia del archivo original con una columna por fecha
-  (a partir de la primera columna libre después del nombre).
-  Valores por defecto: A = 1, F = 0, R = 2, J = 3 (configurables en ⋮ → Valores de cada estado).
+- **Exportar Excel**: copia del archivo original con 3 columnas por día (Asistencia, Lectura, Trabajo),
+  a partir de la primera columna libre después del nombre.
+  Valores por defecto: A = 1, F = 0, R = 2, J = 3; Lectura Sí = 1, No = 0; Trabajo 0/50/100
+  (configurables en ⋮ → Valores de cada estado).
 - Si se vuelve a subir un Excel exportado por la app, las fechas registradas se recuperan.
 
 Los datos se guardan en el dispositivo (localStorage); el Excel solo se genera al exportar.

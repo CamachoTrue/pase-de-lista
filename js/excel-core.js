@@ -1,13 +1,17 @@
 /*
- * Lógica de Excel: leer la lista del maestro y escribir las columnas de asistencia.
+ * Lógica de Excel: leer la lista del maestro y escribir las columnas de cada día.
  * Funciona en el navegador (window.ListaExcel) y en Node (module.exports) para pruebas.
+ *
+ * Por cada fecha se escriben 3 columnas: Asistencia, Lectura y Trabajo.
  *
  * Modelo de un grupo:
  * {
  *   sheet: 'V205', title: 'GRUPO V205 SEM B 20-21',
  *   headerRow: 4, nameCol: 2, startCol: 3, dateCols: [..],
- *   students: [{ row: 5, no: '1', name: 'ACOSTA SANCHEZ ...' }],
- *   records: { '2026-11-14': { 5: 'A', 6: 'F' } }   // fila -> estado
+ *   students: [{ row: 5, no: '1', name: 'ACOSTA SANCHEZ ...', added?: true }],
+ *   records: { '2026-11-14': { 5: 'A', 6: 'F' } },   // asistencia: A/F/R/J
+ *   lect:    { '2026-11-14': { 5: 'S', 6: 'N' } },   // lectura: S (sí) / N (no)
+ *   trab:    { '2026-11-14': { 5: 100, 6: 50 } }     // trabajo: 0 / 50 / 100
  * }
  */
 (function (root, factory) {
@@ -17,7 +21,15 @@
   'use strict';
 
   const STATUSES = ['A', 'F', 'R', 'J'];
-  const DEFAULT_CODES = { A: 1, F: 0, R: 2, J: 3 };
+  const READ = ['S', 'N'];
+  const WORK = [0, 50, 100];
+  const DEFAULT_CODES = { A: 1, F: 0, R: 2, J: 3, S: 1, N: 0 };
+  // Categorías por día, en el orden de las columnas del Excel.
+  const CATS = [
+    { key: 'records', label: 'Asistencia', match: /ASIST/i },
+    { key: 'lect', label: 'Lectura', match: /LECT/i },
+    { key: 'trab', label: 'Trabajo', match: /TRAB/i },
+  ];
 
   function cellText(v) {
     if (v == null) return '';
@@ -33,27 +45,33 @@
 
   const clean = (s) => s.replace(/\s+/g, ' ').trim();
   const pad = (n) => String(n).padStart(2, '0');
+  const isoOf = (d) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 
-  // Devuelve 'YYYY-MM-DD' si el encabezado es una fecha (celda fecha o texto dd/mm/aaaa).
-  function parseDateHeader(v) {
-    if (v instanceof Date && !isNaN(v)) {
-      return `${v.getUTCFullYear()}-${pad(v.getUTCMonth() + 1)}-${pad(v.getUTCDate())}`;
-    }
-    if (v && typeof v === 'object' && v.result instanceof Date) return parseDateHeader(v.result);
-    const m = clean(cellText(v)).match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/);
+  // Encabezado de una columna de día: celda fecha (versión anterior = asistencia)
+  // o texto "dd/mm/aa" + "Asistencia" | "Lectura" | "Trabajo".
+  function parseHeader(v) {
+    if (v instanceof Date && !isNaN(v)) return { date: isoOf(v), cat: 'records' };
+    if (v && typeof v === 'object' && v.result instanceof Date) return parseHeader(v.result);
+    const t = clean(cellText(v));
+    const m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})\b\s*(.*)$/);
     if (!m) return null;
     let y = Number(m[3]);
     if (y < 100) y += 2000;
-    return `${y}-${pad(m[2])}-${pad(m[1])}`;
+    const cat = CATS.find((c) => c.match.test(m[4] || ''));
+    return { date: `${y}-${pad(m[2])}-${pad(m[1])}`, cat: cat ? cat.key : 'records' };
   }
+  // Compatibilidad con pruebas/llamadas anteriores.
+  const parseDateHeader = (v) => { const h = parseHeader(v); return h ? h.date : null; };
 
-  function codeToStatus(value, codes) {
+  function valueFromCell(value, cat, codes) {
     const t = clean(cellText(value)).toUpperCase();
     if (t === '') return null;
-    for (const s of STATUSES) {
-      if (String(codes[s]).toUpperCase() === t) return s;
+    if (cat === 'trab') {
+      const n = Number(t);
+      return WORK.includes(n) ? n : null;
     }
-    return null;
+    const keys = cat === 'lect' ? READ : STATUSES;
+    return keys.find((k) => String(codes[k]).toUpperCase() === t) || null;
   }
 
   function findHeader(ws) {
@@ -68,6 +86,7 @@
   }
 
   function parseWorkbook(wb, codes = DEFAULT_CODES) {
+    codes = Object.assign({}, DEFAULT_CODES, codes);
     const groups = [];
     wb.eachSheet((ws) => {
       const hdr = findHeader(ws);
@@ -89,19 +108,24 @@
       }
       if (!students.length) return;
 
-      // Columnas de fecha ya existentes (por si suben un Excel exportado por la app).
-      const records = {};
+      // Columnas de día ya existentes (por si suben un Excel exportado por la app).
+      const data = { records: {}, lect: {}, trab: {} };
       const dateCols = [];
       const lastCol = Math.max(ws.columnCount, hdr.col);
       for (let c = hdr.col + 1; c <= lastCol; c++) {
-        const date = parseDateHeader(ws.getCell(hdr.row, c).value);
-        if (!date) continue;
+        const h = parseHeader(ws.getCell(hdr.row, c).value);
+        if (!h) continue;
         dateCols.push(c);
-        const day = (records[date] = records[date] || {});
+        const day = (data[h.cat][h.date] = data[h.cat][h.date] || {});
         for (const s of students) {
-          const st = codeToStatus(ws.getCell(s.row, c).value, codes);
-          if (st) day[s.row] = st;
+          const v = valueFromCell(ws.getCell(s.row, c).value, h.cat, codes);
+          if (v != null) day[s.row] = v;
         }
+      }
+
+      // Quita días sin ningún dato (p. ej. la columna de lectura vacía de un día).
+      for (const k of Object.keys(data)) {
+        for (const d of Object.keys(data[k])) if (!Object.keys(data[k][d]).length) delete data[k][d];
       }
 
       // Primera columna libre después del nombre: encabezado vacío y sin datos de alumnos.
@@ -116,20 +140,34 @@
         while (used(startCol)) startCol++;
       }
 
-      groups.push({ sheet: ws.name, title, headerRow: hdr.row, nameCol: hdr.col, startCol, dateCols, students, records });
+      groups.push({
+        sheet: ws.name, title, headerRow: hdr.row, nameCol: hdr.col, startCol, dateCols, students,
+        records: data.records, lect: data.lect, trab: data.trab,
+      });
     });
     return groups;
   }
 
-  function codeValue(status, codes) {
-    const v = codes[status];
+  function codeValue(key, codes) {
+    const v = codes[key];
     if (v === '' || v == null) return null;
     const n = Number(v);
     return Number.isFinite(n) && String(v).trim() !== '' ? n : String(v);
   }
 
-  // Escribe la asistencia en una copia del Excel original y devuelve el buffer .xlsx
+  // Fechas con al menos un dato en cualquiera de las 3 categorías, ordenadas.
+  function groupDates(g) {
+    const set = new Set();
+    for (const c of CATS) {
+      const m = g[c.key] || {};
+      Object.keys(m).forEach((d) => { if (Object.keys(m[d]).length) set.add(d); });
+    }
+    return [...set].sort();
+  }
+
+  // Escribe los datos en una copia del Excel original y devuelve el buffer .xlsx
   async function exportWorkbook(ExcelJS, originalBuffer, groups, codes = DEFAULT_CODES) {
+    codes = Object.assign({}, DEFAULT_CODES, codes);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(originalBuffer);
     const thin = { style: 'thin' };
@@ -139,8 +177,8 @@
       const ws = wb.getWorksheet(g.sheet);
       if (!ws) continue;
 
-      // Limpia columnas de fecha que traía el archivo original (se reescriben ordenadas).
-      for (const c of g.dateCols) {
+      // Limpia columnas de día que traía el archivo original (se reescriben ordenadas).
+      for (const c of g.dateCols || []) {
         ws.getCell(g.headerRow, c).value = null;
         for (const s of g.students) ws.getCell(s.row, c).value = null;
       }
@@ -165,33 +203,41 @@
         }
       }
 
-      const dates = Object.keys(g.records)
-        .filter((d) => Object.keys(g.records[d]).length > 0)
-        .sort();
+      const dates = groupDates(g);
       const headerSrc = ws.getCell(g.headerRow, g.nameCol);
+      if (dates.length) {
+        const hr = ws.getRow(g.headerRow);
+        hr.height = Math.max(hr.height || 15, 30); // dos renglones: fecha + categoría
+      }
 
       dates.forEach((date, i) => {
-        const col = g.startCol + i;
-        const [y, m, d] = date.split('-').map(Number);
-        const h = ws.getCell(g.headerRow, col);
-        h.value = new Date(Date.UTC(y, m - 1, d));
-        h.numFmt = 'dd/mm/yy';
-        h.font = Object.assign({}, headerSrc.font, { bold: true });
-        h.alignment = { horizontal: 'center', vertical: 'middle' };
-        h.border = border;
-        ws.getColumn(col).width = 9.5;
+        const [y, m, d] = date.split('-');
+        CATS.forEach((cat, j) => {
+          const col = g.startCol + i * CATS.length + j;
+          const h = ws.getCell(g.headerRow, col);
+          h.value = `${d}/${m}/${y.slice(-2)}\n${cat.label}`;
+          h.font = Object.assign({}, headerSrc.font, { bold: true });
+          h.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+          h.border = border;
+          ws.getColumn(col).width = 11;
 
-        for (const s of g.students) {
-          const st = g.records[date][s.row];
-          const cell = ws.getCell(s.row, col);
-          cell.value = st ? codeValue(st, codes) : null;
-          cell.alignment = { horizontal: 'center', vertical: 'middle' };
-          cell.border = border;
-        }
+          const day = (g[cat.key] || {})[date] || {};
+          for (const s of g.students) {
+            const v = day[s.row];
+            const cell = ws.getCell(s.row, col);
+            if (v == null) cell.value = null;
+            else cell.value = cat.key === 'trab' ? Number(v) : codeValue(v, codes);
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            cell.border = border;
+          }
+        });
       });
     }
     return wb.xlsx.writeBuffer();
   }
 
-  return { STATUSES, DEFAULT_CODES, parseWorkbook, exportWorkbook, parseDateHeader, cellText };
+  return {
+    STATUSES, READ, WORK, CATS, DEFAULT_CODES,
+    parseWorkbook, exportWorkbook, groupDates, parseHeader, parseDateHeader, cellText,
+  };
 });

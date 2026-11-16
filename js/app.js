@@ -1,7 +1,30 @@
 (function () {
   'use strict';
-  const { STATUSES, DEFAULT_CODES, parseWorkbook, exportWorkbook } = window.ListaExcel;
+  const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates } = window.ListaExcel;
   const LABELS = { A: 'Asistencia', F: 'Falta', R: 'Retardo', J: 'Justificado' };
+  // Opciones de cada apartado: valor guardado, texto del botón, texto largo y color (clase A/F/R/J).
+  const OPTIONS = {
+    lect: [
+      { v: 'S', btn: 'Sí', label: 'Sí leyó', color: 'A' },
+      { v: 'N', btn: 'No', label: 'No leyó', color: 'F' },
+    ],
+    trab: [
+      { v: 0, btn: '0', label: 'Trabajo: 0', color: 'F' },
+      { v: 50, btn: '50', label: 'Trabajo: 50', color: 'R' },
+      { v: 100, btn: '100', label: 'Trabajo: 100', color: 'A' },
+    ],
+  };
+  const optionOf = (cat, v) => (cat === 'records'
+    ? (v ? { v, label: LABELS[v], color: v } : null)
+    : OPTIONS[cat].find((o) => o.v === v) || null);
+  const tab = () => state.ui.tab || 'records';
+  // Datos de un apartado para el día seleccionado.
+  const dayData = (cat, create) => {
+    const g = group();
+    g[cat] = g[cat] || {};
+    if (!g[cat][state.ui.date] && create) g[cat][state.ui.date] = {};
+    return g[cat][state.ui.date] || {};
+  };
   const STORE_KEY = 'paseDeLista.v1';
   const $ = (s) => document.querySelector(s);
 
@@ -65,7 +88,7 @@
         toast('No encontré una columna “NOMBRE” en ninguna hoja');
         return;
       }
-      state = { fileName: file.name, fileB64: bufToB64(buf), groups, codes, ui: { group: 0, date: todayISO() } };
+      state = { fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, ui: { group: 0, date: todayISO(), tab: 'records' } };
       save();
       const total = groups.reduce((n, g) => n + g.students.length, 0);
       toast(`${groups.length} grupo(s), ${total} alumnos cargados`);
@@ -101,12 +124,84 @@
   function refresh() {
     const opt = $('#group-select').options[state.ui.group];
     if (opt) opt.textContent = `${group().sheet} · ${group().students.length} alumnos`;
-    $('#card-view').hidden = view !== 'card';
-    $('#list-view').hidden = view !== 'list';
-    if (view === 'card') renderCard(false);
+    const t = tab();
+    document.querySelectorAll('.tab').forEach((b) => {
+      b.classList.toggle('on', b.dataset.tab === t);
+      b.setAttribute('aria-selected', b.dataset.tab === t);
+    });
+    const att = t === 'records';
+    $('#card-view').hidden = !att || view !== 'card';
+    $('#list-view').hidden = !att || view !== 'list';
+    $('#compact-view').hidden = att;
+    if (!att) renderCompact();
+    else if (view === 'card') renderCard(false);
     else renderStudents();
     renderSummary();
   }
+
+  // ---------- Pestañas ----------
+  $('#tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('.tab');
+    if (!b || b.dataset.tab === tab()) return;
+    state.ui.tab = b.dataset.tab;
+    save();
+    if (state.ui.tab === 'records') startCard();
+    refresh();
+    window.scrollTo(0, 0);
+  });
+
+  // ---------- Vista compacta (lecturas / trabajos) ----------
+  function renderCompact() {
+    const g = group();
+    const cat = tab();
+    const day = dayData(cat, false);
+    const att = dayData('records', false);
+    $('#compact-list').innerHTML = g.students.map((s) => {
+      const cur = optionOf(cat, day[s.row]);
+      const a = att[s.row];
+      const btns = OPTIONS[cat].map((o) => {
+        const on = cur && cur.v === o.v;
+        return `<button class="cb ${cat === 'trab' && o.v === 100 ? 'wide' : ''} ${on ? 'on c' + o.color : ''}" data-v="${o.v}" aria-pressed="${!!on}" aria-label="${escapeHtml(o.label)}">${o.btn}</button>`;
+      }).join('');
+      return `<li class="crow ${cur ? 'c' + cur.color : ''} ${a === 'F' ? 'absent' : ''}" data-row="${s.row}">
+        <span class="cno">${escapeHtml(s.no)}</span>
+        <span class="cname">${a ? `<i class="att ${a}" title="${LABELS[a]}">${a}</i>` : ''}${escapeHtml(s.name)}</span>
+        <span class="cbtns">${btns}</span></li>`;
+    }).join('');
+  }
+
+  $('#compact-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.cb');
+    if (!btn) return;
+    const cat = tab();
+    const li = btn.closest('.crow');
+    const row = li.dataset.row;
+    const v = cat === 'trab' ? Number(btn.dataset.v) : btn.dataset.v;
+    const prev = dayData(cat, false)[row];
+    const next = prev === v ? undefined : v; // tocar la misma otra vez = quitar
+    if (prev != null) {
+      const name = group().students.find((x) => String(x.row) === row).name;
+      if (!(await confirmChange(name, prev, next, cat))) return;
+    }
+    const day = dayData(cat, true);
+    if (next != null) day[row] = next;
+    else delete day[row];
+    save();
+    if (navigator.vibrate) navigator.vibrate(10);
+    const cur = optionOf(cat, day[row]);
+    li.classList.remove('cA', 'cF', 'cR', 'cJ');
+    if (cur) li.classList.add('c' + cur.color);
+    li.querySelectorAll('.cb').forEach((b) => {
+      const o = OPTIONS[cat].find((x) => String(x.v) === b.dataset.v);
+      const on = cur && cur.v === o.v;
+      b.classList.remove('on', 'cA', 'cF', 'cR');
+      if (on) b.classList.add('on', 'c' + o.color);
+      b.setAttribute('aria-pressed', !!on);
+    });
+    renderSummary();
+  });
+  $('#compact-preview').addEventListener('click', openPreview);
+  $('#compact-export').addEventListener('click', () => doExport($('#compact-export')));
 
   function firstPending() {
     const g = group();
@@ -155,18 +250,19 @@
   }
 
   // Pide autorización antes de cambiar (o quitar) una marca que ya existía.
-  function confirmChange(name, from, to) {
+  function confirmChange(name, from, to, cat = 'records') {
     return new Promise((resolve) => {
       const d = $('#confirm-change');
-      const pill = (sel, st) => {
+      const pill = (sel, v) => {
         const el = $(sel);
-        el.className = `pill-lg ${st || 'none'}`;
-        el.textContent = st ? LABELS[st] : 'Sin marca';
+        const o = optionOf(cat, v);
+        el.className = `pill-lg ${o ? o.color : 'none'}`;
+        el.textContent = o ? o.label : 'Sin marca';
       };
       $('#confirm-name').textContent = name;
       pill('#confirm-from', from);
       pill('#confirm-to', to);
-      $('#confirm-ok').textContent = to ? 'Sí, cambiar' : 'Sí, quitar';
+      $('#confirm-ok').textContent = to != null ? 'Sí, cambiar' : 'Sí, quitar';
       d.returnValue = '';
       d.addEventListener('close', () => resolve(d.returnValue === 'ok'), { once: true });
       d.showModal();
@@ -216,7 +312,7 @@
 
   // Teclado (en computadora): A/F/R/J para marcar, flechas para moverse.
   document.addEventListener('keydown', (e) => {
-    if (view !== 'card' || $('#screen-main').hidden || document.querySelector('dialog[open]')) return;
+    if (tab() !== 'records' || view !== 'card' || $('#screen-main').hidden || document.querySelector('dialog[open]')) return;
     if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
     const k = e.key.toUpperCase();
     if (STATUSES.includes(k)) markCard(k);
@@ -247,6 +343,15 @@
 
   function renderSummary() {
     const g = group();
+    const cat = tab();
+    if (cat !== 'records') {
+      const day = dayData(cat, false);
+      const vals = g.students.map((s) => day[s.row]).filter((v) => v != null);
+      $('#summary').innerHTML =
+        `<span>${vals.length}/${g.students.length} capturados</span>` +
+        OPTIONS[cat].map((o) => `<span class="${o.color}">${o.btn}: ${vals.filter((v) => v === o.v).length}</span>`).join('');
+      return;
+    }
     const rec = dayRecords(false);
     const counts = { A: 0, F: 0, R: 0, J: 0 };
     Object.values(rec).forEach((s) => counts[s]++);
@@ -298,7 +403,7 @@
     if (idx < 0) return;
     const s = g.students[idx];
     g.students.splice(idx, 1);
-    Object.values(g.records).forEach((day) => delete day[s.row]);
+    CATS.forEach((c) => Object.values(g[c.key] || {}).forEach((day) => delete day[s.row]));
     save();
     if (cardIdx > g.students.length) cardIdx = g.students.length;
     $('#remove-student').close();
@@ -406,6 +511,8 @@
     save();
     $('#add-student').close();
     // Lo deja en pantalla para pasarle lista de inmediato.
+    state.ui.tab = 'records';
+    save();
     view = 'card';
     cardIdx = g.students.length - 1;
     refresh();
@@ -428,11 +535,23 @@
       return;
     }
 
-    const dates = Object.keys(g.records).filter((d) => Object.keys(g.records[d]).length).sort();
-    const lastCol = Math.max(g.nameCol, g.startCol + dates.length - 1);
-    const curCol = dates.includes(state.ui.date) ? g.startCol + dates.indexOf(state.ui.date) : -1;
+    const dates = groupDates(g);
+    const nCat = CATS.length;
+    const lastCol = Math.max(g.nameCol, g.startCol + dates.length * nCat - 1);
+    const curIdx = dates.indexOf(state.ui.date);
+    const isCur = (c) => curIdx >= 0 && Math.floor((c - g.startCol) / nCat) === curIdx;
     const colLetter = (c) => { let s = ''; for (; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + ((c - 1) % 26)) + s; return s; };
-    const statusOf = (v) => STATUSES.find((k) => String(state.codes[k]).toUpperCase() === String(v).toUpperCase()) || '';
+    // Color de la celda según el apartado de su columna.
+    const colorOf = (c, t) => {
+      if (t === '') return '';
+      const cat = CATS[(c - g.startCol) % nCat].key;
+      const up = t.toUpperCase();
+      if (cat === 'trab') { const o = OPTIONS.trab.find((x) => String(x.v) === t); return o ? o.color : ''; }
+      const keys = cat === 'lect' ? READ : STATUSES;
+      const k = keys.find((x) => String(state.codes[x]).toUpperCase() === up);
+      if (!k) return '';
+      return cat === 'lect' ? optionOf('lect', k).color : k;
+    };
     const text = (v) => {
       if (v instanceof Date) return `${String(v.getUTCDate()).padStart(2, '0')}/${String(v.getUTCMonth() + 1).padStart(2, '0')}/${String(v.getUTCFullYear()).slice(-2)}`;
       return ListaExcel.cellText(v).replace(/\s+/g, ' ').trim();
@@ -451,11 +570,14 @@
         const cls = [];
         if (c <= g.nameCol) cls.push('stick');
         if (c === g.nameCol) cls.push('name');
-        const isDateCol = c >= g.startCol && c < g.startCol + dates.length;
+        const isDateCol = c >= g.startCol && c < g.startCol + dates.length * nCat;
         if (isDateCol && isHdr) cls.push('date-h');
-        if (isDateCol && !isHdr) cls.push('v', statusOf(t));
-        if (c === curCol) cls.push('cur');
-        html += `<td class="${cls.join(' ')}">${escapeHtml(t)}</td>`;
+        if (isDateCol && !isHdr) cls.push('v', colorOf(c, t));
+        if (isDateCol && (c - g.startCol) % nCat === 0) cls.push('day-start');
+        if (isDateCol && isCur(c)) cls.push('cur');
+        // El encabezado lleva fecha y apartado en dos renglones, como en el Excel.
+        const shown = isHdr && isDateCol ? escapeHtml(ListaExcel.cellText(v)).replace(/\n/g, '<br>') : escapeHtml(t);
+        html += `<td class="${cls.join(' ')}">${shown}</td>`;
       }
       html += '</tr>';
     });
@@ -464,9 +586,11 @@
 
     $('#preview-title').textContent = `Vista previa · ${g.sheet}`;
     $('#preview-sub').textContent = dates.length
-      ? `${g.students.length} alumnos · ${dates.length} fecha(s) de pase de lista`
-      : 'Aún no hay pases de lista en este grupo.';
-    $('#preview-legend').innerHTML = STATUSES.map((k) => `<span class="summary-${k}">${escapeHtml(String(state.codes[k]))} = ${LABELS[k]}</span>`).join('');
+      ? `${g.students.length} alumnos · ${dates.length} día(s) · 3 columnas por día`
+      : 'Aún no hay registros en este grupo.';
+    $('#preview-legend').innerHTML =
+      STATUSES.map((k) => `<span class="summary-${k}">${escapeHtml(String(state.codes[k]))} = ${LABELS[k]}</span>`).join('') +
+      READ.map((k) => { const o = optionOf('lect', k); return `<span class="summary-${o.color}">${escapeHtml(String(state.codes[k]))} = ${o.label}</span>`; }).join('');
 
     const d = $('#preview');
     d.showModal();
@@ -528,8 +652,8 @@
     if (action === 'history') openHistory();
     if (action === 'settings') openSettings();
     if (action === 'clear-day') {
-      if (confirm(`¿Borrar el pase de lista del ${fmtDate(state.ui.date)} en ${group().sheet}?`)) {
-        delete group().records[state.ui.date];
+      if (confirm(`¿Borrar asistencia, lecturas y trabajos del ${fmtDate(state.ui.date)} en ${group().sheet}?`)) {
+        CATS.forEach((c) => { if (group()[c.key]) delete group()[c.key][state.ui.date]; });
         changed();
       }
     }
@@ -542,14 +666,15 @@
 
   function openHistory() {
     const g = group();
-    const dates = Object.keys(g.records).filter((d) => Object.keys(g.records[d]).length).sort().reverse();
+    const dates = groupDates(g).reverse();
+    const count = (cat, d) => Object.keys((g[cat] || {})[d] || {}).length;
     $('#history-list').innerHTML = dates.length
       ? dates.map((d) => {
           const c = { A: 0, F: 0, R: 0, J: 0 };
-          Object.values(g.records[d]).forEach((s) => c[s]++);
-          return `<li data-date="${d}"><span>${fmtDate(d)}</span><span class="counts">A ${c.A} · F ${c.F} · R ${c.R} · J ${c.J}</span></li>`;
+          Object.values(g.records[d] || {}).forEach((s) => c[s]++);
+          return `<li data-date="${d}"><span>${fmtDate(d)}</span><span class="counts">A ${c.A} · F ${c.F} · R ${c.R} · J ${c.J}<br>Lecturas ${count('lect', d)} · Trabajos ${count('trab', d)}</span></li>`;
         }).join('')
-      : '<li>Aún no hay pases de lista en este grupo.</li>';
+      : '<li>Aún no hay registros en este grupo.</li>';
     $('#history').showModal();
   }
   $('#history-list').addEventListener('click', (e) => {
@@ -563,18 +688,21 @@
 
   function openSettings() {
     const f = $('#settings-form');
-    STATUSES.forEach((k) => (f.elements[k].value = state.codes[k]));
+    [...STATUSES, ...READ].forEach((k) => (f.elements[k].value = state.codes[k]));
     $('#settings').showModal();
   }
   $('#settings').addEventListener('close', () => {
     if ($('#settings').returnValue !== 'save') return;
     const f = $('#settings-form');
-    const vals = STATUSES.map((k) => f.elements[k].value.trim());
-    if (vals.some((v) => v === '') || new Set(vals.map((v) => v.toUpperCase())).size !== vals.length) {
-      toast('Cada estado necesita un valor distinto');
+    const distinct = (keys) => {
+      const vals = keys.map((k) => f.elements[k].value.trim());
+      return !vals.some((v) => v === '') && new Set(vals.map((v) => v.toUpperCase())).size === vals.length;
+    };
+    if (!distinct(STATUSES) || !distinct(READ)) {
+      toast('Cada opción necesita un valor distinto');
       return;
     }
-    STATUSES.forEach((k, i) => (state.codes[k] = vals[i]));
+    [...STATUSES, ...READ].forEach((k) => (state.codes[k] = f.elements[k].value.trim()));
     save();
     toast('Valores guardados');
   });
@@ -600,6 +728,10 @@
     if (!state.ui) state.ui = { group: 0, date: todayISO() };
     if (state.ui.group >= state.groups.length) state.ui.group = 0;
     state.ui.date = todayISO(); // al abrir la app siempre empieza en hoy
+    if (!state.ui.tab) state.ui.tab = 'records';
+    // Datos guardados con la versión anterior (solo asistencia).
+    state.codes = { ...DEFAULT_CODES, ...state.codes };
+    state.groups.forEach((g) => { g.lect = g.lect || {}; g.trab = g.trab || {}; });
   }
   render();
 

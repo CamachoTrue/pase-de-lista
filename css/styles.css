@@ -241,3 +241,40 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .pick-list li .no { color: var(--muted); font-weight: 400; min-width: 1.6em; text-align: right; }
 .pick-list li.sel { background: var(--F-soft); color: var(--F); box-shadow: inset 4px 0 0 var(--F); }
 .pick-list li.empty { cursor: default; font-weight: 400; color: var(--muted); }
+
+/* ---------- Pestañas: Asistencia / Lecturas / Trabajos ---------- */
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 8px; padding: 3px; background: var(--bg); border-radius: 10px; }
+.tab { border: none; background: transparent; border-radius: 8px; padding: 7px 4px; font-size: .88rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+.tab.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
+.settings-sub { margin: 14px 0 0; font-weight: 700; color: var(--text); }
+#settings-form .pill { width: auto; min-width: 28px; padding: 0 6px; }
+
+/* ---------- Vista compacta ---------- */
+#compact-view { padding: 8px 10px 0; padding-bottom: 84px; }
+.compact-list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.crow { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 8px 4px 6px; border-bottom: 1px solid var(--border); border-left: 4px solid transparent; }
+.crow:last-child { border-bottom: none; }
+.crow.cA { border-left-color: var(--A); } .crow.cF { border-left-color: var(--F); }
+.crow.cR { border-left-color: var(--R); } .crow.cJ { border-left-color: var(--J); }
+.crow.absent .cname { opacity: .55; }
+.cno { flex: none; width: 1.7em; text-align: right; color: var(--muted); font-size: .78rem; }
+.cname { flex: 1; min-width: 0; font-size: .82rem; font-weight: 600; line-height: 1.2;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.att { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-right: 4px; border-radius: 4px; font-size: .62rem; font-weight: 800; font-style: normal; color: #fff; vertical-align: 1px; }
+.att.A { background: var(--A); } .att.F { background: var(--F); } .att.R { background: var(--R); } .att.J { background: var(--J); }
+.cbtns { flex: none; display: flex; gap: 4px; }
+.cb { min-width: 42px; height: 34px; padding: 0 6px; border: 1px solid var(--border); border-radius: 8px; background: transparent; font-size: .85rem; font-weight: 700; color: var(--muted); cursor: pointer; touch-action: manipulation; }
+.cb.wide { min-width: 46px; }
+.cb.on.cA { background: var(--A); border-color: var(--A); color: #fff; }
+.cb.on.cF { background: var(--F); border-color: var(--F); color: #fff; }
+.cb.on.cR { background: var(--R); border-color: var(--R); color: #fff; }
+.cb:active { transform: scale(.95); }
+@media (min-width: 600px) { .cname { font-size: .9rem; } .cb { min-width: 52px; } }
+.sheet td.date-h { line-height: 1.25; font-size: 11px; }
+.sheet td.day-start { border-left: 2px solid #9fb0a7; }
+#history-list .counts { text-align: right; }
+.crow { min-height: 40px; padding-top: 3px; padding-bottom: 3px; }
+.cb { height: 32px; }
+.cb { min-width: 38px; padding: 0 4px; }
+.cb.wide { min-width: 44px; }
+.cbtns { gap: 3px; }
