@@ -15,6 +15,10 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
   En el Excel no hay una columna por día: al final van 2 columnas, *Días con 0* y *Fechas*.
 - **Examen**: se escribe el porcentaje (0 a 100) de cada alumno; Enter pasa al siguiente.
   En el Excel solo hay columna en las fechas con examen, al final de todo.
+- **Calificaciones** (⋮ → Calificaciones y porcentajes): el maestro define cuánto vale cada apartado
+  y la calificación se calcula sola. Asistencia: A y J = 100 %, F = 0 %, R configurable. Lecturas: % de Sí.
+  Trabajos y Examen: promedio. Disciplina: % de días en clase sin 0. Solo cuenta lo capturado; un apartado
+  sin datos aún no cuenta y su peso se reparte. En el Excel van al final, por apartado y total (sobre 10 o 100).
 - **Confirmación de cambios**: si un alumno ya tenía marca y se elige otra, se pide confirmar.
 - **Vista de lista** para revisar y corregir; tocar un nombre regresa al pase uno por uno desde ahí.
 - **Agregar / quitar alumnos**: los nuevos se agregan al final de la lista del grupo.

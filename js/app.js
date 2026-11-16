@@ -1,6 +1,7 @@
 (function () {
   'use strict';
-  const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, examCols, shortDate } = window.ListaExcel;
+  const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, examCols, shortDate,
+    GRADE_PARTS, DEFAULT_GRADING, finalGrade, gradeCols, round1 } = window.ListaExcel;
   // Todos los apartados que se guardan por día (disciplina no lleva columna diaria en el Excel).
   const KEYS = [...CATS.map((c) => c.key), 'disc', 'exam'];
   const LABELS = { A: 'Asistencia', F: 'Falta', R: 'Retardo', J: 'Justificado' };
@@ -98,7 +99,8 @@
         toast('No encontré una columna “NOMBRE” en ninguna hoja');
         return;
       }
-      state = { fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, ui: { group: 0, date: todayISO(), tab: 'records' } };
+      const grading = (state && state.grading) || JSON.parse(JSON.stringify(DEFAULT_GRADING));
+      state = { fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, grading, ui: { group: 0, date: todayISO(), tab: 'records' } };
       save();
       const total = groups.reduce((n, g) => n + g.students.length, 0);
       toast(`${groups.length} grupo(s), ${total} alumnos cargados`);
@@ -620,7 +622,7 @@
     const g = group();
     let ws;
     try {
-      const out = await exportWorkbook(ExcelJS, b64ToBuf(state.fileB64), [g], state.codes);
+      const out = await exportWorkbook(ExcelJS, b64ToBuf(state.fileB64), [g], state.codes, state.grading);
       const wb = new ExcelJS.Workbook();
       await wb.xlsx.load(out);
       ws = wb.getWorksheet(g.sheet);
@@ -636,7 +638,9 @@
     const dc = discCols(g);
     const ex = examCols(g);
     const exCol = new Map(ex.map((x, i) => [x.col, { ...x, first: i === 0, last: i === ex.length - 1 }]));
-    const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col), dc ? dc.dates : 0, ...ex.map((x) => x.col));
+    const gcs = gradeCols(g, state.grading);
+    const gcCol = new Map(gcs.map((x, i) => [x.col, { ...x, first: i === 0, last: i === gcs.length - 1 }]));
+    const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col), dc ? dc.dates : 0, ...ex.map((x) => x.col), ...gcs.map((x) => x.col));
     const isCur = (c) => byCol.has(c) && byCol.get(c).date === state.ui.date;
     const colLetter = (c) => { let s = ''; for (; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + ((c - 1) % 26)) + s; return s; };
     // Se toma de lo capturado (no del número), porque A, R y J pueden tener el mismo valor.
@@ -681,7 +685,15 @@
           if (x.last) cls.push('block-end');
           if (x.date === state.ui.date) cls.push('cur');
         }
-        const isDisc = (dc && (c === dc.count || c === dc.dates)) || isExam;
+        const isGrade = gcCol.has(c);
+        if (isGrade) {
+          const x = gcCol.get(c);
+          cls.push(isHdr ? 'date-h' : 'v');
+          if (x.first || x.key === 'final') cls.push('day-start');
+          if (x.last) cls.push('block-end');
+          if (x.key === 'final') cls.push('final');
+        }
+        const isDisc = (dc && (c === dc.count || c === dc.dates)) || isExam || isGrade;
         if (isDisc && isHdr) cls.push('date-h');
         if (dc && c === dc.count) cls.push('day-start');
         if (dc && c === dc.dates) cls.push('block-end', 'disc-dates');
@@ -721,7 +733,7 @@
   async function doExport(btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
     try {
-      const out = await exportWorkbook(ExcelJS, b64ToBuf(state.fileB64), state.groups, state.codes);
+      const out = await exportWorkbook(ExcelJS, b64ToBuf(state.fileB64), state.groups, state.codes, state.grading);
       const name = state.fileName.replace(/\.xlsx$/i, '') + ' - asistencia.xlsx';
       const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const file = new File([blob], name, { type: blob.type });
@@ -760,6 +772,7 @@
     if (action === 'export') doExport(null);
     if (action === 'preview') openPreview();
     if (action === 'add-student') openAddStudent();
+    if (action === 'grades') openGrades();
     if (action === 'history') openHistory();
     if (action === 'settings') openSettings();
     if (action === 'clear-day') {
@@ -796,6 +809,63 @@
     changed();
     $('#history').close();
   });
+
+  // ---------- Calificaciones ----------
+  // Los porcentajes son del archivo (todos los grupos); la calificación se recalcula sola con cada dato.
+  function openGrades() {
+    const f = $('#grades-form');
+    const gr = state.grading;
+    GRADE_PARTS.forEach((p) => (f.elements[p.key].value = gr.w[p.key] || ''));
+    f.elements.retardo.value = String(gr.retardo);
+    f.elements.escala.value = String(gr.escala);
+    renderGrades();
+    $('#grades').showModal();
+  }
+  $('#grades-form').addEventListener('input', () => {
+    const f = $('#grades-form');
+    GRADE_PARTS.forEach((p) => {
+      const n = Number(f.elements[p.key].value.replace(',', '.'));
+      state.grading.w[p.key] = Number.isFinite(n) && n > 0 ? n : 0;
+    });
+    state.grading.retardo = Number(f.elements.retardo.value);
+    state.grading.escala = Number(f.elements.escala.value);
+    save();
+    renderGrades();
+  });
+  function renderGrades() {
+    const g = group();
+    const gr = state.grading;
+    const total = round1(GRADE_PARTS.reduce((n, p) => n + (gr.w[p.key] || 0), 0));
+    const tot = $('#weights-total');
+    tot.textContent = total === 100 ? 'Total: 100 % ✓' : `Total: ${total} % — debe sumar 100 %`;
+    tot.className = 'weights-total ' + (total === 100 ? 'ok' : 'bad');
+    $('#grades-sub').textContent = `${g.sheet} · ${g.students.length} alumnos · sobre ${gr.escala}`;
+    const parts = GRADE_PARTS.filter((p) => gr.w[p.key] > 0);
+    if (!parts.length) {
+      $('#grades-table').innerHTML = '<tbody><tr><td class="grades-empty">Escribe cuánto vale cada apartado para ver las calificaciones.</td></tr></tbody>';
+      return;
+    }
+    const fmt = (v) => (v == null ? '—' : round1(v));
+    // La calificación final va junto al nombre para que se vea sin desplazar en el celular.
+    let html = '<thead><tr><th class="stick">No.</th><th class="stick name">Nombre</th><th class="final">Calif.</th>' +
+      parts.map((p) => `<th>${p.label}<br><small>${gr.w[p.key]}%</small></th>`).join('') +
+      '</tr></thead><tbody>';
+    for (const s of g.students) {
+      const r = finalGrade(g, s.row, gr);
+      html += `<tr><td class="stick">${escapeHtml(s.no)}</td><td class="stick name">${escapeHtml(s.name)}</td><td class="v final">${fmt(r.final)}</td>` +
+        parts.map((p) => `<td class="v">${fmt(r.parts[p.key])}</td>`).join('') +
+        '</tr>';
+    }
+    const t = $('#grades-table');
+    t.innerHTML = html + '</tbody>';
+    // No. y Nombre fijos al desplazar a la derecha.
+    const w = t.querySelector('thead th.stick').offsetWidth;
+    t.querySelectorAll('tr').forEach((tr) => {
+      tr.children[0].style.left = '0px';
+      tr.children[1].style.left = `${w}px`;
+    });
+  }
+  $('#grades-export').addEventListener('click', () => doExport($('#grades-export')));
 
   function openSettings() {
     const f = $('#settings-form');
@@ -846,6 +916,7 @@
     // Datos guardados con la versión anterior (solo asistencia).
     state.codes = { ...DEFAULT_CODES, ...state.codes };
     state.groups.forEach((g) => { g.lect = g.lect || {}; g.trab = g.trab || {}; g.disc = g.disc || {}; g.exam = g.exam || {}; });
+    state.grading = { ...DEFAULT_GRADING, ...state.grading, w: { ...DEFAULT_GRADING.w, ...(state.grading || {}).w } };
   }
   render();
 

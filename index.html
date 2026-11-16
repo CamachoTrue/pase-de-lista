@@ -123,6 +123,7 @@
   <!-- Menú -->
   <dialog id="menu">
     <h2>Opciones</h2>
+    <button class="menu-item" data-action="grades">Calificaciones y porcentajes</button>
     <button class="menu-item" data-action="add-student">Agregar alumno al grupo</button>
     <button class="menu-item" data-action="preview">Vista previa del Excel</button>
     <button class="menu-item" data-action="export">Exportar Excel</button>
@@ -173,6 +174,41 @@
     <div class="row">
       <button class="btn" data-action="close">Cerrar</button>
       <button class="btn primary" id="preview-export">Exportar Excel</button>
+    </div>
+  </dialog>
+
+  <!-- Calificaciones: porcentaje de cada apartado y calificación de cada alumno -->
+  <dialog id="grades" class="fullscreen">
+    <div class="preview-head">
+      <div>
+        <h2>Calificaciones</h2>
+        <p class="hint" id="grades-sub"></p>
+      </div>
+      <button class="icon-btn" data-action="close" aria-label="Cerrar">✕</button>
+    </div>
+    <form id="grades-form" class="grades-form" onsubmit="return false">
+      <p class="hint settings-sub">¿Cuánto vale cada apartado?</p>
+      <div class="weights">
+        <label>Asistencia <span><input name="records" inputmode="decimal" maxlength="5">%</span></label>
+        <label>Lecturas <span><input name="lect" inputmode="decimal" maxlength="5">%</span></label>
+        <label>Trabajos <span><input name="trab" inputmode="decimal" maxlength="5">%</span></label>
+        <label>Disciplina <span><input name="disc" inputmode="decimal" maxlength="5">%</span></label>
+        <label>Examen <span><input name="exam" inputmode="decimal" maxlength="5">%</span></label>
+      </div>
+      <p class="weights-total" id="weights-total"></p>
+      <div class="grade-opts">
+        <label>Retardo vale
+          <select name="retardo"><option value="100">como asistencia</option><option value="50">media asistencia</option><option value="0">como falta</option></select>
+        </label>
+        <label>Calificar sobre
+          <select name="escala"><option value="10">10</option><option value="100">100</option></select>
+        </label>
+      </div>
+    </form>
+    <div class="preview-scroll"><table class="sheet grades-table" id="grades-table"></table></div>
+    <div class="row">
+      <button class="btn" data-action="close">Cerrar</button>
+      <button class="btn primary" id="grades-export">Exportar Excel</button>
     </div>
   </dialog>
 

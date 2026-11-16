@@ -19,7 +19,8 @@
  *
  * Disciplina no lleva una columna por día: al final van 2 columnas de resumen,
  * "Días con 0" (cantidad) y "Fechas" (las fechas en que sacó 0).
- * Examen tampoco: solo hay columna en las fechas en que hubo examen, al final de todo.
+ * Examen tampoco: solo hay columna en las fechas en que hubo examen.
+ * Al final de todo, si el maestro definió porcentajes, van las calificaciones (por apartado y total).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -129,7 +130,12 @@
       for (let c = hdr.col + 1; c <= lastCol; c++) {
         // Resumen de disciplina: de la columna "Fechas" se recuperan los días con 0.
         const ht = clean(cellText(ws.getCell(hdr.row, c).value));
-        if (/DISCIPLINA/i.test(ht)) {
+        // Columnas de calificación escritas por la app: se reconocen para poder reescribirlas.
+        if (/^CALIFICACI[OÓ]N SOBRE \d+$/i.test(ht) || /^(ASISTENCIA|LECTURAS|TRABAJOS|DISCIPLINA|EXAMEN) \d+(\.\d+)?%$/i.test(ht)) {
+          dateCols.push(c);
+          continue;
+        }
+        if (/^DISCIPLINA (D[IÍ]AS CON 0|FECHAS)$/i.test(ht)) {
           dateCols.push(c);
           if (/FECHA/i.test(ht)) {
             for (const s of students) {
@@ -237,8 +243,70 @@
     return datesWith(g, 'exam').map((date, i) => ({ col: dc.dates + 2 + i, date }));
   }
 
+  // ---------- Calificaciones ----------
+  // Apartados que se califican, en orden.
+  const GRADE_PARTS = [
+    { key: 'records', label: 'Asistencia' },
+    { key: 'lect', label: 'Lecturas' },
+    { key: 'trab', label: 'Trabajos' },
+    { key: 'disc', label: 'Disciplina' },
+    { key: 'exam', label: 'Examen' },
+  ];
+  const DEFAULT_GRADING = { w: { records: 0, lect: 0, trab: 0, disc: 0, exam: 0 }, retardo: 100, escala: 10 };
+  const round1 = (n) => Math.round(n * 10) / 10;
+  const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+
+  // Porcentaje (0-100) de cada apartado para un alumno; null si aún no hay datos.
+  // Solo cuenta lo capturado: un día sin captura para ese alumno no suma ni resta.
+  function gradeParts(g, row, grading) {
+    grading = Object.assign({}, DEFAULT_GRADING, grading);
+    const vals = (key) => Object.keys(g[key] || {}).map((d) => [d, g[key][d][row]]).filter(([, v]) => v != null);
+    const att = vals('records');
+    // Asistencia y Justificado = 100 %, Retardo = lo que diga el maestro, Falta = 0 %.
+    const attScore = { A: 100, J: 100, R: Number(grading.retardo) || 0, F: 0 };
+    // Disciplina: días en que el alumno estuvo en clase (A o R) o tuvo reporte; 10 salvo los días con 0.
+    const present = new Set(att.filter(([, v]) => v === 'A' || v === 'R').map(([d]) => d));
+    const zeros = discDates(g, row);
+    zeros.forEach((d) => present.add(d));
+    return {
+      records: avg(att.map(([, v]) => attScore[v])),
+      lect: avg(vals('lect').map(([, v]) => (v === 'S' ? 100 : 0))),
+      trab: avg(vals('trab').map(([, v]) => Number(v))),
+      disc: present.size ? (100 * (present.size - zeros.length)) / present.size : null,
+      exam: avg(vals('exam').map(([, v]) => Number(v))),
+    };
+  }
+
+  // Calificación final en la escala elegida (10 o 100). Los apartados sin datos aún no cuentan
+  // y su porcentaje se reparte entre los demás, para que siempre haya una calificación al día.
+  function finalGrade(g, row, grading) {
+    grading = Object.assign({}, DEFAULT_GRADING, grading);
+    const parts = gradeParts(g, row, grading);
+    let sum = 0;
+    let wsum = 0;
+    for (const p of GRADE_PARTS) {
+      const w = Number(grading.w[p.key]) || 0;
+      if (w > 0 && parts[p.key] != null) { sum += w * parts[p.key]; wsum += w; }
+    }
+    const final = wsum ? round1(((sum / wsum) * (Number(grading.escala) || 10)) / 100) : null;
+    return { parts, final };
+  }
+  const gradingOn = (grading) => !!grading && GRADE_PARTS.some((p) => Number((grading.w || {})[p.key]) > 0);
+
+  // Columnas de calificación: una por apartado con porcentaje > 0 y la final. Van al final de todo.
+  function gradeCols(g, grading) {
+    if (!gradingOn(grading)) return [];
+    const dc = discCols(g);
+    const ex = examCols(g);
+    let col = ex.length ? ex[ex.length - 1].col + 2 : dc ? dc.dates + 2 : g.startCol;
+    const out = GRADE_PARTS.filter((p) => Number(grading.w[p.key]) > 0)
+      .map((p) => ({ col: col++, key: p.key, label: `${p.label}\n${Number(grading.w[p.key])}%` }));
+    out.push({ col: col++, key: 'final', label: `Calificación\nsobre ${Number(grading.escala) || 10}` });
+    return out;
+  }
+
   // Escribe los datos en una copia del Excel original y devuelve el buffer .xlsx
-  async function exportWorkbook(ExcelJS, originalBuffer, groups, codes = DEFAULT_CODES) {
+  async function exportWorkbook(ExcelJS, originalBuffer, groups, codes = DEFAULT_CODES, grading = null) {
     codes = Object.assign({}, DEFAULT_CODES, codes);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(originalBuffer);
@@ -374,12 +442,43 @@
           };
         }
       });
+
+      // Calificaciones (valores calculados por la app).
+      const gc = gradeCols(g, grading);
+      gc.forEach(({ col, key, label }, i) => {
+        const thick = { style: 'medium', color: { argb: 'FF555555' } };
+        const isFinal = key === 'final';
+        const b = Object.assign({}, border, i === 0 ? { left: thick } : {}, i === gc.length - 1 ? { right: thick } : {}, isFinal ? { left: thick } : {});
+        const fill = isFinal ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } } : undefined;
+        const h = ws.getCell(g.headerRow, col);
+        h.value = label;
+        h.style = {
+          font: Object.assign({}, headerSrc.font, { bold: true }),
+          alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
+          border: b,
+          ...(fill ? { fill } : {}),
+        };
+        ws.getColumn(col).width = isFinal ? 13 : 11;
+        for (const s of g.students) {
+          const r = finalGrade(g, s.row, grading);
+          const v = isFinal ? r.final : r.parts[key];
+          const cell = ws.getCell(s.row, col);
+          cell.value = v == null ? null : round1(v);
+          cell.style = {
+            font: Object.assign({}, ws.getCell(s.row, g.nameCol).font || {}, isFinal ? { bold: true } : {}),
+            alignment: { horizontal: 'center', vertical: 'middle' },
+            border: b,
+            ...(fill ? { fill } : {}),
+          };
+        }
+      });
     }
     return wb.xlsx.writeBuffer();
   }
 
   return {
     STATUSES, READ, WORK, CATS, DEFAULT_CODES,
-    parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, discDates, examCols, shortDate, parseHeader, parseDateHeader, cellText,
+    parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, discDates, examCols, shortDate,
+    GRADE_PARTS, DEFAULT_GRADING, gradeParts, finalGrade, gradeCols, gradingOn, round1, parseHeader, parseDateHeader, cellText,
   };
 });
