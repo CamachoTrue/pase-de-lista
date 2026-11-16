@@ -55,6 +55,10 @@
   };
   // Porcentajes de un grupo, completos (con los valores por defecto que falten).
   const fixGrading = (gr) => JSON.parse(JSON.stringify({ ...DEFAULT_GRADING, ...(gr || {}), w: { ...DEFAULT_GRADING.w, ...((gr || {}).w || {}) } }));
+  // Nombre del grupo para mostrar: hoja del Excel y, si el maestro la puso, la materia (p. ej. "V205 · Ética").
+  const gname = (g) => (g.subject ? `${g.sheet} · ${g.subject}` : g.sheet);
+  // En el selector: con materia se omite el número de alumnos para que quepa el nombre.
+  const glabel = (g) => (g.subject ? gname(g) : `${g.sheet} · ${g.students.length} alumnos`);
   const STORE_KEY = 'paseDeLista.v1';
   const $ = (s) => document.querySelector(s);
 
@@ -123,6 +127,7 @@
       groups.forEach((g) => {
         const prev = old.find((o) => o.sheet === g.sheet);
         g.grading = fixGrading(prev && prev.grading);
+        if (prev && prev.subject) g.subject = prev.subject; // la materia también se conserva
       });
       state = { fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, ui: { group: 0, date: todayISO(), tab: 'records' } };
       save();
@@ -144,7 +149,7 @@
 
     const sel = $('#group-select');
     sel.innerHTML = state.groups
-      .map((g, i) => `<option value="${i}">${escapeHtml(g.sheet)} · ${g.students.length} alumnos</option>`)
+      .map((g, i) => `<option value="${i}">${escapeHtml(glabel(g))}</option>`)
       .join('');
     sel.value = state.ui.group;
     $('#date-input').value = state.ui.date;
@@ -159,7 +164,7 @@
 
   function refresh() {
     const opt = $('#group-select').options[state.ui.group];
-    if (opt) opt.textContent = `${group().sheet} · ${group().students.length} alumnos`;
+    if (opt) opt.textContent = glabel(group());
     const t = tab();
     document.querySelectorAll('.tab').forEach((b) => {
       b.classList.toggle('on', b.dataset.tab === t);
@@ -677,7 +682,7 @@
     if (cardIdx > g.students.length) cardIdx = g.students.length;
     $('#remove-student').close();
     refresh();
-    toast(`${s.name} quitado de ${g.sheet}`);
+    toast(`${s.name} quitado de ${gname(g)}`);
   });
 
   $('#students').addEventListener('click', async (e) => {
@@ -754,7 +759,7 @@
   function openAddStudent() {
     const g = group();
     const nums = g.students.map((s) => Number(s.no)).filter(Number.isFinite);
-    $('#add-group').textContent = `Grupo ${g.sheet} · ${g.students.length} alumnos`;
+    $('#add-group').textContent = `Grupo ${gname(g)} · ${g.students.length} alumnos`;
     $('#add-name').value = '';
     $('#add-no').value = nums.length ? Math.max(...nums) + 1 : g.students.length + 1;
     $('#add-error').textContent = '';
@@ -786,7 +791,7 @@
     view = 'card';
     cardIdx = g.students.length - 1;
     refresh();
-    toast(`${name} agregado a ${g.sheet}`);
+    toast(`${name} agregado a ${gname(g)}`);
   });
 
   // ---------- Vista previa ----------
@@ -880,7 +885,7 @@
     html += '</tbody>';
     $('#preview-table').innerHTML = html;
 
-    $('#preview-title').textContent = `Vista previa · ${g.sheet}`;
+    $('#preview-title').textContent = `Vista previa · ${gname(g)}`;
     $('#preview-sub').textContent = dates.length || dc
       ? `${g.students.length} alumnos · ${dates.length} día(s) · Asistencia y Lectura juntas; Trabajos y Disciplina aparte a la derecha`
       : 'Aún no hay registros en este grupo.';
@@ -988,13 +993,13 @@
     const g = group();
     book.key = g.sheet;
     closeBookDoc();
-    $('#book-sub').textContent = g.sheet;
+    $('#book-sub').textContent = gname(g);
     $('#book').showModal();
     bookShow('loading');
     let rec;
     try { rec = await bookDB.get(book.key); } catch (err) { console.error(err); }
     if (!rec) {
-      $('#book-empty-text').textContent = `Aún no hay cuadernillo para ${g.sheet}. Sube el PDF una sola vez y aquí lo verás siempre, también sin internet.`;
+      $('#book-empty-text').textContent = `Aún no hay cuadernillo para ${gname(g)}. Sube el PDF una sola vez y aquí lo verás siempre, también sin internet.`;
       bookShow('empty');
       return;
     }
@@ -1017,7 +1022,7 @@
       bookShow('empty');
       return;
     }
-    $('#book-sub').textContent = `${book.key} · ${rec.name} · ${fmtSize(rec.size)}`;
+    $('#book-sub').textContent = `${gname(group())} · ${rec.name} · ${fmtSize(rec.size)}`;
     $('#book-total').textContent = book.doc.numPages;
     bookShow('doc');
     await layoutBook(Math.min(rec.page || 1, book.doc.numPages));
@@ -1154,22 +1159,44 @@
     }
     closeBookDoc();
     book.zoom = 0;
-    toast(`Cuadernillo guardado para ${book.key}`);
+    toast(`Cuadernillo guardado para ${gname(group())}`);
     showBookDoc(rec);
   });
   $('#book-remove').addEventListener('click', async () => {
     const key = book.key;
     const name = book.rec ? book.rec.name : 'el cuadernillo';
-    if (!(await confirmBulk(`¿Quitar el cuadernillo de ${key}?`, `Se borra “${name}” de este dispositivo. Puedes volver a subirlo cuando quieras.`, 'Sí, quitar', true))) return;
+    if (!(await confirmBulk(`¿Quitar el cuadernillo de ${gname(group())}?`, `Se borra “${name}” de este dispositivo. Puedes volver a subirlo cuando quieras.`, 'Sí, quitar', true))) return;
     await bookDB.del(key).catch(() => {});
     closeBookDoc();
     book.rec = null;
-    $('#book-sub').textContent = key;
-    $('#book-empty-text').textContent = `Aún no hay cuadernillo para ${key}. Sube el PDF una sola vez y aquí lo verás siempre, también sin internet.`;
+    $('#book-sub').textContent = gname(group());
+    $('#book-empty-text').textContent = `Aún no hay cuadernillo para ${gname(group())}. Sube el PDF una sola vez y aquí lo verás siempre, también sin internet.`;
     bookShow('empty');
     toast('Cuadernillo quitado');
   });
   $('#book').addEventListener('close', () => { $('#book').classList.remove('reading'); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); clearTimeout(book.saveTimer); if (book.rec && book.rec.page !== book.page && book.doc) { book.rec.page = book.page; bookDB.put(book.key, book.rec).catch(() => {}); } closeBookDoc(); });
+
+  // ---------- Materia del grupo ----------
+  // Para maestros que tienen el mismo grupo dos veces en el Excel (una hoja por materia).
+  function openSubject() {
+    const g = group();
+    $('#subject-group').textContent = `Hoja del Excel: ${g.sheet} · ${g.students.length} alumnos`;
+    $('#subject-input').value = g.subject || '';
+    $('#subject-clear').hidden = !g.subject;
+    $('#subject').showModal();
+    setTimeout(() => $('#subject-input').focus(), 50);
+  }
+  function setSubject(v) {
+    const g = group();
+    g.subject = v.replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (!g.subject) delete g.subject;
+    save();
+    $('#subject').close();
+    refresh();
+    toast(g.subject ? `${g.sheet} ahora dice “${g.subject}”` : `${g.sheet} quedó sin materia`);
+  }
+  $('#subject-form').addEventListener('submit', (e) => { e.preventDefault(); setSubject($('#subject-input').value); });
+  $('#subject-clear').addEventListener('click', () => setSubject(''));
 
   // ---------- Resumen por alumno ----------
   // Para quejas o dudas del alumno o de los padres: todo lo capturado de un alumno y su Excel individual.
@@ -1189,7 +1216,7 @@
     $('#student-export').hidden = !picked;
     $('#student-close').hidden = !!picked;
     if (!picked) {
-      $('#student-sub').textContent = `${g.sheet} · elige un alumno`;
+      $('#student-sub').textContent = `${gname(g)} · elige un alumno`;
       const q = normalize($('#student-search').value);
       const shown = g.students.filter((s) => !q || normalize(s.name).includes(q));
       $('#student-list').innerHTML = shown.length
@@ -1201,11 +1228,11 @@
       return;
     }
     const r = studentReport(g, studentRow, g.grading);
-    $('#student-sub').textContent = g.sheet;
+    $('#student-sub').textContent = gname(g);
     const pct = (v) => (v == null ? 'Sin datos' : `${round1(v)} %`);
     const cls = { A: 'A', F: 'F', R: 'R', J: 'J' };
     $('#student-report').innerHTML =
-      `<div class="sr-head"><div><b>${escapeHtml(picked.name)}</b><small>No. ${escapeHtml(picked.no)} · ${escapeHtml(g.sheet)}</small></div>` +
+      `<div class="sr-head"><div><b>${escapeHtml(picked.name)}</b><small>No. ${escapeHtml(picked.no)} · ${escapeHtml(gname(g))}</small></div>` +
       `<div class="sr-final">${r.final == null ? '—' : r.final}<small>${r.graded ? `sobre ${r.grading.escala}` : 'sin porcentajes'}</small></div></div>` +
       '<table class="sheet sr-parts"><thead><tr><th>Apartado</th><th>Vale</th><th>Resultado</th></tr></thead><tbody>' +
       GRADE_PARTS.map((p) => `<tr><td><b>${p.label}</b><small>${escapeHtml(r.detail[p.key])}</small></td>` +
@@ -1241,7 +1268,7 @@
     try {
       const out = await exportStudent(ExcelJS, g, s.row, g.grading);
       const safe = (t) => String(t).replace(/[\\/:*?"<>|]+/g, ' ').trim();
-      await deliverFile(out, `${safe(s.name)} - ${safe(g.sheet)} - resumen.xlsx`);
+      await deliverFile(out, `${safe(s.name)} - ${safe(gname(g))} - resumen.xlsx`);
       toast('Excel del alumno generado');
     } catch (err) {
       console.error(err);
@@ -1271,11 +1298,12 @@
     if (action === 'grades') openGrades();
     if (action === 'student') openStudent();
     if (action === 'book') openBook();
+    if (action === 'subject') openSubject();
     if (action === 'history') openHistory();
     if (action === 'settings') openSettings();
     if (action === 'clear-day') {
       confirmBulk(`¿Borrar los registros del ${fmtDate(state.ui.date)}?`,
-        `Se borran asistencia, lecturas, trabajos, disciplina y examen de ese día en ${group().sheet}. No se puede deshacer.`,
+        `Se borran asistencia, lecturas, trabajos, disciplina y examen de ese día en ${gname(group())}. No se puede deshacer.`,
         'Sí, borrar', true).then((ok) => {
         if (!ok) return;
         KEYS.forEach((k) => { if (group()[k]) delete group()[k][state.ui.date]; });
@@ -1321,7 +1349,7 @@
   function openGrades() {
     const f = $('#grades-form');
     gradeDraft = JSON.parse(JSON.stringify(group().grading));
-    $('#grades-scope').textContent = `¿Cuánto vale cada apartado en ${group().sheet}? Cada grupo tiene sus propios porcentajes y se guardan todo el semestre.`;
+    $('#grades-scope').textContent = `¿Cuánto vale cada apartado en ${gname(group())}? Cada grupo tiene sus propios porcentajes y se guardan todo el semestre.`;
     const gr = gradeDraft;
     GRADE_PARTS.forEach((p) => (f.elements[p.key].value = gr.w[p.key] || ''));
     f.elements.retardo.value = String(gr.retardo);
@@ -1349,7 +1377,7 @@
     group().grading = JSON.parse(JSON.stringify(gradeDraft));
     save();
     renderGrades();
-    toast(`Porcentajes de ${group().sheet} guardados. La calificación saldrá siempre en la vista previa y el Excel.`);
+    toast(`Porcentajes de ${gname(group())} guardados. La calificación saldrá siempre en la vista previa y el Excel.`);
   });
   // Al cerrar sin guardar se descartan los cambios (avisando).
   $('#grades').addEventListener('close', () => {
@@ -1369,7 +1397,7 @@
     const btn = $('#grades-save');
     btn.disabled = saved;
     btn.textContent = saved ? 'Guardado ✓' : 'Guardar porcentajes';
-    $('#grades-sub').textContent = `${g.sheet} · ${g.students.length} alumnos · sobre ${gr.escala}`;
+    $('#grades-sub').textContent = `${gname(g)} · ${g.students.length} alumnos · sobre ${gr.escala}`;
     const parts = GRADE_PARTS.filter((p) => gr.w[p.key] > 0);
     if (!parts.length) {
       $('#grades-table').innerHTML = '<tbody><tr><td class="grades-empty">Escribe cuánto vale cada apartado para ver las calificaciones.</td></tr></tbody>';

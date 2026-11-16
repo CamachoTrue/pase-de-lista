@@ -140,6 +140,7 @@
   <!-- Menú -->
   <dialog id="menu">
     <h2>Opciones</h2>
+    <button class="menu-item" data-action="subject">Materia de este grupo</button>
     <button class="menu-item" data-action="grades">Calificaciones y porcentajes</button>
     <button class="menu-item" data-action="student">Resumen por alumno</button>
     <button class="menu-item" data-action="book">Cuadernillo del grupo (PDF)</button>
@@ -294,6 +295,23 @@
       </div>
     </div>
     <input type="file" id="book-file" accept="application/pdf,.pdf" hidden>
+  </dialog>
+
+  <!-- Materia del grupo -->
+  <dialog id="subject">
+    <h2>Materia de este grupo</h2>
+    <p class="hint" id="subject-group"></p>
+    <form id="subject-form">
+      <label class="field">Materia
+        <input id="subject-input" maxlength="40" autocomplete="off" placeholder="Ej. Literatura">
+      </label>
+      <p class="hint">Sale junto al grupo al cambiar de grupo, p. ej. “V205 · Literatura”. Sirve cuando el mismo grupo está dos veces en el Excel porque das dos materias.</p>
+      <div class="row">
+        <button type="button" class="btn" data-action="close">Cancelar</button>
+        <button type="button" class="btn danger" id="subject-clear" hidden>Quitar</button>
+        <button type="submit" class="btn primary">Guardar</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- Agregar alumno nuevo -->

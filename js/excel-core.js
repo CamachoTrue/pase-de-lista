@@ -612,7 +612,7 @@
     put(y, 1, 'Resumen del alumno', { bold: true });
     ws.getCell(y, 1).font = { name: 'Calibri', size: 16, bold: true };
     y += 2;
-    const info = [['Alumno', s ? s.name : ''], ['No. de lista', s ? s.no : ''], ['Grupo', g.title ? `${g.sheet} — ${g.title}` : g.sheet],
+    const info = [['Alumno', s ? s.name : ''], ['No. de lista', s ? s.no : ''], ['Grupo', g.title ? `${g.sheet} — ${g.title}` : g.sheet], ...(g.subject ? [['Materia', g.subject]] : []),
       ['Generado', longDate((() => { const t = new Date(); return `${t.getFullYear()}-${t.getMonth() + 1}-${t.getDate()}`; })())]];
     info.forEach(([k, v]) => { put(y, 1, k, { bold: true }); ws.mergeCells(y, 2, y, 4); put(y, 2, v == null ? '' : String(v)); y++; });
     y++;
