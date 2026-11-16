@@ -1037,6 +1037,7 @@
     }
     box.innerHTML = html;
     $('#book-zoom-val').textContent = `${Math.round(ZOOMS[book.zoom] * 100)} %`;
+    $('#book-fpage').textContent = `${book.page} / ${book.doc.numPages}`;
     book.observer = new IntersectionObserver((entries) => entries.forEach((e) => {
       if (e.isIntersecting) drawPage(e.target, gen);
       else { const c = e.target.querySelector('canvas'); if (c) { c.width = 0; c.remove(); } } // libera memoria
@@ -1077,6 +1078,7 @@
   function setBookPage(n) {
     book.page = n;
     if (document.activeElement !== $('#book-page')) $('#book-page').value = n;
+    if (book.doc) $('#book-fpage').textContent = `${n} / ${book.doc.numPages}`;
     // Recuerda la página para abrir ahí la próxima vez.
     clearTimeout(book.saveTimer);
     const rec = book.rec;
@@ -1110,6 +1112,29 @@
   };
   $('#book-zoom-in').addEventListener('click', () => zoomBook(1));
   $('#book-zoom-out').addEventListener('click', () => zoomBook(-1));
+  // Pantalla completa: solo el PDF, con controles flotantes mínimos.
+  // En Android usa la pantalla completa del sistema; en iPhone (no la permite) ocupa toda la ventana de la app.
+  const bookDlg = $('#book');
+  const isReading = () => bookDlg.classList.contains('reading');
+  async function setReading(on) {
+    if (on === isReading() || !book.doc) return;
+    const page = book.page;
+    bookDlg.classList.toggle('reading', on);
+    try {
+      if (on && bookDlg.requestFullscreen && !document.fullscreenElement) await bookDlg.requestFullscreen({ navigationUI: 'hide' });
+      if (!on && document.fullscreenElement) await document.exitFullscreen();
+    } catch (err) { /* sin pantalla completa del sistema: basta con ocultar lo demás */ }
+    await new Promise((r) => requestAnimationFrame(() => r()));
+    book.gen++;
+    layoutBook(page); // el ancho cambió: se vuelven a acomodar las páginas en la misma página
+  }
+  $('#book-full').addEventListener('click', () => setReading(true));
+  $('#book-exit').addEventListener('click', () => setReading(false));
+  $('#book-fzoom-in').addEventListener('click', () => zoomBook(1));
+  $('#book-fzoom-out').addEventListener('click', () => zoomBook(-1));
+  // Botón "atrás"/Esc del sistema: primero sale de pantalla completa, no cierra el cuadernillo.
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && isReading()) setReading(false); });
+  bookDlg.addEventListener('cancel', (e) => { if (isReading()) { e.preventDefault(); setReading(false); } });
   $('#book-upload').addEventListener('click', () => $('#book-file').click());
   $('#book-change').addEventListener('click', () => $('#book-file').click());
   $('#book-file').addEventListener('change', async (e) => {
@@ -1144,7 +1169,7 @@
     bookShow('empty');
     toast('Cuadernillo quitado');
   });
-  $('#book').addEventListener('close', () => { clearTimeout(book.saveTimer); if (book.rec && book.rec.page !== book.page && book.doc) { book.rec.page = book.page; bookDB.put(book.key, book.rec).catch(() => {}); } closeBookDoc(); });
+  $('#book').addEventListener('close', () => { $('#book').classList.remove('reading'); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); clearTimeout(book.saveTimer); if (book.rec && book.rec.page !== book.page && book.doc) { book.rec.page = book.page; bookDB.put(book.key, book.rec).catch(() => {}); } closeBookDoc(); });
 
   // ---------- Resumen por alumno ----------
   // Para quejas o dudas del alumno o de los padres: todo lo capturado de un alumno y su Excel individual.

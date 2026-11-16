@@ -280,8 +280,18 @@
     <div id="book-pages" class="book-pages" hidden></div>
     <p id="book-loading" class="hint book-loading" hidden>Abriendo cuadernillo…</p>
     <div class="row" id="book-actions" hidden>
-      <button class="btn" id="book-change">Cambiar PDF</button>
+      <button class="btn" id="book-change">Cambiar</button>
       <button class="btn danger" id="book-remove">Quitar</button>
+      <button class="btn primary book-full-btn" id="book-full">⤢ Ver grande</button>
+    </div>
+    <!-- Controles flotantes en pantalla completa -->
+    <div class="book-float" id="book-float">
+      <button class="book-fab" id="book-exit" aria-label="Salir de pantalla completa">✕</button>
+      <div class="book-fbar">
+        <button class="book-fab" id="book-fzoom-out" aria-label="Alejar">−</button>
+        <span id="book-fpage">1 / 1</span>
+        <button class="book-fab" id="book-fzoom-in" aria-label="Acercar">+</button>
+      </div>
     </div>
     <input type="file" id="book-file" accept="application/pdf,.pdf" hidden>
   </dialog>
