@@ -53,6 +53,8 @@
     if (!g[cat][state.ui.date] && create) g[cat][state.ui.date] = {};
     return g[cat][state.ui.date] || {};
   };
+  // Porcentajes de un grupo, completos (con los valores por defecto que falten).
+  const fixGrading = (gr) => JSON.parse(JSON.stringify({ ...DEFAULT_GRADING, ...(gr || {}), w: { ...DEFAULT_GRADING.w, ...((gr || {}).w || {}) } }));
   const STORE_KEY = 'paseDeLista.v1';
   const $ = (s) => document.querySelector(s);
 
@@ -116,8 +118,13 @@
         toast('No encontré una columna “NOMBRE” en ninguna hoja');
         return;
       }
-      const grading = (state && state.grading) || JSON.parse(JSON.stringify(DEFAULT_GRADING));
-      state = { fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, grading, ui: { group: 0, date: todayISO(), tab: 'records' } };
+      // Porcentajes por grupo: si el grupo ya existía (misma hoja), conserva los suyos.
+      const old = (state && state.groups) || [];
+      groups.forEach((g) => {
+        const prev = old.find((o) => o.sheet === g.sheet);
+        g.grading = fixGrading(prev && prev.grading);
+      });
+      state = { fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, ui: { group: 0, date: todayISO(), tab: 'records' } };
       save();
       const total = groups.reduce((n, g) => n + g.students.length, 0);
       toast(`${groups.length} grupo(s), ${total} alumnos cargados`);
@@ -754,7 +761,7 @@
     const g = group();
     let ws;
     try {
-      const out = await exportWorkbook(ExcelJS, b64ToBuf(state.fileB64), [g], state.codes, state.grading);
+      const out = await exportWorkbook(ExcelJS, b64ToBuf(state.fileB64), [g], state.codes);
       const wb = new ExcelJS.Workbook();
       await wb.xlsx.load(out);
       ws = wb.getWorksheet(g.sheet);
@@ -770,7 +777,7 @@
     const dc = discCols(g);
     const ex = examCols(g);
     const exCol = new Map(ex.map((x, i) => [x.col, { ...x, first: i === 0, last: i === ex.length - 1 }]));
-    const gcs = gradeCols(g, state.grading);
+    const gcs = gradeCols(g, g.grading);
     const gcCol = new Map(gcs.map((x, i) => [x.col, { ...x, first: i === 0, last: i === gcs.length - 1 }]));
     const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col), dc ? dc.dates : 0, ...ex.map((x) => x.col), ...gcs.map((x) => x.col));
     const isCur = (c) => byCol.has(c) && byCol.get(c).date === state.ui.date;
@@ -865,7 +872,7 @@
   async function doExport(btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
     try {
-      const out = await exportWorkbook(ExcelJS, b64ToBuf(state.fileB64), state.groups, state.codes, state.grading);
+      const out = await exportWorkbook(ExcelJS, b64ToBuf(state.fileB64), state.groups, state.codes);
       await deliverFile(out, state.fileName.replace(/\.xlsx$/i, '') + ' - asistencia.xlsx');
       toast('Excel generado');
     } catch (err) {
@@ -914,13 +921,13 @@
       const shown = g.students.filter((s) => !q || normalize(s.name).includes(q));
       $('#student-list').innerHTML = shown.length
         ? shown.map((s) => {
-            const f = finalGrade(g, s.row, state.grading).final;
+            const f = finalGrade(g, s.row, g.grading).final;
             return `<li data-row="${s.row}"><span class="no">${escapeHtml(s.no)}</span><span class="nm">${escapeHtml(s.name)}</span>${f != null ? `<span class="cal">${f}</span>` : ''}</li>`;
           }).join('')
         : '<li class="empty">Ningún alumno coincide con la búsqueda.</li>';
       return;
     }
-    const r = studentReport(g, studentRow, state.grading);
+    const r = studentReport(g, studentRow, g.grading);
     $('#student-sub').textContent = g.sheet;
     const pct = (v) => (v == null ? 'Sin datos' : `${round1(v)} %`);
     const cls = { A: 'A', F: 'F', R: 'R', J: 'J' };
@@ -959,7 +966,7 @@
     btn.disabled = true;
     btn.textContent = 'Generando…';
     try {
-      const out = await exportStudent(ExcelJS, g, s.row, state.grading);
+      const out = await exportStudent(ExcelJS, g, s.row, g.grading);
       const safe = (t) => String(t).replace(/[\\/:*?"<>|]+/g, ' ').trim();
       await deliverFile(out, `${safe(s.name)} - ${safe(g.sheet)} - resumen.xlsx`);
       toast('Excel del alumno generado');
@@ -1039,7 +1046,8 @@
   const sameGrading = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   function openGrades() {
     const f = $('#grades-form');
-    gradeDraft = JSON.parse(JSON.stringify(state.grading));
+    gradeDraft = JSON.parse(JSON.stringify(group().grading));
+    $('#grades-scope').textContent = `¿Cuánto vale cada apartado en ${group().sheet}? Cada grupo tiene sus propios porcentajes y se guardan todo el semestre.`;
     const gr = gradeDraft;
     GRADE_PARTS.forEach((p) => (f.elements[p.key].value = gr.w[p.key] || ''));
     f.elements.retardo.value = String(gr.retardo);
@@ -1057,28 +1065,28 @@
     gradeDraft.retardo = Number(f.elements.retardo.value);
     gradeDraft.escala = Number(f.elements.escala.value);
     const lm = Math.round(Number(f.elements.lectMin.value));
-    gradeDraft.lectMin = Number.isFinite(lm) && lm >= 1 ? lm : state.grading.lectMin;
+    gradeDraft.lectMin = Number.isFinite(lm) && lm >= 1 ? lm : group().grading.lectMin;
     renderGrades();
   });
   const draftTotal = () => round1(GRADE_PARTS.reduce((n, p) => n + (gradeDraft.w[p.key] || 0), 0));
   $('#grades-save').addEventListener('click', () => {
     const total = draftTotal();
     if (total !== 100) { toast(`Los porcentajes suman ${total} %; deben sumar 100 %`); return; }
-    state.grading = JSON.parse(JSON.stringify(gradeDraft));
+    group().grading = JSON.parse(JSON.stringify(gradeDraft));
     save();
     renderGrades();
-    toast('Porcentajes guardados. La calificación saldrá siempre en la vista previa y el Excel.');
+    toast(`Porcentajes de ${group().sheet} guardados. La calificación saldrá siempre en la vista previa y el Excel.`);
   });
   // Al cerrar sin guardar se descartan los cambios (avisando).
   $('#grades').addEventListener('close', () => {
-    if (gradeDraft && !sameGrading(gradeDraft, state.grading)) toast('No se guardaron los cambios en los porcentajes');
+    if (gradeDraft && !sameGrading(gradeDraft, group().grading)) toast('No se guardaron los cambios en los porcentajes');
     gradeDraft = null;
   });
   function renderGrades() {
     const g = group();
     const gr = gradeDraft;
     const total = draftTotal();
-    const saved = sameGrading(gradeDraft, state.grading);
+    const saved = sameGrading(gradeDraft, g.grading);
     const tot = $('#weights-total');
     tot.textContent = total !== 100
       ? `Total: ${total} % — debe sumar 100 %`
@@ -1163,7 +1171,9 @@
     // Datos guardados con la versión anterior (solo asistencia).
     state.codes = { ...DEFAULT_CODES, ...state.codes };
     state.groups.forEach((g) => { g.lect = g.lect || {}; normalizeWorks(g); g.disc = g.disc || {}; g.exam = g.exam || {}; });
-    state.grading = { ...DEFAULT_GRADING, ...state.grading, w: { ...DEFAULT_GRADING.w, ...(state.grading || {}).w } };
+    // Antes los porcentajes eran uno solo para todo el archivo: cada grupo arranca con esa copia.
+    state.groups.forEach((g) => { g.grading = fixGrading(g.grading || state.grading); });
+    delete state.grading;
   }
   render();
 

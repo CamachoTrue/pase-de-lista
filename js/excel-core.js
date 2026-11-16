@@ -501,7 +501,9 @@
       });
 
       // Calificaciones (valores calculados por la app).
-      const gc = gradeCols(g, grading);
+      // Cada grupo tiene sus propios porcentajes (g.grading); `grading` queda como respaldo.
+      const gg = g.grading || grading;
+      const gc = gradeCols(g, gg);
       gc.forEach(({ col, key, label }, i) => {
         const thick = { style: 'medium', color: { argb: 'FF555555' } };
         const isFinal = key === 'final';
@@ -517,7 +519,7 @@
         };
         ws.getColumn(col).width = isFinal ? 13 : 11;
         for (const s of g.students) {
-          const r = finalGrade(g, s.row, grading);
+          const r = finalGrade(g, s.row, gg);
           const v = isFinal ? r.final : r.parts[key];
           const cell = ws.getCell(s.row, col);
           cell.value = v == null ? null : round1(v);
