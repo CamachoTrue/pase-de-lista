@@ -9,7 +9,7 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
 - **Pase de lista uno por uno**: un alumno en pantalla con 4 opciones —
   **A** Asistencia, **F** Falta, **R** Retardo, **J** Justificado. Al elegir, pasa al siguiente.
   Empieza en el primer alumno sin marcar; botones Anterior / Saltar.
-- **Lecturas y trabajos**: pestañas Asistencia / Lecturas / Trabajos. Lecturas es Sí/No y Trabajos 0/50/100,
+- **Pestañas por sección**: Sí/No y 0/50/100 se capturan
   en una lista compacta (unos 13 alumnos por pantalla en celular). Al final, botones para poner Sí o No (Lecturas) o 0 (Trabajos) a los que quedaron sin marcar. Si en Lecturas todos tienen la misma marca, un botón los cambia todos a la otra.
 - **Varios trabajos por día**: en Trabajos, flechas para cambiar de trabajo, botón "+ Otro trabajo" y un nombre opcional
   para cada uno. En el Excel cada trabajo es una columna "dd/mm/aa Trabajo: nombre".
@@ -19,10 +19,12 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
   En el Excel solo hay columna en las fechas con examen, al final de todo.
 - **Materia de cada grupo** (⋮ → Materia de este grupo): para cuando el mismo grupo viene dos veces en el Excel
   (una hoja por materia). El selector muestra p. ej. "V205 · Literatura"; también sale en el resumen por alumno.
-- **Calificaciones** (⋮ → Calificaciones y porcentajes): el maestro define cuánto vale cada apartado, **por grupo** (cada grupo tiene sus propios porcentajes)
-  y la calificación se calcula sola. Asistencia: A y J = 100 %, F = 0 %, R configurable. Lecturas: con el mínimo de Sí que defina el maestro (p. ej. 4) o más = 100 %, debajo proporcional.
-  Trabajos y Examen: promedio. Disciplina: % de días en clase sin 0. Solo cuenta lo capturado; un apartado
-  sin datos aún no cuenta y su peso se reparte. En el Excel van al final, por apartado y total (sobre 10 o 100).
+- **Secciones y calificaciones** (⋮ → Secciones y calificaciones): cada grupo tiene sus propias secciones. El maestro
+  puede **agregar, quitar y renombrar** secciones y elegir la **plantilla** de cada una: Sí/No (con mínimo de "Sí" para el 100 %),
+  0/50/100 (varios por día, con título), Disciplina (todos 10, marcar 0) o Calificación de 0 a 100 (como examen).
+  Asistencia (A/F/R/J) siempre está. Por defecto: Asistencia, Lecturas, Trabajos, Disciplina y Examen.
+  Cada sección es una pestaña y lleva su porcentaje; la calificación se calcula sola (las secciones sin datos aún no cuentan).
+  En el Excel van al final, por sección y total (sobre 10 o 100). Quitar una sección con datos pide confirmación.
 - **Resumen del grupo** (⋮ → Resumen del grupo): alumnos, asistencia promedio, promedio general, faltas y alumnos en riesgo,
   con semáforo por alumno (rojo: calificación < 60 % o asistencia < 80 %; amarillo: < 80 % o < 90 %; verde: lo demás).
   *Vista previa* muestra el Excel tal cual; *Exportar Excel* genera el archivo con los indicadores y cada alumno coloreado, para el director.

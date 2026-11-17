@@ -2,27 +2,17 @@
  * Lógica de Excel: leer la lista del maestro y escribir las columnas de cada día.
  * Funciona en el navegador (window.ListaExcel) y en Node (module.exports) para pruebas.
  *
- * Columnas por fecha: primero Asistencia + Lectura juntas (2 por día); después,
- * separadas por una columna vacía, las de Trabajo (1 por día).
+ * Cada grupo tiene sus SECCIONES (g.sections), que el maestro puede agregar, quitar y renombrar.
+ * Cada sección usa una PLANTILLA (type):
+ *   asist  Asistencia A/F/R/J (siempre existe, id 'records')      g.records[fecha] = { fila: 'A' }
+ *   sino   Sí / No, con mínimo de "Sí" para el 100 %               g[id][fecha] = { fila: 'S' | 'N' }
+ *   trab   0 / 50 / 100, varios por día con título                 g[id][fecha] = [{ title, vals: { fila: 0|50|100 } }]
+ *   disc   Disciplina: todos 10, solo se guarda el 0               g[id][fecha] = { fila: 0 }
+ *   num    Calificación 0 a 100 (como examen)                      g[id][fecha] = { fila: 85 }
  *
- * Modelo de un grupo:
- * {
- *   sheet: 'V205', title: 'GRUPO V205 SEM B 20-21',
- *   headerRow: 4, nameCol: 2, startCol: 3, dateCols: [..],
- *   students: [{ row: 5, no: '1', name: 'ACOSTA SANCHEZ ...', added?: true }],
- *   records: { '2026-11-14': { 5: 'A', 6: 'F' } },   // asistencia: A/F/R/J
- *   lect:    { '2026-11-14': { 5: 'S', 6: 'N' } },   // lectura: S (sí) / N (no)
- *   trab:    { '2026-11-14': [                        // trabajos del día (puede haber varios)
- *              { title: 'Ensayo', vals: { 5: 100, 6: 50 } },   // 0 / 50 / 100
- *            ] },
- *   disc:    { '2026-11-14': { 6: 0 } },             // disciplina: solo se guardan los 0 (los demás tienen 10)
- *   exam:    { '2026-11-14': { 5: 60, 6: 100 } }     // examen: porcentaje 0-100
- * }
- *
- * Disciplina no lleva una columna por día: al final van 2 columnas de resumen,
- * "Días con 0" (cantidad) y "Fechas" (las fechas en que sacó 0).
- * Examen tampoco: solo hay columna en las fechas en que hubo examen.
- * Al final de todo, si el maestro definió porcentajes, van las calificaciones (por apartado y total).
+ * Columnas del Excel, de izquierda a derecha (cada bloque separado por una columna vacía):
+ *   por fecha: Asistencia + las secciones Sí/No · cada sección de trabajos · resumen de cada disciplina
+ *   (Días con 0 y Fechas) · cada sección 0-100 (solo fechas con datos) · calificaciones.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -34,15 +24,26 @@
   const READ = ['S', 'N'];
   const WORK = [0, 50, 100];
   const DEFAULT_CODES = { A: 1, F: 0, R: 2, J: 3, S: 1, N: 0 };
-  // Categorías por día, en el orden de las columnas del Excel.
-  const CATS = [
-    { key: 'records', label: 'Asistencia', match: /^ASIST/i },
-    { key: 'lect', label: 'Lectura', match: /^LECT/i },
-    { key: 'trab', label: 'Trabajo', match: /^TRAB/i },
-  ];
 
-  // Apartados que no van por día; sus encabezados también llevan fecha.
-  const EXAM = { key: 'exam', label: 'Examen', match: /^EXAM/i };
+  // ---------- Secciones y plantillas ----------
+  const TYPES = {
+    asist: { label: 'Asistencia (A / F / R / J)' },
+    sino: { label: 'Sí / No (como lecturas o participaciones)' },
+    trab: { label: '0 / 50 / 100 (como trabajos o tareas)' },
+    disc: { label: 'Disciplina (todos 10, marcar 0)' },
+    num: { label: 'Calificación de 0 a 100 (como examen)' },
+  };
+  const ASIST_ID = 'records';
+  const DEFAULT_SECTIONS = () => [
+    { id: ASIST_ID, name: 'Asistencia', type: 'asist' },
+    { id: 'lect', name: 'Lecturas', type: 'sino', min: 4 },
+    { id: 'trab', name: 'Trabajos', type: 'trab' },
+    { id: 'disc', name: 'Disciplina', type: 'disc' },
+    { id: 'exam', name: 'Examen', type: 'num' },
+  ];
+  const sectionsOf = (g) => (g.sections && g.sections.length ? g.sections : DEFAULT_SECTIONS());
+  const newSectionId = () => `s_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const secMin = (s) => Math.max(1, Math.round(Number(s && s.min) || 4));
 
   function cellText(v) {
     if (v == null) return '';
@@ -57,61 +58,92 @@
   }
 
   const clean = (s) => s.replace(/\s+/g, ' ').trim();
+  // Para comparar nombres: sin acentos, mayúsculas y espacios sencillos.
+  const norm = (s) => clean(String(s || '')).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+  const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pad = (n) => String(n).padStart(2, '0');
   const isoOf = (d) => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 
-  // Encabezado de una columna de día: celda fecha (versión anterior = asistencia)
-  // o texto "dd/mm/aa" + "Asistencia" | "Lectura" | "Trabajo".
-  function parseHeader(v) {
-    if (v instanceof Date && !isNaN(v)) return { date: isoOf(v), cat: 'records' };
-    if (v && typeof v === 'object' && v.result instanceof Date) return parseHeader(v.result);
+  // Encabezado de una columna con fecha: celda fecha (versión anterior = asistencia)
+  // o texto "dd/mm/aa" + nombre de la sección (trabajos: "Nombre", "Nombre 2" o "Nombre: título").
+  function parseHeader(v, sections = DEFAULT_SECTIONS()) {
+    const asist = sections.find((s) => s.type === 'asist');
+    if (v instanceof Date && !isNaN(v)) return asist ? { date: isoOf(v), sec: asist.id } : null;
+    if (v && typeof v === 'object' && v.result instanceof Date) return parseHeader(v.result, sections);
     const t = clean(cellText(v));
     const m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})\b\s*(.*)$/);
     if (!m) return null;
     let y = Number(m[3]);
     if (y < 100) y += 2000;
-    const cat = [...CATS, EXAM].find((c) => c.match.test(m[4] || ''));
-    const out = { date: `${y}-${pad(m[2])}-${pad(m[1])}`, cat: cat ? cat.key : 'records' };
-    // Título del trabajo: "Trabajo: Ensayo" o "Trabajo 2: Ensayo" -> "Ensayo".
-    if (out.cat === 'trab') out.title = (m[4] || '').replace(/^TRABAJO\s*\d*\s*:?\s*/i, '').trim();
-    return out;
+    const date = `${y}-${pad(m[2])}-${pad(m[1])}`;
+    const rest = clean(m[4] || '');
+    if (!rest) return asist ? { date, sec: asist.id } : null;
+    const R = norm(rest);
+    const titleOf = () => (rest.includes(':') ? rest.slice(rest.indexOf(':') + 1).trim() : '');
+    for (const s of sections) {
+      const n = norm(s.name);
+      if (s.type === 'trab') {
+        if (new RegExp(`^${reEsc(n)}(\\s+\\d+)?(\\s*:.*)?$`).test(R)) return { date, sec: s.id, title: titleOf() };
+      } else if (R === n) return { date, sec: s.id };
+    }
+    // Encabezados de versiones anteriores de la app.
+    const first = (type) => sections.find((s) => s.type === type);
+    if (/^ASIST/.test(R) && asist) return { date, sec: asist.id };
+    if (/^LECT/.test(R) && first('sino')) return { date, sec: first('sino').id };
+    if (/^TRAB/.test(R) && first('trab')) return { date, sec: first('trab').id, title: titleOf() };
+    if (/^EXAM/.test(R) && first('num')) return { date, sec: first('num').id };
+    return null;
   }
+  const parseDateHeader = (v) => { const h = parseHeader(v); return h ? h.date : null; };
 
   // ---------- Trabajos: varios por día, cada uno con título ----------
-  // g.trab[fecha] = [{ title, vals: { fila: 0|50|100 } }]
-  const worksOf = (g, date) => {
-    const w = (g.trab || {})[date];
+  const worksOf = (g, date, id = 'trab') => {
+    const w = (g[id] || {})[date];
     if (Array.isArray(w)) return w;
     return w && typeof w === 'object' ? [{ title: '', vals: w }] : []; // formato anterior: un trabajo por día
   };
   const workUsed = (w) => !!w && (Object.keys(w.vals || {}).length > 0 || !!(w.title || '').trim());
-  // Hay datos de un apartado en una fecha (para trabajos: algún trabajo con calificaciones).
-  function hasData(g, key, date) {
-    if (key === 'trab') return worksOf(g, date).some((w) => Object.keys(w.vals || {}).length);
-    return Object.keys(((g[key] || {})[date]) || {}).length > 0;
+  // Hay datos de una sección en una fecha.
+  function hasData(g, sec, date) {
+    if (typeof sec === 'string') sec = sectionsOf(g).find((s) => s.id === sec) || { id: sec, type: sec === 'trab' ? 'trab' : 'x' };
+    if (sec.type === 'trab') return worksOf(g, date, sec.id).some((w) => Object.keys(w.vals || {}).length);
+    return Object.keys(((g[sec.id] || {})[date]) || {}).length > 0;
   }
-  // Pasa datos de la versión anterior ({fecha: {fila: v}}) al formato de varios trabajos.
-  function normalizeWorks(g) {
-    const t = g.trab || {};
+  // Pasa trabajos de la versión anterior ({fecha: {fila: v}}) al formato de varios trabajos.
+  function normalizeWorks(g, id = 'trab') {
+    const t = g[id] || {};
     for (const d of Object.keys(t)) if (!Array.isArray(t[d])) t[d] = [{ title: '', vals: t[d] || {} }];
-    g.trab = t;
+    g[id] = t;
     return g;
   }
-  // Compatibilidad con pruebas/llamadas anteriores.
-  const parseDateHeader = (v) => { const h = parseHeader(v); return h ? h.date : null; };
+  // Deja un grupo listo: secciones (las de siempre si no tiene) y un objeto de datos por sección.
+  function normalizeGroup(g, legacyGrading) {
+    if (!g.sections || !g.sections.length) {
+      g.sections = DEFAULT_SECTIONS();
+      const lm = legacyGrading && legacyGrading.lectMin;
+      if (lm) g.sections.find((s) => s.id === 'lect').min = lm;
+    }
+    if (!g.sections.some((s) => s.type === 'asist')) g.sections.unshift({ id: ASIST_ID, name: 'Asistencia', type: 'asist' });
+    for (const s of g.sections) {
+      g[s.id] = g[s.id] || {};
+      if (s.type === 'trab') normalizeWorks(g, s.id);
+      if (s.type === 'sino') s.min = secMin(s);
+    }
+    return g;
+  }
 
-  function valueFromCell(value, cat, codes) {
+  function valueFromCell(value, type, codes) {
     const t = clean(cellText(value)).toUpperCase();
     if (t === '') return null;
-    if (cat === 'trab') {
+    if (type === 'trab') {
       const n = Number(t);
       return WORK.includes(n) ? n : null;
     }
-    if (cat === 'exam') {
+    if (type === 'num') {
       const n = Number(t);
       return Number.isFinite(n) && n >= 0 && n <= 100 ? n : null;
     }
-    const keys = cat === 'lect' ? READ : STATUSES;
+    const keys = type === 'sino' ? READ : STATUSES;
     return keys.find((k) => String(codes[k]).toUpperCase() === t) || null;
   }
 
@@ -126,12 +158,15 @@
     return null;
   }
 
-  function parseWorkbook(wb, codes = DEFAULT_CODES) {
+  const LEGACY_GRADE = /^(ASISTENCIA|LECTURAS|TRABAJOS|DISCIPLINA|EXAMEN) \d+(\.\d+)?%$/;
+  // sectionsFor(nombreDeHoja) da las secciones de ese grupo (si ya existía), para reconocer sus columnas.
+  function parseWorkbook(wb, codes = DEFAULT_CODES, sectionsFor = null) {
     codes = Object.assign({}, DEFAULT_CODES, codes);
     const groups = [];
     wb.eachSheet((ws) => {
       const hdr = findHeader(ws);
       if (!hdr) return;
+      const sections = JSON.parse(JSON.stringify((sectionsFor && sectionsFor(ws.name)) || DEFAULT_SECTIONS()));
 
       // Título: la celda que diga "GRUPO ..." arriba del encabezado, o el nombre de la hoja.
       let title = ws.name;
@@ -149,54 +184,61 @@
       }
       if (!students.length) return;
 
-      // Columnas de día ya existentes (por si suben un Excel exportado por la app).
-      const data = { records: {}, lect: {}, trab: {}, disc: {}, exam: {} };
+      // Columnas escritas por la app (por si suben un Excel exportado): se recuperan los datos.
+      const data = {};
+      sections.forEach((s) => (data[s.id] = {}));
       const dateCols = [];
       const lastCol = Math.max(ws.columnCount, hdr.col);
+      const discs = sections.filter((s) => s.type === 'disc');
       for (let c = hdr.col + 1; c <= lastCol; c++) {
-        // Resumen de disciplina: de la columna "Fechas" se recuperan los días con 0.
-        const ht = clean(cellText(ws.getCell(hdr.row, c).value));
-        // Columnas de calificación escritas por la app: se reconocen para poder reescribirlas.
-        if (/^CALIFICACI[OÓ]N SOBRE \d+$/i.test(ht) || /^(ASISTENCIA|LECTURAS|TRABAJOS|DISCIPLINA|EXAMEN) \d+(\.\d+)?%$/i.test(ht)) {
+        const ht = norm(cellText(ws.getCell(hdr.row, c).value));
+        // Calificaciones: se reconocen para poder reescribirlas.
+        if (/^CALIFICACION SOBRE \d+$/.test(ht) || LEGACY_GRADE.test(ht) ||
+          sections.some((s) => new RegExp(`^${reEsc(norm(s.name))} \\d+(\\.\\d+)?%$`).test(ht))) {
           dateCols.push(c);
           continue;
         }
-        if (/^DISCIPLINA (D[IÍ]AS CON 0|FECHAS)$/i.test(ht)) {
+        // Resumen de disciplina: de la columna "Fechas" se recuperan los días con 0.
+        const ds = discs.find((s) => ht === `${norm(s.name)} DIAS CON 0` || ht === `${norm(s.name)} FECHAS`) ||
+          (/^DISCIPLINA (DIAS CON 0|FECHAS)$/.test(ht) ? discs[0] || { id: null } : null);
+        if (ds) {
           dateCols.push(c);
-          if (/FECHA/i.test(ht)) {
+          if (ds.id && /FECHAS$/.test(ht)) {
             for (const s of students) {
               const t = cellText(ws.getCell(s.row, c).value);
               for (const m of t.matchAll(/(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})/g)) {
                 const y = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]);
                 const d = `${y}-${pad(m[2])}-${pad(m[1])}`;
-                (data.disc[d] = data.disc[d] || {})[s.row] = 0;
+                (data[ds.id][d] = data[ds.id][d] || {})[s.row] = 0;
               }
             }
           }
           continue;
         }
-        const h = parseHeader(ws.getCell(hdr.row, c).value);
+        const h = parseHeader(ws.getCell(hdr.row, c).value, sections);
         if (!h) continue;
+        const sec = sections.find((s) => s.id === h.sec);
         dateCols.push(c);
         let day;
-        if (h.cat === 'trab') {
+        if (sec.type === 'trab') {
           // Cada columna de trabajo es un trabajo distinto de esa fecha.
           const w = { title: h.title || '', vals: {} };
-          (data.trab[h.date] = data.trab[h.date] || []).push(w);
+          (data[sec.id][h.date] = data[sec.id][h.date] || []).push(w);
           day = w.vals;
-        } else day = (data[h.cat][h.date] = data[h.cat][h.date] || {});
+        } else day = (data[sec.id][h.date] = data[sec.id][h.date] || {});
         for (const s of students) {
-          const v = valueFromCell(ws.getCell(s.row, c).value, h.cat, codes);
+          const v = valueFromCell(ws.getCell(s.row, c).value, sec.type, codes);
           if (v != null) day[s.row] = v;
         }
       }
 
-      // Quita días sin ningún dato (p. ej. la columna de lectura vacía de un día).
-      for (const k of Object.keys(data)) {
+      // Quita días sin ningún dato.
+      for (const sec of sections) {
+        const k = sec.id;
         for (const d of Object.keys(data[k])) {
-          if (k === 'trab') {
-            data.trab[d] = data.trab[d].filter(workUsed);
-            if (!data.trab[d].length) delete data.trab[d];
+          if (sec.type === 'trab') {
+            data[k][d] = data[k][d].filter(workUsed);
+            if (!data[k][d].length) delete data[k][d];
           } else if (!Object.keys(data[k][d]).length) delete data[k][d];
         }
       }
@@ -213,10 +255,7 @@
         while (used(startCol)) startCol++;
       }
 
-      groups.push({
-        sheet: ws.name, title, headerRow: hdr.row, nameCol: hdr.col, startCol, dateCols, students,
-        records: data.records, lect: data.lect, trab: data.trab, disc: data.disc, exam: data.exam,
-      });
+      groups.push(Object.assign({ sheet: ws.name, title, headerRow: hdr.row, nameCol: hdr.col, startCol, dateCols, students, sections }, data));
     });
     return groups;
   }
@@ -228,125 +267,148 @@
     return Number.isFinite(n) && String(v).trim() !== '' ? n : String(v);
   }
 
-  // Fechas con al menos un dato en cualquiera de las 3 categorías, ordenadas.
+  const shortDate = (iso) => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y.slice(-2)}`; };
+  // Fechas con datos de una sección, ordenadas.
+  const datesOf = (g, sec) => Object.keys(g[sec.id] || {}).filter((d) => hasData(g, sec, d)).sort();
+  // Fechas con algún dato de asistencia, Sí/No o trabajos (las que llevan columna por día).
   function groupDates(g) {
     const set = new Set();
-    for (const c of CATS) Object.keys(g[c.key] || {}).forEach((d) => { if (hasData(g, c.key, d)) set.add(d); });
+    sectionsOf(g).filter((s) => ['asist', 'sino', 'trab'].includes(s.type)).forEach((s) => datesOf(g, s).forEach((d) => set.add(d)));
     return [...set].sort();
   }
-
-
-
-  // Columnas que se escriben en el Excel, en orden: [{ col, date, cat, first, block }].
-  // block 'al' = Asistencia + Lectura; block 'trab' = Trabajos (a la derecha, tras una columna vacía).
-  function columnLayout(g) {
-    const all = groupDates(g);
-    const alDates = all.filter((d) => hasData(g, 'records', d) || hasData(g, 'lect', d));
-    const trDates = all.filter((d) => hasData(g, 'trab', d));
-    const out = [];
-    let col = g.startCol;
-    alDates.forEach((date) => {
-      out.push({ col: col++, date, cat: 'records', first: true, block: 'al' });
-      out.push({ col: col++, date, cat: 'lect', first: false, block: 'al' });
-    });
-    if (alDates.length && trDates.length) col++; // columna vacía de separación
-    // Una columna por trabajo (con calificaciones) de cada fecha.
-    let firstTr = true;
-    trDates.forEach((date) => worksOf(g, date).forEach((w, work) => {
-      if (!Object.keys(w.vals || {}).length) return;
-      out.push({ col: col++, date, cat: 'trab', work, first: firstTr, block: 'trab' });
-      firstTr = false;
-    }));
-    return out;
-  }
-
-  // Fechas (ordenadas) en que el alumno sacó 0 en disciplina.
-  function discDates(g, row) {
-    return Object.keys(g.disc || {}).filter((d) => g.disc[d][row] === 0).sort();
-  }
-  const shortDate = (iso) => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y.slice(-2)}`; };
-
-  // Columnas del resumen de disciplina: al final, tras una columna vacía. null si no hay nada que escribir.
-  const datesWith = (g, key) => Object.keys(g[key] || {}).filter((d) => Object.keys(g[key][d]).length).sort();
-
-  function discCols(g) {
-    const layout = columnLayout(g);
-    if (!layout.length && !datesWith(g, 'disc').length && !datesWith(g, 'exam').length) return null;
-    const count = layout.length ? layout[layout.length - 1].col + 2 : g.startCol;
-    return { count, dates: count + 1 };
-  }
-
-  // Columnas de examen: una por fecha con examen, después del resumen de disciplina.
-  function examCols(g) {
-    const dc = discCols(g);
-    if (!dc) return [];
-    return datesWith(g, 'exam').map((date, i) => ({ col: dc.dates + 2 + i, date }));
+  // Fechas (ordenadas) en que el alumno sacó 0 en una sección de disciplina.
+  function discDates(g, row, id = 'disc') {
+    return Object.keys(g[id] || {}).filter((d) => g[id][d][row] === 0).sort();
   }
 
   // ---------- Calificaciones ----------
-  // Apartados que se califican, en orden.
-  const GRADE_PARTS = [
-    { key: 'records', label: 'Asistencia' },
-    { key: 'lect', label: 'Lecturas' },
-    { key: 'trab', label: 'Trabajos' },
-    { key: 'disc', label: 'Disciplina' },
-    { key: 'exam', label: 'Examen' },
-  ];
-  const DEFAULT_GRADING = { w: { records: 0, lect: 0, trab: 0, disc: 0, exam: 0 }, retardo: 100, escala: 10, lectMin: 4 };
+  const DEFAULT_GRADING = { w: {}, retardo: 100, escala: 10 };
   const round1 = (n) => Math.round(n * 10) / 10;
   const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+  const weightOf = (grading, s) => Number(((grading || {}).w || {})[s.id]) || 0;
+  const gradingOn = (grading, g) => (g ? sectionsOf(g) : Object.keys((grading || {}).w || {}).map((id) => ({ id })))
+    .some((s) => weightOf(grading, s) > 0);
+  // Días en que el alumno estuvo en clase: A o R en asistencia (o, sin asistencia, días con algún dato suyo).
+  function presentDays(g, row) {
+    const secs = sectionsOf(g);
+    const asist = secs.find((s) => s.type === 'asist');
+    const set = new Set();
+    if (asist) Object.keys(g[asist.id] || {}).forEach((d) => { const v = g[asist.id][d][row]; if (v === 'A' || v === 'R') set.add(d); });
+    return set;
+  }
 
-  // Porcentaje (0-100) de cada apartado para un alumno; null si aún no hay datos.
+  // Porcentaje (0-100) de cada sección para un alumno; null si aún no hay datos.
   // Solo cuenta lo capturado: un día sin captura para ese alumno no suma ni resta.
   function gradeParts(g, row, grading) {
     grading = Object.assign({}, DEFAULT_GRADING, grading);
-    const vals = (key) => Object.keys(g[key] || {}).map((d) => [d, g[key][d][row]]).filter(([, v]) => v != null);
-    const att = vals('records');
-    // Lecturas: con el mínimo de "Sí" que defina el maestro (o más) tiene el 100 %; debajo, proporcional.
-    const lectVals = vals('lect');
-    const lectMin = Math.max(1, Math.round(Number(grading.lectMin) || DEFAULT_GRADING.lectMin));
-    const lectSi = lectVals.filter(([, v]) => v === 'S').length;
-    // Asistencia y Justificado = 100 %, Retardo = lo que diga el maestro, Falta = 0 %.
-    const attScore = { A: 100, J: 100, R: Number(grading.retardo) || 0, F: 0 };
-    // Disciplina: días en que el alumno estuvo en clase (A o R) o tuvo reporte; 10 salvo los días con 0.
-    const present = new Set(att.filter(([, v]) => v === 'A' || v === 'R').map(([d]) => d));
-    const zeros = discDates(g, row);
-    zeros.forEach((d) => present.add(d));
-    return {
-      records: avg(att.map(([, v]) => attScore[v])),
-      lect: lectVals.length ? (100 * Math.min(lectSi, lectMin)) / lectMin : null,
-      trab: avg(Object.keys(g.trab || {}).flatMap((d) => worksOf(g, d).map((w) => (w.vals || {})[row]))
-        .filter((v) => v != null).map(Number)),
-      disc: present.size ? (100 * (present.size - zeros.length)) / present.size : null,
-      exam: avg(vals('exam').map(([, v]) => Number(v))),
-    };
+    const out = {};
+    const vals = (id) => Object.keys(g[id] || {}).map((d) => [d, g[id][d][row]]).filter(([, v]) => v != null);
+    for (const s of sectionsOf(g)) {
+      if (s.type === 'asist') {
+        // Asistencia y Justificado = 100 %, Retardo = lo que diga el maestro, Falta = 0 %.
+        const sc = { A: 100, J: 100, R: Number(grading.retardo) || 0, F: 0 };
+        out[s.id] = avg(vals(s.id).map(([, v]) => sc[v]).filter((v) => v != null));
+      } else if (s.type === 'sino') {
+        // Con el mínimo de "Sí" (o más) tiene el 100 %; debajo, proporcional.
+        const v = vals(s.id);
+        const si = v.filter(([, x]) => x === 'S').length;
+        out[s.id] = v.length ? (100 * Math.min(si, secMin(s))) / secMin(s) : null;
+      } else if (s.type === 'trab') {
+        out[s.id] = avg(Object.keys(g[s.id] || {}).flatMap((d) => worksOf(g, d, s.id).map((w) => (w.vals || {})[row]))
+          .filter((v) => v != null).map(Number));
+      } else if (s.type === 'disc') {
+        // Días en clase (A o R) o con reporte; 10 salvo los días con 0.
+        const present = presentDays(g, row);
+        const zeros = discDates(g, row, s.id);
+        zeros.forEach((d) => present.add(d));
+        out[s.id] = present.size ? (100 * (present.size - zeros.length)) / present.size : null;
+      } else if (s.type === 'num') {
+        out[s.id] = avg(vals(s.id).map(([, v]) => Number(v)));
+      }
+    }
+    return out;
   }
 
-  // Calificación final en la escala elegida (10 o 100). Los apartados sin datos aún no cuentan
-  // y su porcentaje se reparte entre los demás, para que siempre haya una calificación al día.
+  // Calificación final en la escala elegida (10 o 100). Las secciones sin datos aún no cuentan
+  // y su porcentaje se reparte entre las demás, para que siempre haya una calificación al día.
   function finalGrade(g, row, grading) {
     grading = Object.assign({}, DEFAULT_GRADING, grading);
     const parts = gradeParts(g, row, grading);
     let sum = 0;
     let wsum = 0;
-    for (const p of GRADE_PARTS) {
-      const w = Number(grading.w[p.key]) || 0;
-      if (w > 0 && parts[p.key] != null) { sum += w * parts[p.key]; wsum += w; }
+    for (const s of sectionsOf(g)) {
+      const w = weightOf(grading, s);
+      if (w > 0 && parts[s.id] != null) { sum += w * parts[s.id]; wsum += w; }
     }
     const final = wsum ? round1(((sum / wsum) * (Number(grading.escala) || 10)) / 100) : null;
     return { parts, final };
   }
-  const gradingOn = (grading) => !!grading && GRADE_PARTS.some((p) => Number((grading.w || {})[p.key]) > 0);
 
-  // Columnas de calificación: una por apartado con porcentaje > 0 y la final. Van al final de todo.
-  function gradeCols(g, grading) {
-    if (!gradingOn(grading)) return [];
-    const dc = discCols(g);
-    const ex = examCols(g);
-    let col = ex.length ? ex[ex.length - 1].col + 2 : dc ? dc.dates + 2 : g.startCol;
-    const out = GRADE_PARTS.filter((p) => Number(grading.w[p.key]) > 0)
-      .map((p) => ({ col: col++, key: p.key, label: `${p.label}\n${Number(grading.w[p.key])}%` }));
-    out.push({ col: col++, key: 'final', label: `Calificación\nsobre ${Number(grading.escala) || 10}` });
+  // ---------- Acomodo de columnas ----------
+  // Lista de columnas que escribe la app: { col, kind, sec, date, work, block, first, last, label }.
+  // kind: 'day' (asistencia y Sí/No por fecha) · 'trab' · 'disc-count' · 'disc-dates' · 'num' · 'grade' (key: id o 'final').
+  function sheetLayout(g, grading) {
+    grading = grading || g.grading;
+    const secs = sectionsOf(g);
+    const out = [];
+    let col = g.startCol;
+    const gap = () => { if (out.length) col++; };
+    const close = () => { if (out.length) out[out.length - 1].last = true; };
+    // 1. Por fecha: asistencia + secciones Sí/No (gris).
+    const dayS = secs.filter((s) => s.type === 'asist' || s.type === 'sino');
+    const dayDates = [...new Set(dayS.flatMap((s) => datesOf(g, s)))].sort();
+    const asist = dayS.find((s) => s.type === 'asist');
+    dayDates.forEach((date) => {
+      let first = true;
+      dayS.forEach((s) => {
+        if (s.type === 'sino' && !hasData(g, s, date)) return;
+        out.push({ col: col++, kind: 'day', sec: s, date, block: 'day', first, label: `${shortDate(date)}\n${s.name}` });
+        first = false;
+      });
+    });
+    close();
+    // 2. Cada sección de trabajos: una columna por trabajo con calificaciones.
+    secs.filter((s) => s.type === 'trab').forEach((s) => {
+      const items = [];
+      datesOf(g, s).forEach((date) => {
+        const ws = worksOf(g, date, s.id);
+        const used = ws.filter((w) => Object.keys(w.vals || {}).length);
+        ws.forEach((w, work) => {
+          if (!Object.keys(w.vals || {}).length) return;
+          const n = used.indexOf(w) + 1;
+          const title = (w.title || '').trim();
+          items.push({ kind: 'trab', sec: s, date, work, label: `${shortDate(date)}\n${title ? `${s.name}: ${title}` : n > 1 ? `${s.name} ${n}` : s.name}`, titled: !!title });
+        });
+      });
+      if (!items.length) return;
+      gap();
+      items.forEach((x, i) => out.push(Object.assign(x, { col: col++, block: `trab:${s.id}`, first: i === 0 })));
+      close();
+    });
+    // 3. Disciplina: 2 columnas de resumen por sección (si hay cualquier dato en el grupo).
+    const anyData = out.length || secs.some((s) => (s.type === 'disc' || s.type === 'num') && datesOf(g, s).length);
+    if (anyData) {
+      secs.filter((s) => s.type === 'disc').forEach((s) => {
+        gap();
+        out.push({ col: col++, kind: 'disc-count', sec: s, block: `disc:${s.id}`, first: true, label: `${s.name}\nDías con 0` });
+        out.push({ col: col++, kind: 'disc-dates', sec: s, block: `disc:${s.id}`, last: true, label: `${s.name}\nFechas` });
+      });
+    }
+    // 4. Secciones de 0 a 100: una columna por fecha con datos.
+    secs.filter((s) => s.type === 'num').forEach((s) => {
+      const ds = datesOf(g, s);
+      if (!ds.length) return;
+      gap();
+      ds.forEach((date, i) => out.push({ col: col++, kind: 'num', sec: s, date, block: `num:${s.id}`, first: i === 0, label: `${shortDate(date)}\n${s.name}` }));
+      close();
+    });
+    // 5. Calificaciones: una por sección con porcentaje y la final.
+    if (gradingOn(grading, g)) {
+      gap();
+      const ps = secs.filter((s) => weightOf(grading, s) > 0);
+      ps.forEach((s, i) => out.push({ col: col++, kind: 'grade', key: s.id, sec: s, block: 'grade', first: i === 0, label: `${s.name}\n${weightOf(grading, s)}%` }));
+      out.push({ col: col++, kind: 'grade', key: 'final', block: 'grade', first: true, last: true, label: `Calificación\nsobre ${Number(grading.escala) || 10}` });
+    }
     return out;
   }
 
@@ -357,15 +419,17 @@
     await wb.xlsx.load(originalBuffer);
     const thin = { style: 'thin' };
     const border = { top: thin, left: thin, bottom: thin, right: thin };
+    const thick = { style: 'medium', color: { argb: 'FF555555' } };
+    const grayFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDEDED' } };
+    const finalFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
 
     for (const g of groups) {
       const ws = wb.getWorksheet(g.sheet);
       if (!ws) continue;
-      normalizeWorks(g);
+      sectionsOf(g).filter((s) => s.type === 'trab').forEach((s) => normalizeWorks(g, s.id));
 
-      // Limpia columnas de día que traía el archivo original (se reescriben ordenadas).
+      // Limpia las columnas que la app había escrito (se reescriben ordenadas).
       for (const c of g.dateCols || []) {
-        // Formato puesto por la app: se quita para que no queden bordes sueltos si cambia el acomodo.
         for (const r of [g.headerRow, ...g.students.map((s) => s.row)]) {
           const cell = ws.getCell(r, c);
           cell.value = null;
@@ -373,8 +437,7 @@
         }
       }
 
-      // Alumnos agregados en la app: se escriben al final de la lista con el mismo formato
-      // (bordes, fuente) que el último alumno del archivo original.
+      // Alumnos agregados en la app: al final de la lista con el formato del último alumno original.
       const added = g.students.filter((s) => s.added);
       if (added.length) {
         const original = g.students.filter((s) => !s.added);
@@ -393,140 +456,55 @@
         }
       }
 
-      const dates = groupDates(g);
+      const gg = g.grading || grading;
+      const layout = sheetLayout(g, gg);
       const headerSrc = ws.getCell(g.headerRow, g.nameCol);
-      if (dates.length) {
+      if (layout.length) {
         const hr = ws.getRow(g.headerRow);
-        hr.height = Math.max(hr.height || 15, 30); // dos renglones: fecha + categoría
+        hr.height = Math.max(hr.height || 15, layout.some((x) => x.titled) ? 45 : 30);
       }
-
-      // Línea gruesa al inicio de cada día (y al final de cada bloque); Lectura con gris claro.
-      const thick = { style: 'medium', color: { argb: 'FF555555' } };
-      const lectFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDEDED' } };
-      const layout = columnLayout(g);
-      if (layout.some((x) => x.cat === 'trab' && (worksOf(g, x.date)[x.work].title || '').trim())) {
-        const hr = ws.getRow(g.headerRow);
-        hr.height = Math.max(hr.height || 15, 45); // fecha + "Trabajo: título" en varios renglones
-      }
-      layout.forEach(({ col, date, cat, block, work }, i) => {
-        const next = layout[i + 1];
-        const leftThick = cat === 'records' || (cat === 'trab' && layout[i].first);
-        const rightThick = !next || next.block !== block;
-        const cellBorder = Object.assign({}, border, leftThick ? { left: thick } : {}, rightThick ? { right: thick } : {});
-        const [y, m, d] = date.split('-');
-        let label = CATS.find((c) => c.key === cat).label;
-        let wk = null;
-        if (cat === 'trab') {
-          wk = worksOf(g, date)[work];
-          const n = worksOf(g, date).filter((w) => Object.keys(w.vals || {}).length).indexOf(wk) + 1;
-          const title = (wk.title || '').trim();
-          label = title ? `Trabajo: ${title}` : n > 1 ? `Trabajo ${n}` : 'Trabajo';
-        }
-        const h = ws.getCell(g.headerRow, col);
-        h.value = `${d}/${m}/${y.slice(-2)}\n${label}`;
+      const finals = {};
+      const gradeOf = (row) => (finals[row] = finals[row] || finalGrade(g, row, gg));
+      layout.forEach((x) => {
+        const { col, kind, sec, date } = x;
+        const isFinal = kind === 'grade' && x.key === 'final';
+        const cellBorder = Object.assign({}, border, x.first ? { left: thick } : {}, x.last ? { right: thick } : {});
+        const fill = kind === 'day' && sec.type === 'sino' ? grayFill : isFinal ? finalFill : null;
         // Estilo completo y propio de cada celda (ExcelJS comparte objetos de estilo entre celdas).
+        const h = ws.getCell(g.headerRow, col);
+        h.value = x.label;
         h.style = {
           font: Object.assign({}, headerSrc.font, { bold: true }),
           alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
           border: cellBorder,
-          ...(cat === 'lect' ? { fill: lectFill } : {}),
-        };
-        ws.getColumn(col).width = wk && (wk.title || '').trim() ? 16 : 11;
-
-        const day = wk ? wk.vals : (g[cat] || {})[date] || {};
-        for (const s of g.students) {
-          const v = day[s.row];
-          const cell = ws.getCell(s.row, col);
-          if (v == null) cell.value = null;
-          else cell.value = cat === 'trab' ? Number(v) : codeValue(v, codes);
-          cell.style = {
-            font: Object.assign({}, ws.getCell(s.row, g.nameCol).font || {}),
-            alignment: { horizontal: 'center', vertical: 'middle' },
-            border: cellBorder,
-            ...(cat === 'lect' ? { fill: lectFill } : {}),
-          };
-        }
-      });
-
-      // Resumen de disciplina.
-      const dc = discCols(g);
-      if (dc) {
-        const thick = { style: 'medium', color: { argb: 'FF555555' } };
-        [['count', 'Disciplina\nDías con 0'], ['dates', 'Disciplina\nFechas']].forEach(([k, label]) => {
-          const col = dc[k];
-          const b = Object.assign({}, border, k === 'count' ? { left: thick } : { right: thick });
-          ws.getCell(g.headerRow, col).value = label;
-          ws.getCell(g.headerRow, col).style = {
-            font: Object.assign({}, headerSrc.font, { bold: true }),
-            alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
-            border: b,
-          };
-          ws.getColumn(col).width = k === 'count' ? 11 : 24;
-          for (const s of g.students) {
-            const dates = discDates(g, s.row);
-            const cell = ws.getCell(s.row, col);
-            cell.value = k === 'count' ? dates.length : (dates.map(shortDate).join(', ') || null);
-            cell.style = {
-              font: Object.assign({}, ws.getCell(s.row, g.nameCol).font || {}),
-              alignment: { horizontal: k === 'count' ? 'center' : 'left', vertical: 'middle', wrapText: true },
-              border: b,
-            };
-          }
-        });
-      }
-
-      // Exámenes.
-      const ex = examCols(g);
-      ex.forEach(({ col, date }, i) => {
-        const thick = { style: 'medium', color: { argb: 'FF555555' } };
-        const b = Object.assign({}, border, i === 0 ? { left: thick } : {}, i === ex.length - 1 ? { right: thick } : {});
-        const h = ws.getCell(g.headerRow, col);
-        h.value = `${shortDate(date)}\n${EXAM.label}`;
-        h.style = {
-          font: Object.assign({}, headerSrc.font, { bold: true }),
-          alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
-          border: b,
-        };
-        ws.getColumn(col).width = 11;
-        for (const s of g.students) {
-          const v = g.exam[date][s.row];
-          const cell = ws.getCell(s.row, col);
-          cell.value = v == null ? null : Number(v);
-          cell.style = {
-            font: Object.assign({}, ws.getCell(s.row, g.nameCol).font || {}),
-            alignment: { horizontal: 'center', vertical: 'middle' },
-            border: b,
-          };
-        }
-      });
-
-      // Calificaciones (valores calculados por la app).
-      // Cada grupo tiene sus propios porcentajes (g.grading); `grading` queda como respaldo.
-      const gg = g.grading || grading;
-      const gc = gradeCols(g, gg);
-      gc.forEach(({ col, key, label }, i) => {
-        const thick = { style: 'medium', color: { argb: 'FF555555' } };
-        const isFinal = key === 'final';
-        const b = Object.assign({}, border, i === 0 ? { left: thick } : {}, i === gc.length - 1 ? { right: thick } : {}, isFinal ? { left: thick } : {});
-        const fill = isFinal ? { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } } : undefined;
-        const h = ws.getCell(g.headerRow, col);
-        h.value = label;
-        h.style = {
-          font: Object.assign({}, headerSrc.font, { bold: true }),
-          alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
-          border: b,
           ...(fill ? { fill } : {}),
         };
-        ws.getColumn(col).width = isFinal ? 13 : 11;
+        ws.getColumn(col).width = kind === 'disc-dates' ? 24 : x.titled ? 16 : isFinal ? 13 : 11;
         for (const s of g.students) {
-          const r = finalGrade(g, s.row, gg);
-          const v = isFinal ? r.final : r.parts[key];
+          let v = null;
+          if (kind === 'day') {
+            const raw = ((g[sec.id] || {})[date] || {})[s.row];
+            v = raw == null ? null : codeValue(raw, codes);
+          } else if (kind === 'trab') {
+            const raw = (worksOf(g, date, sec.id)[x.work].vals || {})[s.row];
+            v = raw == null ? null : Number(raw);
+          } else if (kind === 'num') {
+            const raw = ((g[sec.id] || {})[date] || {})[s.row];
+            v = raw == null ? null : Number(raw);
+          } else if (kind.startsWith('disc')) {
+            const z = discDates(g, s.row, sec.id);
+            v = kind === 'disc-count' ? z.length : (z.map(shortDate).join(', ') || null);
+          } else if (kind === 'grade') {
+            const r = gradeOf(s.row);
+            const raw = isFinal ? r.final : r.parts[x.key];
+            v = raw == null ? null : round1(raw);
+          }
           const cell = ws.getCell(s.row, col);
-          cell.value = v == null ? null : round1(v);
+          cell.value = v;
           cell.style = {
             font: Object.assign({}, ws.getCell(s.row, g.nameCol).font || {}, isFinal ? { bold: true } : {}),
-            alignment: { horizontal: 'center', vertical: 'middle' },
-            border: b,
+            alignment: { horizontal: kind === 'disc-dates' ? 'left' : 'center', vertical: 'middle', wrapText: kind === 'disc-dates' },
+            border: cellBorder,
             ...(fill ? { fill } : {}),
           };
         }
@@ -536,7 +514,7 @@
   }
 
   // ---------- Resumen de un alumno ----------
-  // Todo lo capturado de un alumno, día por día, más su calificación. Lo usan la pantalla
+  // Todo lo capturado de un alumno, día por día y por sección, más su calificación. Lo usan la pantalla
   // "Resumen por alumno" y el Excel individual (para quejas del alumno o de los padres).
   const STATUS_LABEL = { A: 'Asistencia', F: 'Falta', R: 'Retardo', J: 'Justificado' };
   const WEEKDAY = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
@@ -548,50 +526,71 @@
 
   function studentReport(g, row, grading) {
     grading = Object.assign({}, DEFAULT_GRADING, grading);
+    const secs = sectionsOf(g);
     const student = g.students.find((s) => s.row === row) || null;
-    const at = (key, d) => ((g[key] || {})[d] || {})[row];
+    const at = (id, d) => ((g[id] || {})[d] || {})[row];
+    const present = presentDays(g, row);
     const dates = new Set();
-    ['records', 'lect', 'disc', 'exam'].forEach((k) => Object.keys(g[k] || {}).forEach((d) => { if (at(k, d) != null) dates.add(d); }));
-    Object.keys(g.trab || {}).forEach((d) => { if (worksOf(g, d).some((w) => (w.vals || {})[row] != null)) dates.add(d); });
+    for (const s of secs) {
+      if (s.type === 'trab') Object.keys(g[s.id] || {}).forEach((d) => { if (worksOf(g, d, s.id).some((w) => (w.vals || {})[row] != null)) dates.add(d); });
+      else Object.keys(g[s.id] || {}).forEach((d) => { if (at(s.id, d) != null) dates.add(d); });
+    }
     const counts = { A: 0, F: 0, R: 0, J: 0 };
-    const lect = { S: 0, N: 0 };
-    const works = [];
-    const exams = [];
+    const stats = {};
+    secs.forEach((s) => (stats[s.id] = { S: 0, N: 0, works: 0, list: [] }));
+    // Celda de cada sección en un día: texto para el Excel, texto corto para la pantalla y si es "mala" (rojo).
     const days = [...dates].sort().map((date) => {
-      const att = at('records', date) || null;
-      if (att) counts[att]++;
-      const l = at('lect', date) || null;
-      if (l) lect[l]++;
-      const ws = worksOf(g, date);
-      const dayWorks = ws.map((w, i) => ({ title: workLabel(w, i, ws.length), v: (w.vals || {})[row] }))
-        .filter((w) => w.v != null).map((w) => ({ title: w.title, v: Number(w.v) }));
-      dayWorks.forEach((w) => works.push({ date, ...w }));
-      const exam = at('exam', date);
-      if (exam != null) exams.push({ date, v: Number(exam) });
-      // Disciplina: 0 si tuvo reporte; 10 si estuvo en clase (A o R) sin reporte; vacío si no vino.
-      const disc = at('disc', date) === 0 ? 0 : att === 'A' || att === 'R' ? 10 : null;
-      return { date, label: longDate(date), att, lect: l, works: dayWorks, disc, exam: exam != null ? Number(exam) : null };
+      const cells = {};
+      for (const s of secs) {
+        let c = null;
+        if (s.type === 'asist') {
+          const v = at(s.id, date);
+          if (v) { counts[v]++; c = { text: STATUS_LABEL[v], short: v, tone: v, bad: v === 'F' }; }
+        } else if (s.type === 'sino') {
+          const v = at(s.id, date);
+          if (v) { stats[s.id][v]++; c = { text: v === 'S' ? 'Sí' : 'No', short: v === 'S' ? 'Sí' : 'No', tone: v === 'S' ? 'A' : 'F', bad: v === 'N' }; }
+        } else if (s.type === 'trab') {
+          const ws = worksOf(g, date, s.id);
+          const list = ws.map((w, i) => ({ title: workLabel(w, i, ws.length), v: (w.vals || {})[row] })).filter((w) => w.v != null);
+          if (list.length) {
+            stats[s.id].works += list.length;
+            const t = list.map((w) => `${w.title}: ${Number(w.v)}`).join('\n');
+            c = { text: t, short: t, bad: list.some((w) => Number(w.v) === 0), list };
+          }
+        } else if (s.type === 'disc') {
+          // 0 si tuvo reporte; 10 si estuvo en clase sin reporte; vacío si no vino.
+          const v = at(s.id, date) === 0 ? 0 : present.has(date) ? 10 : null;
+          if (v != null) c = { text: v, short: v, bad: v === 0, tone: v === 0 ? 'F' : '' };
+        } else if (s.type === 'num') {
+          const v = at(s.id, date);
+          if (v != null) { stats[s.id].list.push({ date, v: Number(v) }); c = { text: Number(v), short: Number(v) }; }
+        }
+        if (c) cells[s.id] = c;
+      }
+      return { date, label: longDate(date), cells };
     });
-    const zeros = discDates(g, row);
     const { parts, final } = finalGrade(g, row, grading);
-    const lectMin = Math.max(1, Math.round(Number(grading.lectMin) || DEFAULT_GRADING.lectMin));
-    const detail = {
-      records: `Asistencias ${counts.A} · Faltas ${counts.F} · Retardos ${counts.R} · Justificados ${counts.J}`,
-      lect: lect.S + lect.N ? `Sí ${lect.S} de ${lect.S + lect.N} · mínimo para el 100 %: ${lectMin}` : 'Sin lecturas',
-      trab: works.length ? `${works.length} trabajo(s) calificado(s)` : 'Sin trabajos',
-      disc: zeros.length ? `${zeros.length} día(s) con 0: ${zeros.map(shortDate).join(', ')}` : 'Sin días con 0',
-      exam: exams.length ? exams.map((e) => `${shortDate(e.date)}: ${e.v}`).join(' · ') : 'Sin exámenes',
-    };
-    return { student, days, counts, lect, works, exams, zeros, parts, final, detail, grading, graded: gradingOn(grading) };
+    const detail = {};
+    for (const s of secs) {
+      const st = stats[s.id];
+      if (s.type === 'asist') detail[s.id] = `Asistencias ${counts.A} · Faltas ${counts.F} · Retardos ${counts.R} · Justificados ${counts.J}`;
+      else if (s.type === 'sino') detail[s.id] = st.S + st.N ? `Sí ${st.S} de ${st.S + st.N} · mínimo para el 100 %: ${secMin(s)}` : 'Sin datos';
+      else if (s.type === 'trab') detail[s.id] = st.works ? `${st.works} calificación(es)` : 'Sin datos';
+      else if (s.type === 'disc') { const z = discDates(g, row, s.id); detail[s.id] = z.length ? `${z.length} día(s) con 0: ${z.map(shortDate).join(', ')}` : 'Sin días con 0'; }
+      else if (s.type === 'num') detail[s.id] = st.list.length ? st.list.map((e) => `${shortDate(e.date)}: ${e.v}`).join(' · ') : 'Sin datos';
+    }
+    return { student, sections: secs, days, counts, parts, final, detail, grading, graded: gradingOn(grading, g) };
   }
 
   // Excel nuevo (no es copia del original) con el concentrado de un solo alumno.
   function exportStudent(ExcelJS, g, row, grading) {
     const r = studentReport(g, row, grading);
     const s = r.student;
+    const secs = r.sections;
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Resumen', { views: [{ showGridLines: false }] });
-    ws.columns = [{ width: 18 }, { width: 14 }, { width: 12 }, { width: 34 }, { width: 12 }, { width: 10 }];
+    const nCols = Math.max(4, secs.length + 1);
+    ws.columns = Array.from({ length: nCols }, (_, i) => ({ width: i === 0 ? 18 : i === 3 && nCols === 4 ? 34 : 16 }));
     const thin = { style: 'thin', color: { argb: 'FF999999' } };
     const border = { top: thin, left: thin, bottom: thin, right: thin };
     const fill = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
@@ -600,7 +599,7 @@
     const YEL = fill('FFFFF2CC');
     const style = (cell, o = {}) => {
       cell.style = {
-        font: { name: 'Calibri', size: 11, bold: !!o.bold, color: o.color ? { argb: o.color } : undefined },
+        font: { name: 'Calibri', size: o.size || 11, bold: !!o.bold, color: o.color ? { argb: o.color } : undefined },
         alignment: { vertical: 'middle', horizontal: o.align || 'left', wrapText: true },
         ...(o.box ? { border } : {}),
         ...(o.fill ? { fill: o.fill } : {}),
@@ -609,52 +608,53 @@
     const put = (r0, c, v, o) => { const cell = ws.getCell(r0, c); cell.value = v; style(cell, o); return cell; };
 
     let y = 1;
-    put(y, 1, 'Resumen del alumno', { bold: true });
-    ws.getCell(y, 1).font = { name: 'Calibri', size: 16, bold: true };
+    put(y, 1, 'Resumen del alumno', { bold: true, size: 16 });
+    ws.mergeCells(y, 1, y, 4);
     y += 2;
+    const today = new Date();
     const info = [['Alumno', s ? s.name : ''], ['No. de lista', s ? s.no : ''], ['Grupo', g.title ? `${g.sheet} — ${g.title}` : g.sheet], ...(g.subject ? [['Materia', g.subject]] : []),
-      ['Generado', longDate((() => { const t = new Date(); return `${t.getFullYear()}-${t.getMonth() + 1}-${t.getDate()}`; })())]];
+      ['Generado', longDate(`${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`)]];
     info.forEach(([k, v]) => { put(y, 1, k, { bold: true }); ws.mergeCells(y, 2, y, 4); put(y, 2, v == null ? '' : String(v)); y++; });
     y++;
 
-    // Calificación por apartado
-    put(y, 1, 'Calificación', { bold: true });
-    ws.getCell(y, 1).font = { name: 'Calibri', size: 13, bold: true };
+    // Calificación por sección
+    put(y, 1, 'Calificación', { bold: true, size: 13 });
     y++;
-    ['Apartado', 'Vale', 'Resultado', 'Detalle'].forEach((t, i) => put(y, i + 1, t, { bold: true, box: true, fill: HEAD, align: i === 3 ? 'left' : 'center' }));
+    ['Sección', 'Vale', 'Resultado', 'Detalle'].forEach((t, i) => put(y, i + 1, t, { bold: true, box: true, fill: HEAD, align: i === 3 ? 'left' : 'center' }));
+    if (nCols > 4) ws.mergeCells(y, 4, y, nCols);
     y++;
-    for (const p of GRADE_PARTS) {
-      const w = Number(r.grading.w[p.key]) || 0;
-      const v = r.parts[p.key];
-      put(y, 1, p.label, { box: true, bold: true });
+    for (const p of secs) {
+      const w = weightOf(r.grading, p);
+      const v = r.parts[p.id];
+      put(y, 1, p.name, { box: true, bold: true });
       put(y, 2, w ? `${w} %` : '—', { box: true, align: 'center' });
       put(y, 3, v == null ? 'Sin datos' : `${round1(v)} %`, { box: true, align: 'center' });
-      put(y, 4, r.detail[p.key], { box: true });
+      put(y, 4, r.detail[p.id], { box: true });
+      if (nCols > 4) ws.mergeCells(y, 4, y, nCols);
       y++;
     }
     put(y, 1, `Calificación final (sobre ${r.grading.escala})`, { bold: true, box: true, fill: YEL });
     ws.mergeCells(y, 1, y, 2);
     put(y, 3, r.final == null ? (r.graded ? 'Sin datos' : 'Sin porcentajes') : r.final, { bold: true, box: true, fill: YEL, align: 'center' });
-    put(y, 4, r.graded ? 'Los apartados sin datos aún no cuentan.' : 'El maestro aún no define cuánto vale cada apartado.', { box: true, fill: YEL });
+    put(y, 4, r.graded ? 'Las secciones sin datos aún no cuentan.' : 'El maestro aún no define cuánto vale cada sección.', { box: true, fill: YEL });
+    if (nCols > 4) ws.mergeCells(y, 4, y, nCols);
     y += 2;
 
-    // Detalle por día
-    put(y, 1, 'Detalle por día', { bold: true });
-    ws.getCell(y, 1).font = { name: 'Calibri', size: 13, bold: true };
+    // Detalle por día: una columna por sección.
+    put(y, 1, 'Detalle por día', { bold: true, size: 13 });
     y++;
-    ['Fecha', 'Asistencia', 'Lectura', 'Trabajos', 'Disciplina', 'Examen'].forEach((t, i) => put(y, i + 1, t, { bold: true, box: true, fill: HEAD, align: i === 3 ? 'left' : 'center' }));
+    ['Fecha', ...secs.map((p) => p.name)].forEach((t, i) => put(y, i + 1, t, { bold: true, box: true, fill: HEAD, align: 'center' }));
     y++;
     if (!r.days.length) {
-      ws.mergeCells(y, 1, y, 6);
+      ws.mergeCells(y, 1, y, secs.length + 1);
       put(y, 1, 'Aún no hay datos capturados de este alumno.', { box: true });
     }
     for (const d of r.days) {
       put(y, 1, d.label, { box: true });
-      put(y, 2, d.att ? STATUS_LABEL[d.att] : '', { box: true, align: 'center', fill: d.att === 'F' ? RED : undefined });
-      put(y, 3, d.lect ? (d.lect === 'S' ? 'Sí' : 'No') : '', { box: true, align: 'center', fill: d.lect === 'N' ? RED : undefined });
-      put(y, 4, d.works.map((w) => `${w.title}: ${w.v}`).join('\n'), { box: true, fill: d.works.some((w) => w.v === 0) ? RED : undefined });
-      put(y, 5, d.disc, { box: true, align: 'center', fill: d.disc === 0 ? RED : undefined });
-      put(y, 6, d.exam, { box: true, align: 'center' });
+      secs.forEach((p, i) => {
+        const c = d.cells[p.id];
+        put(y, i + 2, c ? c.text : '', { box: true, align: p.type === 'trab' ? 'left' : 'center', fill: c && c.bad ? RED : undefined });
+      });
       y++;
     }
     return wb.xlsx.writeBuffer();
@@ -669,12 +669,12 @@
   function groupReport(g, grading) {
     grading = Object.assign({}, DEFAULT_GRADING, grading);
     const escala = Number(grading.escala) || 10;
-    const graded = gradingOn(grading);
+    const graded = gradingOn(grading, g);
     let present = 0;
     let taken = 0;
     const rows = g.students.map((s) => {
       const c = { A: 0, F: 0, R: 0, J: 0 };
-      Object.values(g.records || {}).forEach((day) => { const v = day[s.row]; if (v in c) c[v]++; });
+      Object.values(g[ASIST_ID] || {}).forEach((day) => { const v = day[s.row]; if (v in c) c[v]++; });
       const total = c.A + c.F + c.R + c.J;
       present += total - c.F;
       taken += total;
@@ -719,9 +719,9 @@
     const r = groupReport(g, grading);
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('Resumen del grupo', { views: [{ showGridLines: false }] });
-    const parts = GRADE_PARTS.filter((p) => Number(r.grading.w[p.key]) > 0);
+    const parts = sectionsOf(g).filter((p) => weightOf(r.grading, p) > 0);
     const head = ['No.', 'Nombre', 'Asistencias', 'Faltas', 'Retardos', 'Justificados', '% Asistencia',
-      ...parts.map((p) => `${p.label}\n${r.grading.w[p.key]}%`), `Calificación\nsobre ${r.escala}`, 'Estado', 'Motivo'];
+      ...parts.map((p) => `${p.name}\n${weightOf(r.grading, p)}%`), `Calificación\nsobre ${r.escala}`, 'Estado', 'Motivo'];
     ws.columns = head.map((h, i) => ({ width: i === 0 ? 6 : i === 1 ? 36 : h === 'Motivo' ? 34 : 12 }));
     const thin = { style: 'thin', color: { argb: 'FF999999' } };
     const border = { top: thin, left: thin, bottom: thin, right: thin };
@@ -785,7 +785,7 @@
       const f = SOFT[row.status];
       const vals = [row.student.no, row.student.name, row.counts.A, row.counts.F, row.counts.R, row.counts.J,
         row.att == null ? '' : round1(row.att),
-        ...parts.map((p) => (row.parts[p.key] == null ? '' : round1(row.parts[p.key]))),
+        ...parts.map((p) => (row.parts[p.id] == null ? '' : round1(row.parts[p.id]))),
         row.final == null ? '' : row.final, STATUS_TXT[row.status], row.reasons.join(' · ')];
       vals.forEach((v, i) => {
         const isState = i === vals.length - 2;
@@ -804,9 +804,9 @@
   }
 
   return {
-    STATUSES, READ, WORK, CATS, DEFAULT_CODES,
-    parseWorkbook, exportWorkbook, groupDates, columnLayout, worksOf, normalizeWorks, hasData, discCols, discDates, examCols, shortDate,
-    GRADE_PARTS, DEFAULT_GRADING, gradeParts, finalGrade, gradeCols, gradingOn, round1, parseHeader, parseDateHeader, cellText,
+    STATUSES, READ, WORK, DEFAULT_CODES, TYPES, ASIST_ID, DEFAULT_SECTIONS, sectionsOf, newSectionId, secMin,
+    parseWorkbook, exportWorkbook, groupDates, sheetLayout, worksOf, normalizeWorks, normalizeGroup, hasData, discDates, datesOf, shortDate,
+    DEFAULT_GRADING, gradeParts, finalGrade, gradingOn, weightOf, round1, parseHeader, parseDateHeader, cellText,
     studentReport, exportStudent, groupReport, exportGroupReport,
   };
 });

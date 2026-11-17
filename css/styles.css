@@ -256,8 +256,9 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .pick-list li.empty { cursor: default; font-weight: 400; color: var(--muted); }
 
 /* ---------- Pestañas: Asistencia / Lecturas / Trabajos ---------- */
-.tabs { display: grid; grid-template-columns: repeat(5, auto); justify-content: space-between; gap: 4px; margin-top: 8px; padding: 3px; background: var(--bg); border-radius: 10px; }
-.tab { border: none; background: transparent; border-radius: 8px; padding: 7px 6px; font-size: .78rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+.tabs { display: flex; gap: 4px; margin-top: 8px; padding: 3px; background: var(--bg); border-radius: 10px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: 1 0 auto; white-space: nowrap; border: none; background: transparent; border-radius: 8px; padding: 7px 8px; font-size: .78rem; font-weight: 600; color: var(--muted); cursor: pointer; }
 .tab.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgb(0 0 0 / .15); }
 .settings-sub { margin: 14px 0 0; font-weight: 700; color: var(--text); }
 #settings-form .pill { width: auto; min-width: 28px; padding: 0 6px; }
@@ -428,3 +429,21 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 /* Vista previa del resumen del grupo */
 .sheet.gr-sheet td { white-space: normal; vertical-align: middle; }
 .sheet.gr-sheet td[colspan] { white-space: nowrap; }
+
+/* Editor de secciones (en Secciones y calificaciones) */
+.grades-form { max-height: 52dvh; overflow: auto; padding-right: 2px; }
+.sec-list { display: flex; flex-direction: column; gap: 6px; }
+.sec-row { border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--bg); }
+.sec-row.new { border-color: var(--primary); }
+.sec-top { display: flex; align-items: center; gap: 6px; }
+.sec-name { flex: 1; min-width: 0; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-weight: 700; font-size: .95rem; }
+.sec-w { display: flex; align-items: center; gap: 3px; color: var(--muted); }
+.sec-w input { width: 52px; padding: 7px 4px; text-align: center; font-size: 1rem; font-weight: 700; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.sec-del { color: var(--F); font-size: 1rem; width: 34px; height: 34px; }
+.sec-del-ph { width: 34px; flex: none; }
+.sec-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 6px; font-size: .8rem; color: var(--muted); }
+.sec-sub select { max-width: 100%; padding: 5px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: .85rem; }
+.sec-min { display: flex; align-items: center; gap: 4px; }
+.sec-min .mini-num { width: 40px; padding: 4px; text-align: center; font-weight: 700; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
+.sec-add { width: 100%; margin-top: 8px; border-style: dashed; font-weight: 700; }
+.sr-days th.wrap { white-space: normal; min-width: 0; font-size: .72rem; line-height: 1.15; }

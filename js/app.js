@@ -1,43 +1,48 @@
 (function () {
   'use strict';
-  const { STATUSES, READ, WORK, CATS, DEFAULT_CODES, parseWorkbook, exportWorkbook, groupDates, columnLayout, discCols, examCols, shortDate,
-    GRADE_PARTS, DEFAULT_GRADING, finalGrade, gradeCols, round1, worksOf, normalizeWorks, studentReport, exportStudent, groupReport, exportGroupReport } = window.ListaExcel;
-  // Todos los apartados que se guardan por día (disciplina no lleva columna diaria en el Excel).
-  const KEYS = [...CATS.map((c) => c.key), 'disc', 'exam'];
+  const { STATUSES, READ, DEFAULT_CODES, TYPES, ASIST_ID, sectionsOf, newSectionId, secMin, parseWorkbook, exportWorkbook, groupDates, sheetLayout,
+    DEFAULT_GRADING, finalGrade, gradingOn, weightOf, round1, worksOf, normalizeGroup, studentReport, exportStudent, groupReport, exportGroupReport } = window.ListaExcel;
   const LABELS = { A: 'Asistencia', F: 'Falta', R: 'Retardo', J: 'Justificado' };
-  // Opciones de cada apartado: valor guardado, texto del botón, texto largo y color (clase A/F/R/J).
+  // Opciones de captura según la plantilla de la sección: valor guardado, texto del botón y color (clase A/F/R/J/N).
   const OPTIONS = {
-    lect: [
-      { v: 'S', btn: 'Sí', label: 'Sí leyó', color: 'A' },
-      { v: 'N', btn: 'No', label: 'No leyó', color: 'F' },
+    sino: [
+      { v: 'S', btn: 'Sí', color: 'A' },
+      { v: 'N', btn: 'No', color: 'F' },
     ],
     trab: [
-      { v: 0, btn: '0', label: 'Trabajo: 0', color: 'F' },
-      { v: 50, btn: '50', label: 'Trabajo: 50', color: 'R' },
-      { v: 100, btn: '100', label: 'Trabajo: 100', color: 'A' },
+      { v: 0, btn: '0', color: 'F' },
+      { v: 50, btn: '50', color: 'R' },
+      { v: 100, btn: '100', color: 'A' },
     ],
     // Disciplina: todos tienen 10 sin capturar nada; solo se guarda el 0.
     disc: [
-      { v: 10, btn: '10', label: 'Disciplina: 10', color: 'N' },
-      { v: 0, btn: '0', label: 'Disciplina: 0', color: 'F' },
+      { v: 10, btn: '10', color: 'N' },
+      { v: 0, btn: '0', color: 'F' },
     ],
   };
   const DISC_DEFAULT = 10;
-  // Valor del botón "restantes" en lecturas y trabajos.
-  const FILL_REST = { lect: ['S', 'N'], trab: [0] };
-  const optionOf = (cat, v) => {
-    if (cat === 'records') return v ? { v, label: LABELS[v], color: v } : null;
-    if (cat === 'exam') return v != null ? { v, label: `Examen: ${v}`, color: 'N' } : null;
-    return OPTIONS[cat].find((o) => o.v === v) || null;
+  // Valores del botón "restantes" según la plantilla.
+  const FILL_REST = { sino: ['S', 'N'], trab: [0] };
+  // Secciones del grupo actual (cada maestro las agrega, quita y renombra).
+  const secs = () => sectionsOf(group());
+  const secById = (id) => secs().find((x) => x.id === id);
+  const tab = () => (state.ui.tab && secById(state.ui.tab) ? state.ui.tab : ASIST_ID);
+  const typeOf = (id) => (secById(id) || { type: 'asist' }).type;
+  const optionOf = (id, v) => {
+    const sec = secById(id) || { type: 'asist', name: 'Asistencia' };
+    if (sec.type === 'asist') return v ? { v, label: LABELS[v], color: v } : null;
+    if (sec.type === 'num') return v != null ? { v, label: `${sec.name}: ${v}`, color: 'N' } : null;
+    const o = OPTIONS[sec.type].find((x) => x.v === v);
+    return o ? { ...o, label: `${sec.name}: ${o.btn}` } : null;
   };
-  const tab = () => state.ui.tab || 'records';
-  // Datos de un apartado para el día seleccionado.
+  // Datos de una sección para el día seleccionado.
   // Trabajos: puede haber varios por día; se usa el trabajo seleccionado (state.ui.work).
   const works = (create) => {
     const g = group();
-    g.trab = g.trab || {};
-    if (!g.trab[state.ui.date] && create) g.trab[state.ui.date] = [];
-    return g.trab[state.ui.date] || [];
+    const id = tab();
+    g[id] = g[id] || {};
+    if (!g[id][state.ui.date] && create) g[id][state.ui.date] = [];
+    return g[id][state.ui.date] || [];
   };
   const workIdx = () => Math.max(0, Math.min(state.ui.work || 0, Math.max(works(false).length - 1, 0)));
   const curWork = (create) => {
@@ -46,12 +51,12 @@
     if (!ws[i] && create) ws[i] = { title: '', vals: {} };
     return ws[i] || null;
   };
-  const dayData = (cat, create) => {
-    if (cat === 'trab') { const w = curWork(create); return w ? w.vals : {}; }
+  const dayData = (id, create) => {
+    if (typeOf(id) === 'trab') { const w = curWork(create); return w ? w.vals : {}; }
     const g = group();
-    g[cat] = g[cat] || {};
-    if (!g[cat][state.ui.date] && create) g[cat][state.ui.date] = {};
-    return g[cat][state.ui.date] || {};
+    g[id] = g[id] || {};
+    if (!g[id][state.ui.date] && create) g[id][state.ui.date] = {};
+    return g[id][state.ui.date] || {};
   };
   // Porcentajes de un grupo, completos (con los valores por defecto que falten).
   const fixGrading = (gr) => JSON.parse(JSON.stringify({ ...DEFAULT_GRADING, ...(gr || {}), w: { ...DEFAULT_GRADING.w, ...((gr || {}).w || {}) } }));
@@ -117,19 +122,21 @@
       const wb = new ExcelJS.Workbook();
       await wb.xlsx.load(buf);
       const codes = (state && state.codes) || { ...DEFAULT_CODES };
-      const groups = parseWorkbook(wb, codes);
+      // Si el grupo ya existía (misma hoja), conserva sus secciones, porcentajes y materia.
+      const old = (state && state.groups) || [];
+      const prevOf = (sheet) => old.find((o) => o.sheet === sheet);
+      const groups = parseWorkbook(wb, codes, (sheet) => (prevOf(sheet) || {}).sections);
       if (!groups.length) {
         toast('No encontré una columna “NOMBRE” en ninguna hoja');
         return;
       }
-      // Porcentajes por grupo: si el grupo ya existía (misma hoja), conserva los suyos.
-      const old = (state && state.groups) || [];
       groups.forEach((g) => {
-        const prev = old.find((o) => o.sheet === g.sheet);
+        const prev = prevOf(g.sheet);
+        normalizeGroup(g);
         g.grading = fixGrading(prev && prev.grading);
         if (prev && prev.subject) g.subject = prev.subject; // la materia también se conserva
       });
-      state = { fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, ui: { group: 0, date: todayISO(), tab: 'records' } };
+      state = { fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, ui: { group: 0, date: todayISO(), tab: ASIST_ID } };
       save();
       const total = groups.reduce((n, g) => n + g.students.length, 0);
       toast(`${groups.length} grupo(s), ${total} alumnos cargados`);
@@ -166,11 +173,8 @@
     const opt = $('#group-select').options[state.ui.group];
     if (opt) opt.textContent = glabel(group());
     const t = tab();
-    document.querySelectorAll('.tab').forEach((b) => {
-      b.classList.toggle('on', b.dataset.tab === t);
-      b.setAttribute('aria-selected', b.dataset.tab === t);
-    });
-    const att = t === 'records';
+    renderTabs();
+    const att = typeOf(t) === 'asist';
     $('#card-view').hidden = !att || view !== 'card';
     $('#list-view').hidden = !att || view !== 'list';
     $('#compact-view').hidden = att;
@@ -180,13 +184,24 @@
     renderSummary();
   }
 
-  // ---------- Pestañas ----------
+  // ---------- Pestañas (una por sección del grupo) ----------
+  function renderTabs() {
+    const t = tab();
+    const box = $('#tabs');
+    const html = secs().map((x) => `<button class="tab ${x.id === t ? 'on' : ''}" role="tab" aria-selected="${x.id === t}" data-tab="${x.id}">${escapeHtml(x.name)}</button>`).join('');
+    if (box.innerHTML !== html) {
+      box.innerHTML = html;
+      const on = box.querySelector('.tab.on');
+      if (on) box.scrollLeft = Math.max(0, on.offsetLeft - box.clientWidth / 2 + on.offsetWidth / 2);
+    }
+  }
   $('#tabs').addEventListener('click', (e) => {
     const b = e.target.closest('.tab');
     if (!b || b.dataset.tab === tab()) return;
     state.ui.tab = b.dataset.tab;
     save();
-    if (state.ui.tab === 'records') startCard();
+    state.ui.work = 0;
+    if (typeOf(state.ui.tab) === 'asist') startCard();
     refresh();
     window.scrollTo(0, 0);
   });
@@ -195,23 +210,25 @@
   function renderCompact() {
     const g = group();
     const cat = tab();
+    const t = typeOf(cat);
+    const sec = secById(cat);
     const day = dayData(cat, false);
-    const att = dayData('records', false);
+    const att = dayData(ASIST_ID, false);
     renderWorkBar();
-    const disc = cat === 'disc';
-    const exam = cat === 'exam';
+    const disc = t === 'disc';
+    const exam = t === 'num';
     $('#compact-search-bar').hidden = !disc && !exam;
     $('#compact-hint').innerHTML = exam
-      ? 'Escribe el porcentaje del examen (0 a 100). Con <b>Enter</b> pasas al siguiente alumno.'
+      ? `Escribe la calificación de <b>${escapeHtml(sec.name)}</b> (0 a 100). Con <b>Enter</b> pasas al siguiente alumno.`
       : 'Todos tienen 10. Busca al alumno y toca <b>0</b> si se portó mal.';
     $('#compact-list').innerHTML = g.students.map((s) => {
       const cur = optionOf(cat, disc ? (day[s.row] ?? DISC_DEFAULT) : day[s.row]);
       const a = att[s.row];
       const btns = exam
-        ? `<input class="exam-in" type="text" inputmode="decimal" enterkeyhint="next" maxlength="5" value="${day[s.row] ?? ''}" aria-label="Examen de ${escapeHtml(s.name)}" placeholder="—">`
-        : OPTIONS[cat].map((o) => {
+        ? `<input class="exam-in" type="text" inputmode="decimal" enterkeyhint="next" maxlength="5" value="${day[s.row] ?? ''}" aria-label="${escapeHtml(sec.name)} de ${escapeHtml(s.name)}" placeholder="—">`
+        : OPTIONS[t].map((o) => {
         const on = cur && cur.v === o.v;
-        return `<button class="cb ${cat === 'trab' && o.v === 100 ? 'wide' : ''} ${on ? 'on c' + o.color : ''}" data-v="${o.v}" aria-pressed="${!!on}" aria-label="${escapeHtml(o.label)}">${o.btn}</button>`;
+        return `<button class="cb ${t === 'trab' && o.v === 100 ? 'wide' : ''} ${on ? 'on c' + o.color : ''}" data-v="${o.v}" aria-pressed="${!!on}" aria-label="${escapeHtml(sec.name)}: ${o.btn}">${o.btn}</button>`;
       }).join('');
       return `<li class="crow ${cur ? 'c' + cur.color : ''} ${a === 'F' ? 'absent' : ''}" data-row="${s.row}" data-name="${escapeHtml(normalize(s.name))}">
         <span class="cno">${escapeHtml(s.no)}</span>
@@ -227,19 +244,19 @@
     const day = dayData(tab(), false);
     return group().students.filter((s) => day[s.row] == null);
   };
-  // Lecturas: si todos tienen la misma marca, botón para cambiarlos todos a la otra.
+  // Sí/No: si todos tienen la misma marca, botón para cambiarlos todos a la otra.
   const flipTarget = () => {
-    if (tab() !== 'lect') return null;
-    const day = dayData('lect', false);
+    if (typeOf(tab()) !== 'sino') return null;
+    const day = dayData(tab(), false);
     const vals = new Set(group().students.map((s) => day[s.row]));
     if (vals.size !== 1 || !group().students.length) return null;
     const [only] = vals;
     return only === 'S' ? 'N' : only === 'N' ? 'S' : null;
   };
   function updateFillRest() {
-    const cat = tab();
+    const t = typeOf(tab());
     const box = $('#fill-rest');
-    const n = cat in FILL_REST ? pendingRows().length : 0;
+    const n = t in FILL_REST ? pendingRows().length : 0;
     const flip = n ? null : flipTarget();
     box.hidden = !n && !flip;
     if (flip) {
@@ -249,7 +266,7 @@
     }
     if (!n) return;
     const text = { S: `Poner “Sí” a los ${n} sin marcar`, N: `Poner “No” a los ${n} sin marcar`, 0: `Poner 0 a los ${n} sin calificar` };
-    box.innerHTML = FILL_REST[cat].map((v) => `<button class="btn fill-rest ${v === 'S' ? 'yes' : ''}" data-v="${v}">${text[v]}</button>`).join('');
+    box.innerHTML = FILL_REST[t].map((v) => `<button class="btn fill-rest ${v === 'S' ? 'yes' : ''}" data-v="${v}">${text[v]}</button>`).join('');
   }
   $('#fill-rest').addEventListener('click', async (e) => {
     const all = e.target.closest('button[data-all]');
@@ -260,7 +277,7 @@
       const students = group().students;
       if (!(await confirmBulk(`¿Cambiar a los ${students.length} alumnos a “${label}”?`,
         `Todos tienen “${to === 'S' ? 'No' : 'Sí'}” en este día y quedarán con “${label}”.`, 'Sí, cambiar'))) return;
-      const day = dayData('lect', true);
+      const day = dayData(tab(), true);
       students.forEach((s) => (day[s.row] = to));
       save();
       if (navigator.vibrate) navigator.vibrate(15);
@@ -270,10 +287,11 @@
     }
     const btn = e.target.closest('button[data-v]');
     const cat = tab();
+    const t = typeOf(cat);
     const rows = pendingRows();
-    if (!btn || !(cat in FILL_REST) || !rows.length) return;
-    const v = cat === 'trab' ? Number(btn.dataset.v) : btn.dataset.v;
-    const what = { S: '“Sí leyó”', N: '“No leyó”' }[v] || '0 de trabajo';
+    if (!btn || !(t in FILL_REST) || !rows.length) return;
+    const v = t === 'trab' ? Number(btn.dataset.v) : btn.dataset.v;
+    const what = { S: '“Sí”', N: '“No”' }[v] || '0';
     if (!(await confirmBulk(`¿Poner ${what} a ${rows.length} alumno(s)?`, 'Solo a los que siguen en blanco. Los que ya marcaste no cambian.'))) return;
     const day = dayData(cat, true);
     rows.forEach((s) => (day[s.row] = v));
@@ -313,10 +331,11 @@
     const btn = e.target.closest('.cb');
     if (!btn) return;
     const cat = tab();
+    const t = typeOf(cat);
     const li = btn.closest('.crow');
     const row = li.dataset.row;
-    const disc = cat === 'disc';
-    const v = cat === 'lect' ? btn.dataset.v : Number(btn.dataset.v);
+    const disc = t === 'disc';
+    const v = t === 'sino' ? btn.dataset.v : Number(btn.dataset.v);
     let prev = dayData(cat, false)[row];
     let next = prev === v ? undefined : v; // tocar la misma otra vez = quitar
     if (disc) {
@@ -341,7 +360,7 @@
     li.classList.remove('cA', 'cF', 'cR', 'cJ', 'cN');
     if (cur) li.classList.add('c' + cur.color);
     li.querySelectorAll('.cb').forEach((b) => {
-      const o = OPTIONS[cat].find((x) => String(x.v) === b.dataset.v);
+      const o = OPTIONS[t].find((x) => String(x.v) === b.dataset.v);
       const on = cur && cur.v === o.v;
       b.classList.remove('on', 'cA', 'cF', 'cR', 'cN');
       if (on) b.classList.add('on', 'c' + o.color);
@@ -353,16 +372,16 @@
   // Examen: se guarda al salir del campo o con Enter.
   $('#compact-list').addEventListener('change', async (e) => {
     const inp = e.target.closest('.exam-in');
-    if (!inp || tab() !== 'exam') return;
+    if (!inp || typeOf(tab()) !== 'num') return;
     const li = inp.closest('.crow');
     const row = li.dataset.row;
-    const prev = dayData('exam', false)[row];
+    const prev = dayData(tab(), false)[row];
     const txt = inp.value.trim().replace(',', '.');
     let next;
     if (txt !== '') {
       next = Number(txt);
       if (!Number.isFinite(next) || next < 0 || next > 100) {
-        toast('El examen va de 0 a 100');
+        toast('La calificación va de 0 a 100');
         inp.value = prev ?? '';
         return;
       }
@@ -370,9 +389,9 @@
     if (next === prev) { inp.value = prev ?? ''; return; }
     if (prev != null) {
       const name = group().students.find((x) => String(x.row) === row).name;
-      if (!(await confirmChange(name, prev, next, 'exam'))) { inp.value = prev; return; }
+      if (!(await confirmChange(name, prev, next, tab()))) { inp.value = prev; return; }
     }
-    const day = dayData('exam', true);
+    const day = dayData(tab(), true);
     if (next != null) day[row] = next;
     else delete day[row];
     inp.value = next ?? '';
@@ -390,14 +409,14 @@
   // ---------- Varios trabajos por día ----------
   function renderWorkBar() {
     const bar = $('#work-bar');
-    bar.hidden = tab() !== 'trab';
+    bar.hidden = typeOf(tab()) !== 'trab';
     if (bar.hidden) return;
     const ws = works(false);
     const total = Math.max(ws.length, 1);
     const i = workIdx();
     state.ui.work = i;
     const w = ws[i];
-    $('#work-pos').textContent = `Trabajo ${i + 1} de ${total}`;
+    $('#work-pos').textContent = `${secById(tab()).name} ${i + 1} de ${total}`;
     $('#work-prev').disabled = i === 0;
     $('#work-next').disabled = i >= total - 1;
     // El nombre se refresca al cambiar de trabajo o de día (no mientras se escribe en el mismo trabajo).
@@ -450,7 +469,7 @@
       'Sí, eliminar', true);
     if (!ok) return;
     ws.splice(i, 1);
-    if (!ws.length) delete group().trab[state.ui.date];
+    if (!ws.length) delete group()[tab()][state.ui.date];
     goWork(Math.max(0, i - 1));
     toast(`${name} eliminado`);
   });
@@ -505,7 +524,7 @@
   }
 
   // Pide autorización antes de cambiar (o quitar) una marca que ya existía.
-  function confirmChange(name, from, to, cat = 'records') {
+  function confirmChange(name, from, to, cat = ASIST_ID) {
     return new Promise((resolve) => {
       const d = $('#confirm-change');
       const pill = (sel, v) => {
@@ -567,7 +586,7 @@
 
   // Teclado (en computadora): A/F/R/J para marcar, flechas para moverse.
   document.addEventListener('keydown', (e) => {
-    if (tab() !== 'records' || view !== 'card' || $('#screen-main').hidden || document.querySelector('dialog[open]')) return;
+    if (typeOf(tab()) !== 'asist' || view !== 'card' || $('#screen-main').hidden || document.querySelector('dialog[open]')) return;
     if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
     const k = e.key.toUpperCase();
     if (STATUSES.includes(k)) markCard(k);
@@ -599,7 +618,8 @@
   function renderSummary() {
     const g = group();
     const cat = tab();
-    if (cat === 'exam') {
+    const t = typeOf(cat);
+    if (t === 'num') {
       const day = dayData(cat, false);
       const vals = g.students.map((s) => day[s.row]).filter((v) => v != null);
       const avg = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
@@ -608,19 +628,19 @@
         (avg != null ? `<span>Promedio: ${avg}</span>` : '');
       return;
     }
-    if (cat === 'disc') {
+    if (t === 'disc') {
       const day = dayData(cat, false);
       const zeros = g.students.filter((s) => day[s.row] === 0).length;
       $('#summary').innerHTML =
         `<span>${fmtDate(state.ui.date)}</span><span class="F">Con 0: ${zeros}</span><span>Los demás: 10</span>`;
       return;
     }
-    if (cat !== 'records') {
+    if (t !== 'asist') {
       const day = dayData(cat, false);
       const vals = g.students.map((s) => day[s.row]).filter((v) => v != null);
       $('#summary').innerHTML =
         `<span>${vals.length}/${g.students.length} capturados</span>` +
-        OPTIONS[cat].map((o) => `<span class="${o.color}">${o.btn}: ${vals.filter((v) => v === o.v).length}</span>`).join('');
+        OPTIONS[t].map((o) => `<span class="${o.color}">${o.btn}: ${vals.filter((v) => v === o.v).length}</span>`).join('');
       return;
     }
     const rec = dayRecords(false);
@@ -673,7 +693,7 @@
     if (idx < 0) return;
     const s = g.students[idx];
     g.students.splice(idx, 1);
-    KEYS.forEach((k) => Object.values(g[k] || {}).forEach((day) => {
+    sectionsOf(g).forEach((x) => Object.values(g[x.id] || {}).forEach((day) => {
       if (Array.isArray(day)) day.forEach((w) => delete w.vals[s.row]); // trabajos
       else delete day[s.row];
     }));
@@ -784,7 +804,7 @@
     save();
     $('#add-student').close();
     // Lo deja en pantalla para pasarle lista de inmediato.
-    state.ui.tab = 'records';
+    state.ui.tab = ASIST_ID;
     save();
     view = 'card';
     cardIdx = g.students.length - 1;
@@ -809,25 +829,21 @@
     }
 
     const dates = groupDates(g);
-    const layout = columnLayout(g);
+    const layout = sheetLayout(g, g.grading);
     const byCol = new Map(layout.map((x) => [x.col, x]));
-    const dc = discCols(g);
-    const ex = examCols(g);
-    const exCol = new Map(ex.map((x, i) => [x.col, { ...x, first: i === 0, last: i === ex.length - 1 }]));
-    const gcs = gradeCols(g, g.grading);
-    const gcCol = new Map(gcs.map((x, i) => [x.col, { ...x, first: i === 0, last: i === gcs.length - 1 }]));
-    const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col), dc ? dc.dates : 0, ...ex.map((x) => x.col), ...gcs.map((x) => x.col));
+    const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col));
     const isCur = (c) => byCol.has(c) && byCol.get(c).date === state.ui.date;
     const colLetter = (c) => { let s = ''; for (; c > 0; c = Math.floor((c - 1) / 26)) s = String.fromCharCode(65 + ((c - 1) % 26)) + s; return s; };
     // Se toma de lo capturado (no del número), porque A, R y J pueden tener el mismo valor.
-    const colorOf = (c, r) => {
-      const { cat, date, work } = byCol.get(c);
-      const v = cat === 'trab' ? (worksOf(g, date)[work].vals || {})[r] : ((g[cat] || {})[date] || {})[r];
+    const colorOf = (x, r) => {
+      if (x.kind === 'disc-count') return discCount(x.sec, r) > 0 ? 'F' : '';
+      if (x.kind !== 'day' && x.kind !== 'trab') return '';
+      const v = x.kind === 'trab' ? (worksOf(g, x.date, x.sec.id)[x.work].vals || {})[r] : ((g[x.sec.id] || {})[x.date] || {})[r];
       if (v == null) return '';
-      if (cat === 'records') return v;
-      const o = optionOf(cat, v);
+      const o = optionOf(x.sec.id, v);
       return o ? o.color : '';
     };
+    const discCount = (sec, r) => Object.values(g[sec.id] || {}).filter((d) => d[r] === 0).length;
     const text = (v) => {
       if (v instanceof Date) return `${String(v.getUTCDate()).padStart(2, '0')}/${String(v.getUTCMonth() + 1).padStart(2, '0')}/${String(v.getUTCFullYear()).slice(-2)}`;
       return ListaExcel.cellText(v).replace(/\s+/g, ' ').trim();
@@ -846,36 +862,19 @@
         const cls = [];
         if (c <= g.nameCol) cls.push('stick');
         if (c === g.nameCol) cls.push('name');
-        const isDateCol = byCol.has(c);
-        if (isDateCol && isHdr) cls.push('date-h');
-        if (isDateCol && !isHdr) cls.push('v', colorOf(c, r));
-        if (isDateCol && byCol.get(c).first) cls.push('day-start');
-        if (isDateCol && byCol.get(c).cat === 'lect') cls.push('lect-col');
-        if (isDateCol && !byCol.has(c + 1)) cls.push('block-end');
-        if (isDateCol && isCur(c)) cls.push('cur');
-        const isExam = exCol.has(c);
-        if (isExam) {
-          const x = exCol.get(c);
+        const x = byCol.get(c);
+        if (x) {
           cls.push(isHdr ? 'date-h' : 'v');
+          if (!isHdr) cls.push(colorOf(x, r));
           if (x.first) cls.push('day-start');
           if (x.last) cls.push('block-end');
-          if (x.date === state.ui.date) cls.push('cur');
+          if (x.kind === 'day' && x.sec.type === 'sino') cls.push('lect-col');
+          if (x.kind === 'grade' && x.key === 'final') cls.push('final');
+          if (x.kind === 'disc-dates') cls.push('disc-dates');
+          if (isCur(c)) cls.push('cur');
         }
-        const isGrade = gcCol.has(c);
-        if (isGrade) {
-          const x = gcCol.get(c);
-          cls.push(isHdr ? 'date-h' : 'v');
-          if (x.first || x.key === 'final') cls.push('day-start');
-          if (x.last) cls.push('block-end');
-          if (x.key === 'final') cls.push('final');
-        }
-        const isDisc = (dc && (c === dc.count || c === dc.dates)) || isExam || isGrade;
-        if (isDisc && isHdr) cls.push('date-h');
-        if (dc && c === dc.count) cls.push('day-start');
-        if (dc && c === dc.dates) cls.push('block-end', 'disc-dates');
-        if (dc && c === dc.count && !isHdr) cls.push('v', Number(t) > 0 ? 'F' : '');
         // El encabezado lleva fecha y apartado en dos renglones, como en el Excel.
-        const shown = isHdr && (isDateCol || isDisc) ? escapeHtml(ListaExcel.cellText(v)).replace(/\n/g, '<br>') : escapeHtml(t);
+        const shown = isHdr && x ? escapeHtml(ListaExcel.cellText(v)).replace(/\n/g, '<br>') : escapeHtml(t);
         html += `<td class="${cls.join(' ')}">${shown}</td>`;
       }
       html += '</tr>';
@@ -884,12 +883,12 @@
     $('#preview-table').innerHTML = html;
 
     $('#preview-title').textContent = `Vista previa · ${gname(g)}`;
-    $('#preview-sub').textContent = dates.length || dc
-      ? `${g.students.length} alumnos · ${dates.length} día(s) · Asistencia y Lectura juntas; Trabajos y Disciplina aparte a la derecha`
+    $('#preview-sub').textContent = layout.length
+      ? `${g.students.length} alumnos · ${dates.length} día(s) · Por fecha: ${secs().filter((x) => x.type === 'asist' || x.type === 'sino').map((x) => x.name).join(' + ')}; las demás secciones aparte a la derecha`
       : 'Aún no hay registros en este grupo.';
     $('#preview-legend').innerHTML =
       STATUSES.map((k) => `<span class="summary-${k}">${escapeHtml(String(state.codes[k]))} = ${LABELS[k]}</span>`).join('') +
-      READ.map((k) => { const o = optionOf('lect', k); return `<span class="summary-${o.color}">${escapeHtml(String(state.codes[k]))} = ${o.label}</span>`; }).join('');
+      (secs().some((x) => x.type === 'sino') ? READ.map((k) => `<span class="summary-${k === 'S' ? 'A' : 'F'}">${escapeHtml(String(state.codes[k]))} = ${k === 'S' ? 'Sí' : 'No'}</span>`).join('') : '');
 
     const d = $('#preview');
     d.showModal();
@@ -1369,22 +1368,24 @@
     const r = studentReport(g, studentRow, g.grading);
     $('#student-sub').textContent = gname(g);
     const pct = (v) => (v == null ? 'Sin datos' : `${round1(v)} %`);
-    const cls = { A: 'A', F: 'F', R: 'R', J: 'J' };
     $('#student-report').innerHTML =
       `<div class="sr-head"><div><b>${escapeHtml(picked.name)}</b><small>No. ${escapeHtml(picked.no)} · ${escapeHtml(gname(g))}</small></div>` +
       `<div class="sr-final">${r.final == null ? '—' : r.final}<small>${r.graded ? `sobre ${r.grading.escala}` : 'sin porcentajes'}</small></div></div>` +
-      '<table class="sheet sr-parts"><thead><tr><th>Apartado</th><th>Vale</th><th>Resultado</th></tr></thead><tbody>' +
-      GRADE_PARTS.map((p) => `<tr><td><b>${p.label}</b><small>${escapeHtml(r.detail[p.key])}</small></td>` +
-        `<td class="v">${r.grading.w[p.key] ? `${r.grading.w[p.key]} %` : '—'}</td><td class="v">${pct(r.parts[p.key])}</td></tr>`).join('') +
+      '<table class="sheet sr-parts"><thead><tr><th>Sección</th><th>Vale</th><th>Resultado</th></tr></thead><tbody>' +
+      r.sections.map((p) => `<tr><td><b>${escapeHtml(p.name)}</b><small>${escapeHtml(r.detail[p.id])}</small></td>` +
+        `<td class="v">${weightOf(r.grading, p) ? `${weightOf(r.grading, p)} %` : '—'}</td><td class="v">${pct(r.parts[p.id])}</td></tr>`).join('') +
       '</tbody></table>' +
       '<h3 class="sr-title">Detalle por día</h3>' +
       (r.days.length
-        ? '<div class="preview-scroll"><table class="sheet sr-days"><thead><tr><th>Fecha</th><th>Asist.</th><th>Lect.</th><th>Trabajos</th><th>Disc.</th><th>Exam.</th></tr></thead><tbody>' +
+        ? '<div class="preview-scroll"><table class="sheet sr-days"><thead><tr><th>Fecha</th>' +
+          r.sections.map((p) => `<th class="wrap">${escapeHtml(p.name)}</th>`).join('') + '</tr></thead><tbody>' +
           r.days.map((d) => `<tr><td class="nowrap">${d.label.replace(/\/\d\d(\d\d)$/, '/$1')}</td>` +
-            `<td class="v ${d.att ? cls[d.att] : ''}">${d.att || ''}</td>` +
-            `<td class="v ${d.lect === 'N' ? 'F' : d.lect ? 'A' : ''}">${d.lect ? (d.lect === 'S' ? 'Sí' : 'No') : ''}</td>` +
-            `<td>${d.works.map((w) => `<span class="${w.v === 0 ? 'F' : ''}">${escapeHtml(w.title)}: ${w.v}</span>`).join('<br>')}</td>` +
-            `<td class="v ${d.disc === 0 ? 'F' : ''}">${d.disc ?? ''}</td><td class="v">${d.exam ?? ''}</td></tr>`).join('') +
+            r.sections.map((p) => {
+              const c = d.cells[p.id];
+              if (!c) return '<td></td>';
+              if (p.type === 'trab') return `<td>${c.list.map((w) => `<span class="${Number(w.v) === 0 ? 'F' : ''}">${escapeHtml(w.title)}: ${w.v}</span>`).join('<br>')}</td>`;
+              return `<td class="v ${c.tone || ''}">${escapeHtml(String(c.short))}</td>`;
+            }).join('') + '</tr>').join('') +
           '</tbody></table></div>'
         : '<p class="hint">Aún no hay datos capturados de este alumno.</p>');
   }
@@ -1440,17 +1441,7 @@
     if (action === 'group-report') openGroupReport();
     if (action === 'book') openBook();
     if (action === 'subject') openSubject();
-    if (action === 'history') openHistory();
     if (action === 'settings') openSettings();
-    if (action === 'clear-day') {
-      confirmBulk(`¿Borrar los registros del ${fmtDate(state.ui.date)}?`,
-        `Se borran asistencia, lecturas, trabajos, disciplina y examen de ese día en ${gname(group())}. No se puede deshacer.`,
-        'Sí, borrar', true).then((ok) => {
-        if (!ok) return;
-        KEYS.forEach((k) => { if (group()[k]) delete group()[k][state.ui.date]; });
-        changed();
-      });
-    }
     if (action === 'new-file') {
       if (confirm('Se reemplazará la lista actual y su asistencia guardada. Exporta antes si la necesitas. ¿Continuar?')) {
         $('#file-input').click();
@@ -1458,101 +1449,162 @@
     }
   });
 
-  function openHistory() {
-    const g = group();
-    const count = (cat, d) => (cat === 'trab'
-      ? worksOf(g, d).filter((w) => Object.keys(w.vals).length).length
-      : Object.keys((g[cat] || {})[d] || {}).length);
-    const dates = [...new Set([...groupDates(g), ...['disc', 'exam'].flatMap((k) => Object.keys(g[k] || {}).filter((d) => count(k, d)))])].sort().reverse();
-    $('#history-list').innerHTML = dates.length
-      ? dates.map((d) => {
-          const c = { A: 0, F: 0, R: 0, J: 0 };
-          Object.values(g.records[d] || {}).forEach((s) => c[s]++);
-          return `<li data-date="${d}"><span>${fmtDate(d)}</span><span class="counts">A ${c.A} · F ${c.F} · R ${c.R} · J ${c.J}<br>Lecturas ${count('lect', d)} · Trabajos ${count('trab', d)} (${worksOf(g, d).reduce((n, w) => n + Object.keys(w.vals).length, 0)} calif.)${count('disc', d) ? ` · Disciplina 0: ${count('disc', d)}` : ''}${count('exam', d) ? ` · Examen: ${count('exam', d)}` : ''}</span></li>`;
-        }).join('')
-      : '<li>Aún no hay registros en este grupo.</li>';
-    $('#history').showModal();
+  // ---------- Secciones y calificaciones ----------
+  // Cada grupo tiene sus secciones (nombre + plantilla) y cuánto vale cada una. Todo se edita en un
+  // borrador: la tabla se actualiza al instante, pero solo se guarda con "Guardar".
+  let gradeDraft = null; // { sections, grading }
+  const snapshot = (g) => JSON.parse(JSON.stringify({ sections: sectionsOf(g), grading: g.grading }));
+  const sameDraft = () => JSON.stringify(gradeDraft) === JSON.stringify(snapshot(group()));
+  // Grupo "de prueba" con el borrador, para calcular la tabla sin tocar el grupo real.
+  const draftGroup = () => Object.assign({}, group(), { sections: gradeDraft.sections });
+  const typeLabel = (t) => TYPES[t].label;
+  const draftTotal = () => round1(gradeDraft.sections.reduce((n, x) => n + weightOf(gradeDraft.grading, x), 0));
+  // Cuántos datos tiene una sección (para avisar antes de borrarla).
+  function secDataCount(g, sec) {
+    const d = g[sec.id] || {};
+    return Object.keys(d).filter((k) => (Array.isArray(d[k]) ? d[k].some((w) => Object.keys(w.vals || {}).length) : Object.keys(d[k]).length)).length;
   }
-  $('#history-list').addEventListener('click', (e) => {
-    const li = e.target.closest('li[data-date]');
-    if (!li) return;
-    state.ui.date = li.dataset.date;
-    $('#date-input').value = state.ui.date;
-    changed();
-    $('#history').close();
-  });
 
-  // ---------- Calificaciones ----------
-  // Los porcentajes son del archivo (todos los grupos); la calificación se recalcula sola con cada dato.
-  // Lo que se escribe es un borrador: la tabla se actualiza al instante, pero solo se guarda con "Guardar".
-  let gradeDraft = null;
-  const sameGrading = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   function openGrades() {
+    gradeDraft = snapshot(group());
+    $('#grades-scope').textContent = `Secciones de ${gname(group())} y cuánto vale cada una. Cada grupo tiene las suyas.`;
     const f = $('#grades-form');
-    gradeDraft = JSON.parse(JSON.stringify(group().grading));
-    $('#grades-scope').textContent = `¿Cuánto vale cada apartado en ${gname(group())}? Cada grupo tiene sus propios porcentajes.`;
-    const gr = gradeDraft;
-    GRADE_PARTS.forEach((p) => (f.elements[p.key].value = gr.w[p.key] || ''));
-    f.elements.retardo.value = String(gr.retardo);
-    f.elements.escala.value = String(gr.escala);
-    f.elements.lectMin.value = gr.lectMin;
+    f.elements.retardo.value = String(gradeDraft.grading.retardo);
+    f.elements.escala.value = String(gradeDraft.grading.escala);
+    renderSecList();
     renderGrades();
     $('#grades').showModal();
   }
-  $('#grades-form').addEventListener('input', () => {
-    const f = $('#grades-form');
-    GRADE_PARTS.forEach((p) => {
-      const n = Number(f.elements[p.key].value.replace(',', '.'));
-      gradeDraft.w[p.key] = Number.isFinite(n) && n > 0 ? n : 0;
-    });
-    gradeDraft.retardo = Number(f.elements.retardo.value);
-    gradeDraft.escala = Number(f.elements.escala.value);
-    const lm = Math.round(Number(f.elements.lectMin.value));
-    gradeDraft.lectMin = Number.isFinite(lm) && lm >= 1 ? lm : group().grading.lectMin;
+  function renderSecList() {
+    const g = group();
+    $('#sec-list').innerHTML = gradeDraft.sections.map((x, i) => {
+      const isNew = !sectionsOf(g).some((o) => o.id === x.id);
+      const w = gradeDraft.grading.w[x.id];
+      const typeBox = isNew
+        ? `<select data-f="type" aria-label="Plantilla">${Object.keys(TYPES).filter((t) => t !== 'asist').map((t) => `<option value="${t}" ${t === x.type ? 'selected' : ''}>${escapeHtml(typeLabel(t))}</option>`).join('')}</select>`
+        : `<span class="sec-type">${escapeHtml(typeLabel(x.type))}</span>`;
+      return `<div class="sec-row ${isNew ? 'new' : ''}" data-i="${i}">
+        <div class="sec-top">
+          <input class="sec-name" data-f="name" maxlength="30" value="${escapeHtml(x.name)}" placeholder="Nombre de la sección" aria-label="Nombre de la sección">
+          <span class="sec-w"><input data-f="w" inputmode="decimal" maxlength="5" value="${w || ''}" aria-label="Porcentaje de ${escapeHtml(x.name)}">%</span>
+          ${x.type === 'asist' ? '<span class="sec-del-ph"></span>' : `<button type="button" class="icon-btn sec-del" data-del="${i}" aria-label="Quitar ${escapeHtml(x.name)}">✕</button>`}
+        </div>
+        <div class="sec-sub">${typeBox}${x.type === 'sino' ? `<label class="sec-min">100 % con <input data-f="min" class="mini-num" inputmode="numeric" maxlength="3" value="${secMin(x)}"> o más “Sí”</label>` : ''}</div>
+      </div>`;
+    }).join('');
+  }
+  $('#sec-list').addEventListener('input', (e) => {
+    const el = e.target.closest('[data-f]');
+    const row = e.target.closest('.sec-row');
+    if (!el || !row) return;
+    const x = gradeDraft.sections[Number(row.dataset.i)];
+    const f = el.dataset.f;
+    if (f === 'name') x.name = el.value.replace(/[:\n]/g, ' ').replace(/\s+/g, ' ').trimStart();
+    if (f === 'w') {
+      const n = Number(el.value.replace(',', '.'));
+      if (Number.isFinite(n) && n > 0) gradeDraft.grading.w[x.id] = n; else delete gradeDraft.grading.w[x.id];
+    }
+    if (f === 'min') { const n = Math.round(Number(el.value)); if (Number.isFinite(n) && n >= 1) x.min = n; }
+    if (f === 'type') {
+      x.type = el.value;
+      if (x.type === 'sino') x.min = x.min || 4; else delete x.min;
+      renderSecList();
+    }
     renderGrades();
   });
-  const draftTotal = () => round1(GRADE_PARTS.reduce((n, p) => n + (gradeDraft.w[p.key] || 0), 0));
-  $('#grades-save').addEventListener('click', () => {
-    const total = draftTotal();
-    if (total !== 100) { toast(`Los porcentajes suman ${total} %; deben sumar 100 %`); return; }
-    group().grading = JSON.parse(JSON.stringify(gradeDraft));
-    save();
+  $('#sec-list').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-del]');
+    if (!b) return;
+    const x = gradeDraft.sections[Number(b.dataset.del)];
+    gradeDraft.sections.splice(Number(b.dataset.del), 1);
+    delete gradeDraft.grading.w[x.id];
+    renderSecList();
     renderGrades();
-    toast(`Porcentajes de ${gname(group())} guardados. La calificación saldrá siempre en la vista previa y el Excel.`);
+    const n = secDataCount(group(), x);
+    toast(n ? `“${x.name}” se quitará al guardar (tiene datos de ${n} día(s))` : `“${x.name || 'Sección'}” quitada`);
+  });
+  $('#sec-add').addEventListener('click', () => {
+    gradeDraft.sections.push({ id: newSectionId(), name: '', type: 'num' });
+    renderSecList();
+    renderGrades();
+    const rows = document.querySelectorAll('#sec-list .sec-row');
+    const last = rows[rows.length - 1];
+    last.scrollIntoView({ block: 'nearest' });
+    last.querySelector('.sec-name').focus();
+  });
+  $('#grades-form').addEventListener('change', (e) => {
+    if (e.target.name === 'retardo') gradeDraft.grading.retardo = Number(e.target.value);
+    if (e.target.name === 'escala') gradeDraft.grading.escala = Number(e.target.value);
+    if (e.target.name === 'retardo' || e.target.name === 'escala') renderGrades();
+  });
+  $('#grades-save').addEventListener('click', async () => {
+    const g = group();
+    const list = gradeDraft.sections;
+    list.forEach((x) => (x.name = x.name.trim()));
+    const empty = list.find((x) => !x.name);
+    if (empty) { toast('Ponle nombre a todas las secciones'); return; }
+    const seen = new Set();
+    const dup = list.find((x) => { const k = normalize(x.name); if (seen.has(k)) return true; seen.add(k); return false; });
+    if (dup) { toast(`Hay dos secciones llamadas “${dup.name}”`); return; }
+    const total = draftTotal();
+    if (total !== 100 && total !== 0) { toast(`Los porcentajes suman ${total} %; deben sumar 100 %`); return; }
+    // Secciones quitadas que tenían datos: se avisa antes de borrarlas.
+    const gone = sectionsOf(g).filter((o) => !list.some((x) => x.id === o.id));
+    const withData = gone.map((o) => [o, secDataCount(g, o)]).filter(([, n]) => n);
+    if (withData.length && !(await confirmBulk(
+      `¿Quitar ${withData.map(([o]) => `“${o.name}”`).join(', ')}?`,
+      `Se borrarán sus datos capturados (${withData.map(([o, n]) => `${o.name}: ${n} día(s)`).join(', ')}). No se puede deshacer.`,
+      'Sí, quitar', true))) return;
+    gone.forEach((o) => delete g[o.id]);
+    g.sections = JSON.parse(JSON.stringify(list));
+    g.grading = JSON.parse(JSON.stringify(gradeDraft.grading));
+    Object.keys(g.grading.w).forEach((id) => { if (!g.sections.some((x) => x.id === id)) delete g.grading.w[id]; });
+    normalizeGroup(g);
+    gradeDraft = snapshot(g);
+    if (!secById(state.ui.tab)) state.ui.tab = ASIST_ID;
+    save();
+    renderSecList();
+    renderGrades();
+    refresh();
+    toast(`Secciones y porcentajes de ${gname(g)} guardados`);
   });
   // Al cerrar sin guardar se descartan los cambios (avisando).
   $('#grades').addEventListener('close', () => {
-    if (gradeDraft && !sameGrading(gradeDraft, group().grading)) toast('No se guardaron los cambios en los porcentajes');
+    if (gradeDraft && !sameDraft()) toast('No se guardaron los cambios');
     gradeDraft = null;
   });
   function renderGrades() {
     const g = group();
-    const gr = gradeDraft;
+    const dg = draftGroup();
+    const gr = gradeDraft.grading;
     const total = draftTotal();
-    const saved = sameGrading(gradeDraft, g.grading);
+    const saved = sameDraft();
     const tot = $('#weights-total');
-    tot.textContent = total !== 100
-      ? `Total: ${total} % — debe sumar 100 %`
-      : saved ? 'Total: 100 % · Guardado ✓' : 'Total: 100 % · Falta guardar';
-    tot.className = 'weights-total ' + (total !== 100 ? 'bad' : saved ? 'ok' : 'warn');
+    const okTotal = total === 100 || total === 0;
+    tot.textContent = total === 0
+      ? (saved ? 'Sin porcentajes · Guardado ✓' : 'Sin porcentajes (no se calcula calificación) · Falta guardar')
+      : total !== 100
+        ? `Total: ${total} % — debe sumar 100 %`
+        : saved ? 'Total: 100 % · Guardado ✓' : 'Total: 100 % · Falta guardar';
+    tot.className = 'weights-total ' + (!okTotal ? 'bad' : saved ? 'ok' : 'warn');
     const btn = $('#grades-save');
     btn.disabled = saved;
-    btn.textContent = saved ? 'Guardado ✓' : 'Guardar porcentajes';
+    btn.textContent = saved ? 'Guardado ✓' : 'Guardar';
     $('#grades-sub').textContent = `${gname(g)} · ${g.students.length} alumnos · sobre ${gr.escala}`;
-    const parts = GRADE_PARTS.filter((p) => gr.w[p.key] > 0);
+    const parts = dg.sections.filter((x) => weightOf(gr, x) > 0);
     if (!parts.length) {
-      $('#grades-table').innerHTML = '<tbody><tr><td class="grades-empty">Escribe cuánto vale cada apartado para ver las calificaciones.</td></tr></tbody>';
+      $('#grades-table').innerHTML = '<tbody><tr><td class="grades-empty">Escribe cuánto vale cada sección para ver las calificaciones.</td></tr></tbody>';
       return;
     }
     const fmt = (v) => (v == null ? '—' : round1(v));
     // La calificación final va junto al nombre para que se vea sin desplazar en el celular.
     let html = '<thead><tr><th class="stick">No.</th><th class="stick name">Nombre</th><th class="final">Calif.</th>' +
-      parts.map((p) => `<th>${p.label}<br><small>${gr.w[p.key]}%${p.key === 'lect' ? ` · mín. ${gr.lectMin}` : ''}</small></th>`).join('') +
+      parts.map((x) => `<th>${escapeHtml(x.name || 'Sin nombre')}<br><small>${weightOf(gr, x)}%${x.type === 'sino' ? ` · mín. ${secMin(x)}` : ''}</small></th>`).join('') +
       '</tr></thead><tbody>';
-    for (const s of g.students) {
-      const r = finalGrade(g, s.row, gr);
-      html += `<tr><td class="stick">${escapeHtml(s.no)}</td><td class="stick name">${escapeHtml(s.name)}</td><td class="v final">${fmt(r.final)}</td>` +
-        parts.map((p) => `<td class="v">${fmt(r.parts[p.key])}</td>`).join('') +
+    for (const st of g.students) {
+      const r = finalGrade(dg, st.row, gr);
+      html += `<tr><td class="stick">${escapeHtml(st.no)}</td><td class="stick name">${escapeHtml(st.name)}</td><td class="v final">${fmt(r.final)}</td>` +
+        parts.map((x) => `<td class="v">${fmt(r.parts[x.id])}</td>`).join('') +
         '</tr>';
     }
     const t = $('#grades-table');
@@ -1610,12 +1662,15 @@
     if (!state.ui) state.ui = { group: 0, date: todayISO() };
     if (state.ui.group >= state.groups.length) state.ui.group = 0;
     state.ui.date = todayISO(); // al abrir la app siempre empieza en hoy
-    if (!state.ui.tab) state.ui.tab = 'records';
-    // Datos guardados con la versión anterior (solo asistencia).
+    if (!state.ui.tab) state.ui.tab = ASIST_ID;
     state.codes = { ...DEFAULT_CODES, ...state.codes };
-    state.groups.forEach((g) => { g.lect = g.lect || {}; normalizeWorks(g); g.disc = g.disc || {}; g.exam = g.exam || {}; });
-    // Antes los porcentajes eran uno solo para todo el archivo: cada grupo arranca con esa copia.
-    state.groups.forEach((g) => { g.grading = fixGrading(g.grading || state.grading); });
+    // Versiones anteriores: porcentajes de todo el archivo y 5 secciones fijas. Cada grupo queda con su copia
+    // y con sus secciones (las de siempre: Asistencia, Lecturas, Trabajos, Disciplina y Examen).
+    state.groups.forEach((g) => {
+      g.grading = fixGrading(g.grading || state.grading);
+      normalizeGroup(g, g.grading);
+      delete g.grading.lectMin; // el mínimo de "Sí" ahora es de cada sección
+    });
     delete state.grading;
   }
   render();

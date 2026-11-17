@@ -42,13 +42,7 @@
         <input type="date" id="date-input" aria-label="Fecha">
         <button class="icon-btn" id="next-day" aria-label="Día siguiente">›</button>
       </div>
-      <div class="tabs" role="tablist" id="tabs">
-        <button class="tab" role="tab" data-tab="records">Asistencia</button>
-        <button class="tab" role="tab" data-tab="lect">Lecturas</button>
-        <button class="tab" role="tab" data-tab="trab">Trabajos</button>
-        <button class="tab" role="tab" data-tab="disc">Disciplina</button>
-        <button class="tab" role="tab" data-tab="exam">Examen</button>
-      </div>
+      <div class="tabs" role="tablist" id="tabs"></div>
       <div class="summary" id="summary"></div>
     </header>
 
@@ -137,7 +131,7 @@
   <dialog id="menu">
     <h2>Opciones</h2>
     <button class="menu-item" data-action="subject">Materia de este grupo</button>
-    <button class="menu-item" data-action="grades">Calificaciones y porcentajes</button>
+    <button class="menu-item" data-action="grades">Secciones y calificaciones</button>
     <button class="menu-item" data-action="group-report">Resumen del grupo (semáforo)</button>
     <button class="menu-item" data-action="student">Resumen por alumno</button>
     <button class="menu-item" data-action="book">Cuadernillo del grupo (PDF)</button>
@@ -148,11 +142,6 @@
     <button class="btn" data-action="close">Cerrar</button>
   </dialog>
 
-  <dialog id="history">
-    <h2>Historial</h2>
-    <ul id="history-list"></ul>
-    <button class="btn" data-action="close">Cerrar</button>
-  </dialog>
 
   <dialog id="settings">
     <h2>Valor en el Excel</h2>
@@ -195,27 +184,19 @@
   <dialog id="grades" class="fullscreen">
     <div class="preview-head">
       <div>
-        <h2>Calificaciones</h2>
+        <h2>Secciones y calificaciones</h2>
         <p class="hint" id="grades-sub"></p>
       </div>
       <button class="icon-btn" data-action="close" aria-label="Cerrar">✕</button>
     </div>
     <form id="grades-form" class="grades-form" onsubmit="return false">
-      <p class="hint settings-sub" id="grades-scope">¿Cuánto vale cada apartado?</p>
-      <div class="weights">
-        <label>Asistencia <span><input name="records" inputmode="decimal" maxlength="5">%</span></label>
-        <label>Lecturas <span><input name="lect" inputmode="decimal" maxlength="5">%</span></label>
-        <label>Trabajos <span><input name="trab" inputmode="decimal" maxlength="5">%</span></label>
-        <label>Disciplina <span><input name="disc" inputmode="decimal" maxlength="5">%</span></label>
-        <label>Examen <span><input name="exam" inputmode="decimal" maxlength="5">%</span></label>
-      </div>
+      <p class="hint settings-sub" id="grades-scope"></p>
+      <div class="sec-list" id="sec-list"></div>
+      <button type="button" class="btn sec-add" id="sec-add">+ Agregar sección</button>
       <p class="weights-total" id="weights-total"></p>
       <div class="grade-opts">
         <label>Retardo vale
           <select name="retardo"><option value="100">como asistencia</option><option value="50">media asistencia</option><option value="0">como falta</option></select>
-        </label>
-        <label>Lecturas completas con
-          <input name="lectMin" class="mini-num" inputmode="numeric" maxlength="3"> o más
         </label>
         <label>Calificar sobre
           <select name="escala"><option value="10">10</option><option value="100">100</option></select>
@@ -225,7 +206,7 @@
     <div class="preview-scroll"><table class="sheet grades-table" id="grades-table"></table></div>
     <div class="row">
       <button class="btn" data-action="close">Cerrar</button>
-      <button class="btn primary" id="grades-save">Guardar porcentajes</button>
+      <button class="btn primary" id="grades-save">Guardar</button>
     </div>
   </dialog>
 
