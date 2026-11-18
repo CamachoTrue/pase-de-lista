@@ -6,7 +6,7 @@ import { armarGrupo, huella } from '../lib/sync-plan.js';
 import { nube } from '../lib/nube.js';
 import { setState, save, state, todayISO, fixGrading } from './state.js';
 import { bufToB64, loadExcel } from './util.js';
-import { bookDB } from './book.js';
+import { bookDB } from './book-db.js';
 import { ASIST_ID } from '../lib/excel-core.js';
 
 const PAGINA = 1000;

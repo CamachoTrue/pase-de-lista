@@ -274,6 +274,24 @@ test('archivos: cada maestro solo usa su propia carpeta', async () => {
   assert.equal((await as(U.maeB, 'select name from storage.objects')).length, 0);
 });
 
+test('panel del administrador: escuelas con cobro, pagos y precios de lista', async () => {
+  await fails(U.dirA, 'select * from panel_escuelas()', [], /administrador general/);
+  const filas = await as(U.super, 'select * from panel_escuelas()');
+  const a = filas.find((f) => f.clave === 'ESCA');
+  assert.equal(a.precio_lista, '69.00');
+  assert.ok(a.cuentas_usadas >= 1);
+  await fails(U.dirA, `select registrar_pago('${ESC_A}', 100, '2026-08-01', '2026-12-31', 'transferencia', '')`, [], /administrador general/);
+  await as(U.super, `select registrar_pago('${ESC_A}', 2070, '2026-08-01', '2027-01-31', 'transferencia', 'F-123')`);
+  const [p] = await as(U.dirA, 'select vence_el, activa from mi_perfil()');
+  assert.equal(p.vence_el.toISOString().slice(0, 10), '2027-01-31');
+  assert.equal(p.activa, true);
+  // Precio especial: lo pone el superadmin, no el director.
+  await as(U.super, `update escuelas set precio_mensual = 50 where id = '${ESC_A}'`);
+  assert.equal((await as(U.super, 'select * from panel_escuelas()')).find((f) => f.clave === 'ESCA').precio_mensual, '50.00');
+  assert.equal((await as(U.dirA, `update precios_lista set por_mes = 1 returning paquete`)).length, 0);
+  assert.equal((await as(U.maeA1, 'select * from precios_lista')).length, 2);
+});
+
 test('todas las tablas tienen RLS activo', async () => {
   const r = await db.query(`select relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity`);

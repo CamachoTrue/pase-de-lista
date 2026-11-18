@@ -1,33 +1,14 @@
 import { confirmBulk } from './dialogs.js';
 import { gname, group } from './state.js';
 import { $, toast } from './util.js';
+import { bookDB } from './book-db.js';
 
 // ---------- Cuadernillo (PDF por grupo) ----------
 // El PDF es grande para localStorage: se guarda en IndexedDB, una entrada por grupo (nombre de la hoja),
 // así sigue ahí aunque se vuelva a subir el Excel. Se muestra con PDF.js para que se vea igual en Android y iPhone.
 // La sincronización se entera de que cambió un cuadernillo (sin importar sync.js aquí, para no crear un ciclo).
 const avisarCuadernillo = () => window.dispatchEvent(new Event('cuadernillo-cambio'));
-export const bookDB = (() => {
-  let p;
-  const open = () => (p = p || new Promise((res, rej) => {
-    const r = indexedDB.open('paseDeLista', 1);
-    r.onupgradeneeded = () => r.result.createObjectStore('cuadernillos');
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  }));
-  const run = (mode, fn) => open().then((db) => new Promise((res, rej) => {
-    const tx = db.transaction('cuadernillos', mode);
-    const req = fn(tx.objectStore('cuadernillos'));
-    tx.oncomplete = () => res(req && req.result);
-    tx.onerror = () => rej(tx.error);
-    tx.onabort = () => rej(tx.error);
-  }));
-  return {
-    get: (k) => run('readonly', (s) => s.get(k)),
-    put: (k, v) => run('readwrite', (s) => s.put(v, k)),
-    del: (k) => run('readwrite', (s) => s.delete(k)),
-  };
-})();
+
 export let pdfjsReady = null;
 export const loadPdfJs = () => (pdfjsReady = pdfjsReady || new Promise((res, rej) => {
   const sc = document.createElement('script');

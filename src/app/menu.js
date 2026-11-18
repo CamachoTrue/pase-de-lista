@@ -1,16 +1,13 @@
-import { openBook } from './book.js';
 import { doExport, openPreview } from './export.js';
-import { openGrades } from './grades.js';
-import { openGroupReport } from './group-report.js';
 import { openSettings } from './settings.js';
-import { openStudent } from './student-report.js';
 import { openAddStudent, openRemoveStudent } from './students.js';
 import { openSubject } from './subject.js';
-import { $ } from './util.js';
-import { openCuenta } from './cuenta.js';
-import { openSemestral } from './semestral.js';
+import { $, toast } from './util.js';
 
 // ---------- Menú y diálogos ----------
+// Pantallas que se usan poco se cargan al abrirlas (la app abre más rápido).
+const abrir = (carga, fn) => carga().then((m) => m[fn]()).catch((e) => { console.error(e); toast('No se pudo abrir. Revisa tu conexión e inténtalo otra vez.'); });
+export const openCuenta = () => abrir(() => import('./cuenta.js'), 'openCuenta');
 export const menu = $('#menu');
 $('#menu-btn').addEventListener('click', () => menu.showModal());
 document.querySelectorAll('dialog').forEach((d) =>
@@ -27,17 +24,20 @@ menu.addEventListener('click', (e) => {
   if (action === 'preview') openPreview();
   if (action === 'add-student') openAddStudent();
   if (action === 'remove-student') openRemoveStudent();
-  if (action === 'grades') openGrades();
-  if (action === 'student') openStudent();
-  if (action === 'group-report') openGroupReport();
-  if (action === 'book') openBook();
+  if (action === 'grades') abrir(() => import('./grades.js'), 'openGrades');
+  if (action === 'student') abrir(() => import('./student-report.js'), 'openStudent');
+  if (action === 'group-report') abrir(() => import('./group-report.js'), 'openGroupReport');
+  if (action === 'book') abrir(() => import('./book.js'), 'openBook');
   if (action === 'subject') openSubject();
   if (action === 'settings') openSettings();
   if (action === 'cuenta') openCuenta();
-  if (action === 'semestral') openSemestral();
+  if (action === 'semestral') abrir(() => import('./semestral.js'), 'openSemestral');
   if (action === 'new-file') {
     if (confirm('Se reemplazará la lista actual y su asistencia guardada. Exporta antes si la necesitas. ¿Continuar?')) {
       $('#file-input').click();
     }
   }
 });
+
+// Pantalla inicial (sin Excel): entrar con la cuenta para bajar los datos.
+$('#upload-cuenta').addEventListener('click', openCuenta);

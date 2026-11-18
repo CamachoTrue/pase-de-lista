@@ -46,6 +46,7 @@ async function renderCuenta() {
       <span class="rol-badge">${ROL[p.rol]}</span>
       ${p.escuela ? `<div class="cuenta-escuela">${escapeHtml(p.escuela)} · ${escapeHtml(p.clave)}</div>` : ''}
     </div>
+    ${avisoSuscripcion(p)}
     ${p.escuela_id ? '<div class="nube-estado" data-nube></div>' : ''}
     ${p.escuela_id && !(state && state.groups && state.groups.length) ? '<div class="cuenta-bajar" data-bajar hidden></div>' : ''}`;
   if (p.rol === 'director') html += seccionPeriodos() + seccionMaestros();
@@ -69,6 +70,7 @@ function textoNube() {
     case 'error': return ['mal', `No se pudo guardar en tu cuenta: ${estado.error}`];
     case 'otra-cuenta': return ['mal', 'Las listas de este celular son de otra cuenta, así que no se suben a esta.'];
     case 'sin-escuela': return ['espera', 'Tu cuenta aún no pertenece a una escuela.'];
+    case 'vencida': return ['', '']; // ya lo dice el aviso de la suscripción
     case 'listo': return ['ok', `Todo guardado en tu cuenta ✓${hace ? ` · ${hace}` : ''}`];
     default: return ['', 'Tus listas se guardan en este celular y en tu cuenta.'];
   }
@@ -77,6 +79,7 @@ function pintarNube() {
   const el = body().querySelector('[data-nube]');
   if (!el) return;
   const [cls, txt] = textoNube();
+  el.hidden = !txt;
   el.className = `nube-estado ${cls}`;
   el.innerHTML = `<span>${escapeHtml(txt)}</span>${['mal', 'espera', 'ok'].includes(cls) && estado.fase !== 'otra-cuenta' ? '<button class="link-btn" data-act="subir">Guardar ahora</button>' : ''}`;
 }
@@ -97,6 +100,21 @@ async function ofrecerBajar() {
     <button class="btn primary" data-act="bajar">Bajar a este celular</button><p class="hint" data-avance></p>`;
 }
 
+// Prueba gratis, suscripción vencida o escuela desactivada.
+export const suscripcionVencida = (p) => !!p && !!p.escuela_id && (!p.activa || (p.vence_el && p.vence_el < new Date().toISOString().slice(0, 10)));
+function avisoSuscripcion(p) {
+  if (!p.escuela_id) return '';
+  if (suscripcionVencida(p)) {
+    return `<div class="nube-estado mal"><span>${!p.activa ? 'Tu escuela está desactivada.' : `Tu ${p.paquete === 'individual' ? 'suscripción' : 'licencia'} venció el ${p.vence_el}.`}
+      Tus listas siguen guardándose en este celular, pero ya no se guardan en tu cuenta. ${p.paquete === 'individual' ? 'Renueva para seguir.' : 'Avisa a tu director.'}</span></div>`;
+  }
+  if (p.paquete === 'individual' && p.vence_el) {
+    const dias = Math.ceil((new Date(`${p.vence_el}T23:59:59`) - new Date()) / 864e5);
+    if (dias <= 31) return `<div class="nube-estado espera"><span>Tu cuenta está activa hasta el ${p.vence_el} (${dias} día${dias === 1 ? '' : 's'}).</span></div>`;
+  }
+  return '';
+}
+
 const btnSalir = () => '<button class="btn cuenta-salir" data-act="salir">Cerrar sesión</button>';
 
 function sinConexion(correo) {
@@ -112,6 +130,24 @@ function renderEntrar() {
       <label class="check"><input type="checkbox" name="recordar" ${recordar() ? 'checked' : ''}> Mantener la sesión iniciada en este celular</label>
       <p class="form-error" data-error></p>
       <button class="btn primary big" type="submit">Entrar</button>
+    </form>
+    <div class="cuenta-card cuenta-indep">
+      <b>¿Eres maestro independiente?</b>
+      <small>Crea tu cuenta sin escuela: 30 días gratis para guardar tus listas en la nube y abrirlas en otro celular.</small>
+      <button class="btn" data-act="registro">Crear mi cuenta</button>
+    </div>`;
+}
+
+function renderRegistro() {
+  body().innerHTML = `<form class="cuenta-form" data-form="registro" autocomplete="on">
+      <p class="hint">Cuenta de maestro independiente. Si tu escuela usa la app, mejor pide a tu director una invitación.</p>
+      <label class="field">Tu nombre completo<input name="nombre" autocomplete="name" required></label>
+      <label class="field">Correo<input name="correo" type="email" autocomplete="username" required></label>
+      <label class="field">Crea una contraseña (mínimo 8)<input name="pass" type="password" autocomplete="new-password" minlength="8" required></label>
+      <label class="check"><input type="checkbox" name="recordar" checked> Mantener la sesión iniciada en este celular</label>
+      <p class="form-error" data-error></p>
+      <button class="btn primary big" type="submit">Crear cuenta (30 días gratis)</button>
+      <button class="btn" type="button" data-act="volver-entrar">Ya tengo cuenta: entrar</button>
     </form>`;
 }
 
@@ -210,14 +246,61 @@ function seccionEscuelas() {
       </form>
       <div data-nuevo></div>
       <ul class="pick-list cuenta-lista" data-escuelas></ul>
+      <h3>Precios de lista (MXN por maestro)</h3>
+      <div data-precios></div>
     </section>`;
 }
 
+// Panel: cada escuela con su paquete, cuentas, precio (de lista o especial), vencimiento y pagos.
+const pesos = (n) => `$${Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 })}`;
+const hoyISO = () => new Date().toISOString().slice(0, 10);
 async function cargarEscuelas(sb) {
-  const { data } = await sb.from('escuelas').select('id, nombre, clave, paquete, activa').order('creado_en', { ascending: false });
-  body().querySelector('[data-escuelas]').innerHTML = (data || []).length
-    ? '<li class="titulo">Escuelas dadas de alta</li>' + data.map((e) => `<li><span class="nm">${escapeHtml(e.nombre)}<small>${escapeHtml(e.clave)} · ${e.paquete}${e.activa ? '' : ' · inactiva'}</small></span></li>`).join('')
+  const [{ data, error }, precios] = await Promise.all([sb.rpc('panel_escuelas'), sb.from('precios_lista').select('*').order('paquete')]);
+  const ul = body().querySelector('[data-escuelas]');
+  if (error) { ul.innerHTML = `<li class="empty">${escapeHtml(errorLegible(error))}</li>`; return; }
+  const activas = (data || []).filter((e) => e.activa && (!e.vence_el || e.vence_el >= hoyISO()));
+  const mensual = activas.reduce((n, e) => n + e.cuentas_contratadas * Number(e.precio_mensual ?? e.precio_lista ?? 0), 0);
+  ul.innerHTML = (data || []).length
+    ? `<li class="titulo">Escuelas: ${data.length} · activas ${activas.length} · ${pesos(mensual)} al mes</li>` + data.map((e) => {
+        const precio = e.precio_mensual ?? e.precio_lista;
+        const vencida = e.vence_el && e.vence_el < hoyISO();
+        const estado = !e.activa ? '<b class="danger-text">inactiva</b>' : vencida ? `<b class="danger-text">venció ${e.vence_el}</b>` : e.vence_el ? `vence ${e.vence_el}` : 'sin vencimiento';
+        return `<li class="esc-item" data-esc="${e.id}">
+          <details>
+            <summary><span class="nm">${escapeHtml(e.nombre)}<small>${escapeHtml(e.clave)} · ${e.paquete} · ${e.cuentas_usadas}/${e.cuentas_contratadas} cuentas
+              · ${pesos(precio)}${e.precio_mensual != null ? ' (especial)' : ''} por maestro · ${estado}</small></span></summary>
+            <form class="cuenta-form esc-form" data-form="esc-editar">
+              <div class="cuenta-2col"><label class="field">Paquete<select name="paquete"><option value="empresarial" ${e.paquete === 'empresarial' ? 'selected' : ''}>Empresarial</option><option value="individual" ${e.paquete === 'individual' ? 'selected' : ''}>Individual</option></select></label>
+                <label class="field">Cuentas<input name="cuentas" type="number" min="1" value="${e.cuentas_contratadas}"></label></div>
+              <div class="cuenta-2col"><label class="field">Precio especial por maestro (vacío = lista ${pesos(e.precio_lista)})<input name="precio" inputmode="decimal" value="${e.precio_mensual ?? ''}"></label>
+                <label class="field">Vence<input name="vence" type="date" value="${e.vence_el || ''}"></label></div>
+              <label class="check"><input type="checkbox" name="activa" ${e.activa ? 'checked' : ''}> Activa</label>
+              <button class="btn primary" type="submit">Guardar cambios</button>
+              <p class="form-error" data-error></p>
+            </form>
+            <form class="cuenta-form esc-form" data-form="esc-pago">
+              <b>Registrar pago</b>
+              <div class="cuenta-2col"><label class="field">Monto (MXN)<input name="monto" inputmode="decimal" required value="${e.cuentas_contratadas * Number(precio || 0) * 6}"></label>
+                <label class="field">Método<select name="metodo"><option>transferencia</option><option>efectivo</option><option>tarjeta</option><option>depósito</option></select></label></div>
+              <div class="cuenta-2col"><label class="field">Del<input name="inicio" type="date" required value="${hoyISO()}"></label>
+                <label class="field">Al<input name="fin" type="date" required></label></div>
+              <label class="field">Factura (folio, opcional)<input name="factura"></label>
+              <button class="btn" type="submit">Registrar pago y extender</button>
+              <p class="form-error" data-error></p>
+            </form>
+          </details></li>`;
+      }).join('')
     : '<li class="empty">Aún no hay escuelas.</li>';
+  const pl = body().querySelector('[data-precios]');
+  if (pl && precios.data) {
+    pl.innerHTML = precios.data.map((p) => `<form class="cuenta-form precio-form" data-form="precio" data-paquete="${p.paquete}">
+        <b>${p.paquete === 'individual' ? 'Individual' : 'Empresarial'}</b>
+        <label>Mes <input name="mes" inputmode="decimal" value="${Number(p.por_mes)}"></label>
+        <label>Año <input name="anio" inputmode="decimal" value="${Number(p.por_anio)}"></label>
+        <label>Prueba <input name="prueba" type="number" min="0" value="${p.dias_prueba}"> días</label>
+        <button class="btn" type="submit">Guardar</button><p class="form-error" data-error></p>
+      </form>`).join('');
+  }
 }
 
 // Muestra el enlace de una invitación recién creada, listo para mandarlo por WhatsApp o correo.
@@ -260,6 +343,42 @@ $('#cuenta-body').addEventListener('submit', async (e) => {
       if (error) throw error;
       toast('Sesión iniciada');
       await renderCuenta();
+    } else if (f.dataset.form === 'registro') {
+      setRecordar(f.elements.recordar.checked);
+      const email = v('correo').toLowerCase();
+      const password = f.elements.pass.value;
+      let r = await sb.auth.signUp({ email, password, options: { data: { nombre: v('nombre') } } });
+      if (r.error && /already registered|already been registered/i.test(r.error.message)) r = await sb.auth.signInWithPassword({ email, password });
+      if (r.error) throw r.error;
+      if (!r.data.session) throw new Error('Falta confirmar el correo. Avisa al administrador.');
+      const { error } = await sb.rpc('registrar_individual', { p_nombre: v('nombre') });
+      if (error && !/ya pertenece/.test(error.message)) throw error;
+      toast('¡Listo! Tu cuenta quedó creada');
+      await renderCuenta();
+      programar(300);
+    } else if (f.dataset.form === 'esc-editar' || f.dataset.form === 'esc-pago') {
+      const id = f.closest('[data-esc]').dataset.esc;
+      if (f.dataset.form === 'esc-editar') {
+        const precio = v('precio') === '' ? null : Number(v('precio').replace(',', '.'));
+        if (precio != null && !(precio >= 0)) throw new Error('El precio debe ser un número.');
+        const { error } = await sb.from('escuelas').update({
+          paquete: v('paquete'), cuentas_contratadas: Math.max(1, Number(v('cuentas')) || 1), precio_mensual: precio,
+          vence_el: v('vence') || null, activa: f.elements.activa.checked,
+        }).eq('id', id);
+        if (error) throw error;
+        toast('Escuela actualizada');
+      } else {
+        if (v('fin') < v('inicio')) throw new Error('La fecha final debe ser después de la inicial.');
+        const { error } = await sb.rpc('registrar_pago', { p_escuela: id, p_monto: Number(v('monto').replace(',', '.')) || 0, p_inicio: v('inicio'), p_fin: v('fin'), p_metodo: v('metodo'), p_factura: v('factura') });
+        if (error) throw error;
+        toast(`Pago registrado: la escuela queda activa hasta ${v('fin')}`);
+      }
+      await cargarEscuelas(sb);
+    } else if (f.dataset.form === 'precio') {
+      const { error } = await sb.from('precios_lista').update({ por_mes: Number(v('mes')) || 0, por_anio: Number(v('anio')) || 0, dias_prueba: Number(v('prueba')) || 0, actualizado_en: new Date().toISOString() }).eq('paquete', f.dataset.paquete);
+      if (error) throw error;
+      toast('Precio de lista guardado');
+      await cargarEscuelas(sb);
     } else if (f.dataset.form === 'periodos') {
       await guardarPeriodos(sb, f);
       toast('Parciales guardados para toda la escuela');
@@ -301,6 +420,8 @@ $('#cuenta-body').addEventListener('click', async (e) => {
   const act = b.dataset.act;
   const token = (b.closest('[data-token]') || {}).dataset?.token;
   if (act === 'subir') sincronizar();
+  if (act === 'registro') renderRegistro();
+  if (act === 'volver-entrar') renderEntrar();
   if (act === 'bajar') {
     const av = body().querySelector('[data-avance]');
     b.disabled = true;
@@ -398,5 +519,3 @@ $('#inv-form').addEventListener('submit', async (e) => {
   }
 });
 
-// Pantalla inicial (sin Excel): entrar con la cuenta para bajar los datos.
-$('#upload-cuenta').addEventListener('click', openCuenta);

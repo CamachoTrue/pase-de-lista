@@ -5,7 +5,7 @@ import { alGuardar, save, state } from './state.js';
 import { errorLegible, haySesion, nube } from '../lib/nube.js';
 import { diasDeTrabajos, faltaImportar, huella, planDias, planSecciones } from '../lib/sync-plan.js';
 import { b64ToBuf } from './util.js';
-import { bookDB } from './book.js';
+import { bookDB } from './book-db.js';
 
 const LOTE = 60; // días por llamada
 export const estado = { fase: 'inactivo', ultimo: null, error: '', subidos: 0 };
@@ -39,6 +39,9 @@ export async function sincronizar() {
     const { data: perfil, error } = await sb.rpc('mi_perfil');
     if (error) throw error;
     if (!perfil || !perfil[0] || !perfil[0].escuela_id) { estado.fase = 'sin-escuela'; return; }
+    // Suscripción vencida o escuela desactivada: no se sube nada (los datos siguen en el celular).
+    const p0 = perfil[0];
+    if (!p0.activa || (p0.vence_el && p0.vence_el < new Date().toISOString().slice(0, 10))) { estado.fase = 'vencida'; return; }
     state.nube_usuario = session.user.id;
     await bajarPeriodos(sb, perfil[0].escuela_id);
     for (const g of state.groups) await subirGrupo(sb, g);

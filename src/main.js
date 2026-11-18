@@ -1,6 +1,5 @@
 import { ASIST_ID, DEFAULT_CODES, normalizeGroup } from './lib/excel-core.js';
 import { render } from './app/main-view.js';
-import { openInvitacion } from './app/cuenta.js';
 import { fixGrading, state, todayISO } from './app/state.js';
 import './app/util.js';
 import './app/dialogs.js';
@@ -9,12 +8,8 @@ import './app/compact.js';
 import './app/card.js';
 import './app/students.js';
 import './app/export.js';
-import './app/book.js';
 import './app/subject.js';
-import './app/group-report.js';
-import './app/student-report.js';
 import './app/menu.js';
-import './app/grades.js';
 import './app/settings.js';
 import './app/sync.js';
 
@@ -38,7 +33,7 @@ render();
 
 // Enlace de invitación (?invitacion=TOKEN): abre la pantalla para crear la cuenta.
 const invitacion = new URLSearchParams(location.search).get('invitacion');
-if (invitacion && /^[0-9a-f-]{36}$/i.test(invitacion)) openInvitacion(invitacion);
+if (invitacion && /^[0-9a-f-]{36}$/i.test(invitacion)) import('./app/cuenta.js').then((m) => m.openInvitacion(invitacion));
 
 // En desarrollo (npm run dev) no hay service worker: la lista de archivos solo existe al construir.
 if (import.meta.env.PROD && 'serviceWorker' in navigator && location.protocol !== 'file:') {

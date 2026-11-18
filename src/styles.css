@@ -515,3 +515,20 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .sem-mal { color: var(--F); font-weight: 700; }
 .sem-falta { color: var(--R); font-weight: 700; font-size: .75rem; }
 .sheet td.final.sem-rep { color: var(--F); }
+
+/* Panel del administrador */
+.esc-item { display: block !important; padding: 0 !important; }
+.esc-item summary { list-style: none; padding: 12px; cursor: pointer; display: flex; }
+.esc-item summary::-webkit-details-marker { display: none; }
+.esc-item details[open] { background: var(--bg); }
+.esc-form { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 6px; }
+.esc-form .field { margin: 0; font-size: .8rem; }
+.esc-form .field input, .esc-form .field select { padding: 8px; font-size: .9rem; text-transform: none; width: 100%; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); margin-top: 2px; }
+.precio-form { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: .85rem; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.precio-form b { width: 100%; }
+.precio-form input { width: 64px; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); text-align: center; }
+.precio-form .btn { padding: 6px 12px; }
+
+.cuenta-indep { margin-top: 12px; gap: 6px; }
+.cuenta-indep .btn { align-self: flex-start; }
+.esc-form .cuenta-2col { grid-template-columns: 1fr 1fr; }

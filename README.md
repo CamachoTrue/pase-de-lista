@@ -38,6 +38,11 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
   parcial y cada parcial se puede **cerrar** (calificaciones definitivas) y reabrir. En ⋮ → *Calificación semestral* el
   maestro elige promedio de parciales o parciales + examen final (pesos, exentos desde X, mínimo aprobatorio, entero o
   decimal, reprobados como 5) y cierra el semestre. El Excel lleva Parcial 1–3 y Semestral.
+- **Cuentas y nube** (⋮ → Mi cuenta): entrar con correo y contraseña (sesión guardada), invitaciones por enlace,
+  sincronización automática (también sin internet) y "Bajar a este celular" en un dispositivo nuevo. Maestro independiente:
+  "Crear mi cuenta" con 30 días gratis. Si la suscripción vence, la app avisa y deja de subir (los datos siguen en el celular).
+- **Panel del administrador general** (Mi cuenta, rol superadmin): alta de escuelas con invitación al director, paquete,
+  cuentas, precio especial por escuela, vencimiento, activar/desactivar, registrar pagos y precios de lista.
 - **Confirmación de cambios**: si un alumno ya tenía marca y se elige otra, se pide confirmar.
 - **Vista de lista** para revisar y corregir; tocar un nombre regresa al pase uno por uno desde ahí.
 - **Agregar / quitar alumnos**: los nuevos se agregan al final de la lista del grupo.
