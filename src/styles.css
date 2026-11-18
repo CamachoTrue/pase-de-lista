@@ -481,3 +481,6 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .nube-estado.espera { color: var(--R); background: var(--R-soft); }
 .nube-estado.mal { color: var(--F); background: var(--F-soft); }
 .nube-estado .link-btn { padding: 0; }
+.cuenta-bajar { border: 1.5px solid var(--J); background: var(--J-soft); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.cuenta-bajar small { color: var(--muted); }
+.upload-cuenta { width: 100%; margin-top: 12px; }

@@ -3,7 +3,9 @@
 // sube solo unos segundos después, al volver el internet y al abrir la app.
 import { alGuardar, save, state } from './state.js';
 import { errorLegible, haySesion, nube } from '../lib/nube.js';
-import { diasDeTrabajos, faltaImportar, planDias, planSecciones } from '../lib/sync-plan.js';
+import { diasDeTrabajos, faltaImportar, huella, planDias, planSecciones } from '../lib/sync-plan.js';
+import { b64ToBuf } from './util.js';
+import { bookDB } from './book.js';
 
 const LOTE = 60; // días por llamada
 export const estado = { fase: 'inactivo', ultimo: null, error: '', subidos: 0 };
@@ -39,6 +41,9 @@ export async function sincronizar() {
     if (!perfil || !perfil[0] || !perfil[0].escuela_id) { estado.fase = 'sin-escuela'; return; }
     state.nube_usuario = session.user.id;
     for (const g of state.groups) await subirGrupo(sb, g);
+    const carpeta = `${perfil[0].escuela_id}/${session.user.id}`;
+    await subirExcel(sb, carpeta);
+    await subirCuadernillos(sb, carpeta, perfil[0].escuela_id);
     estado.fase = 'listo';
     estado.ultimo = Date.now();
     estado.error = '';
@@ -109,7 +114,54 @@ async function subirGrupo(sb, g) {
   }
 }
 
+// ---------- Archivos: Excel original y cuadernillos (Supabase Storage, carpeta propia) ----------
+export const nombreArchivo = (n) => String(n || 'lista.xlsx').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_').slice(-80);
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+async function subirExcel(sb, carpeta) {
+  if (!state.fileB64) return;
+  const marca = huella(`${state.fileName}|${state.fileB64.length}|${state.fileB64.slice(-200)}`);
+  if (state.nube_excel === marca) return;
+  const st = sb.storage.from('archivos');
+  const nombre = nombreArchivo(state.fileName);
+  const { error } = await st.upload(`${carpeta}/excel/${nombre}`, new Blob([b64ToBuf(state.fileB64)], { type: XLSX }), { upsert: true, contentType: XLSX });
+  if (error) throw error;
+  // Solo queda el Excel actual.
+  const { data: viejos } = await st.list(`${carpeta}/excel`);
+  const sobran = (viejos || []).filter((f) => f.name !== nombre).map((f) => `${carpeta}/excel/${f.name}`);
+  if (sobran.length) await st.remove(sobran);
+  state.nube_excel = marca;
+  save(true);
+}
+
+async function subirCuadernillos(sb, carpeta, escuela) {
+  const st = sb.storage.from('archivos');
+  for (const g of state.groups) {
+    const clase = g.nube && g.nube.clase_id;
+    if (!clase) continue;
+    let rec = null;
+    try { rec = await bookDB.get(g.sheet); } catch { /* sin IndexedDB */ }
+    const ruta = `${carpeta}/cuadernillos/${clase}.pdf`;
+    if (rec) {
+      const marca = huella(`${rec.name}|${rec.size}|${rec.added || ''}`);
+      if (g.nube.pdf === marca) continue;
+      const up = await st.upload(ruta, new Blob([rec.data], { type: 'application/pdf' }), { upsert: true, contentType: 'application/pdf' });
+      if (up.error) throw up.error;
+      const r = await sb.from('cuadernillos').upsert({ escuela_id: escuela, clase_id: clase, nombre: rec.name, ruta, tamano: rec.size, pagina: rec.page || 1 }, { onConflict: 'clase_id' });
+      if (r.error) throw r.error;
+      g.nube.pdf = marca;
+      save(true);
+    } else if (g.nube.pdf) {
+      await st.remove([ruta]);
+      await sb.from('cuadernillos').delete().eq('clase_id', clase);
+      delete g.nube.pdf;
+      save(true);
+    }
+  }
+}
+
 // Cada cambio guardado programa una subida; también al volver el internet y al abrir la app.
 alGuardar(() => programar());
 window.addEventListener('online', () => programar(1000));
+window.addEventListener('cuadernillo-cambio', () => programar(1500));
 if (haySesion()) setTimeout(() => programar(500), 2500);

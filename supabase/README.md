@@ -8,6 +8,7 @@ en orden; nunca se cambian a mano en el panel.
 | `…0001_esquema.sql` | 16 tablas: escuelas, cuentas, periodos, alumnos, grupos, clases, secciones, capturas, cierres, historial… |
 | `…0002_permisos.sql` | Row Level Security por escuela y rol, historial automático, invitaciones y registro individual |
 | `…0003_invitacion_publica.sql` | `ver_invitacion(token)` para el enlace (sin sesión) y `mi_perfil()` |
+| `…0005_archivos.sql` | Bucket privado `archivos`: `<escuela>/<usuario>/excel/…` y `/cuadernillos/<clase>.pdf`, cada quien su carpeta |
 | `…0004_sincronizar.sql` | `importar_grupo`, `guardar_secciones`, `guardar_trabajos`, `guardar_dias` (security invoker: aplica RLS) |
 
 ## Probar en local (sin tocar el proyecto real)
@@ -18,7 +19,9 @@ ficticias (`tests/rls.test.js`).
 `src/app/sync.js` sube solo lo que cambió (`src/lib/sync-plan.js`, con pruebas): por cada (sección, fecha) guarda una
 huella de lo subido; si cambia, manda el día completo y `guardar_dias` lo deja igual (solo cambia lo distinto, así el
 historial no se llena de repetidos). Corre unos segundos después de cada cambio, al volver el internet y al abrir.
-Pendiente (4b): bajar datos en otro dispositivo, Excel original y cuadernillos en Storage.
+También sube el Excel original y los cuadernillos (Storage). En un dispositivo nuevo, Mi cuenta ofrece
+"Bajar a este celular" (`src/app/bajar.js` + `armarGrupo` en `sync-plan.js`): baja Excel, clases, secciones, alumnos,
+capturas y cuadernillos, y deja todo marcado como ya subido.
 
 > `supabase db push/query` desde la consola interna de Claude se cuelga: correrlos en la terminal.
 

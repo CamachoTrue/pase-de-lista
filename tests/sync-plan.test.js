@@ -81,3 +81,45 @@ test('un alumno agregado en la app pide importar otra vez', () => {
   g.students.push({ row: 7, no: '3', name: 'CARLA', added: true });
   assert.equal(faltaImportar(g), true);
 });
+
+test('bajar de la nube arma el grupo igual y lo deja como ya subido', async () => {
+  const { armarGrupo } = await import('../src/lib/sync-plan.js');
+  // Un grupo recién leído del Excel (sin datos), en otro celular.
+  const g = { sheet: 'V205', headerRow: 4, students: [{ row: 5, no: '1', name: 'ANA' }, { row: 6, no: '2', name: 'BETO' }] };
+  normalizeGroup(g);
+  g.records['2026-01-01'] = { 5: 'F' }; // dato viejo del Excel: la nube manda
+  const nube = {
+    clase: { id: 'c1', grupo_id: 'g1', materia: 'Ética', retardo: 50, escala: 100 },
+    secciones: [
+      { id: 's-asist', nombre: 'Asistencia', plantilla: 'asist', porcentaje: 40, minimo: null, orden: 0 },
+      { id: 's-part', nombre: 'Participación', plantilla: 'sino', porcentaje: 20, minimo: 3, orden: 1 },
+      { id: 's-tar', nombre: 'Tareas', plantilla: 'trab', porcentaje: 40, minimo: null, orden: 2 },
+    ],
+    inscripciones: [
+      { alumno_id: 'a1', numero_lista: '1', nombre: 'Ana' },
+      { alumno_id: 'a2', numero_lista: '2', nombre: 'Beto' },
+      { alumno_id: 'a3', numero_lista: '3', nombre: 'Carla Nueva' },
+    ],
+    trabajos: [{ id: 't2', seccion_id: 's-tar', fecha: '2026-11-20', titulo: '', orden: 1 }, { id: 't1', seccion_id: 's-tar', fecha: '2026-11-20', titulo: 'Unit 1', orden: 0 }],
+    capturas: [
+      { seccion_id: 's-asist', alumno_id: 'a1', fecha: '2026-11-20', trabajo_id: null, valor: 'A' },
+      { seccion_id: 's-asist', alumno_id: 'a3', fecha: '2026-11-20', trabajo_id: null, valor: 'R' },
+      { seccion_id: 's-part', alumno_id: 'a2', fecha: '2026-11-20', trabajo_id: null, valor: 'S' },
+      { seccion_id: 's-tar', alumno_id: 'a1', fecha: '2026-11-20', trabajo_id: 't1', valor: '100' },
+      { seccion_id: 's-tar', alumno_id: 'a2', fecha: '2026-11-20', trabajo_id: 't2', valor: '50' },
+    ],
+  };
+  armarGrupo(g, nube);
+  assert.equal(g.subject, 'Ética');
+  assert.deepEqual(g.sections.map((s) => [s.name, s.type]), [['Asistencia', 'asist'], ['Participación', 'sino'], ['Tareas', 'trab']]);
+  assert.equal(g.sections[1].min, 3);
+  assert.deepEqual(g.grading, { w: { records: 40, [g.sections[1].id]: 20, [g.sections[2].id]: 40 }, retardo: 50, escala: 100 });
+  assert.deepEqual(g.records, { '2026-11-20': { 5: 'A', 7: 'R' } });
+  assert.deepEqual(g.students.map((s) => [s.row, s.name, s.alumno_id, !!s.added]), [[5, 'ANA', 'a1', false], [6, 'BETO', 'a2', false], [7, 'Carla Nueva', 'a3', true]]);
+  const tar = g[g.sections[2].id]['2026-11-20'];
+  assert.deepEqual(tar.map((w) => [w.title, w.vals, w.nube_id]), [['Unit 1', { 5: 100 }, 't1'], ['', { 6: 50 }, 't2']]);
+  // No hay nada pendiente por subir.
+  assert.equal(planSecciones(g), null);
+  const p = planDias(g);
+  assert.deepEqual([p.dias.length, p.trabajos.length, faltaImportar(g)], [0, 0, false]);
+});

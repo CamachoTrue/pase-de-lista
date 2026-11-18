@@ -7,6 +7,8 @@ import { confirmBulk } from './dialogs.js';
 import { errorLegible, nube, recordar, setRecordar } from '../lib/nube.js';
 import { alCambiarEstado, estado, programar, sincronizar } from './sync.js';
 import { state } from './state.js';
+import { bajarDeLaNube, clasesEnLaNube } from './bajar.js';
+import { render } from './main-view.js';
 
 const ROL = { superadmin: 'Administrador general', director: 'Director', maestro: 'Maestro' };
 const body = () => $('#cuenta-body');
@@ -44,12 +46,14 @@ async function renderCuenta() {
       <span class="rol-badge">${ROL[p.rol]}</span>
       ${p.escuela ? `<div class="cuenta-escuela">${escapeHtml(p.escuela)} · ${escapeHtml(p.clave)}</div>` : ''}
     </div>
-    ${p.escuela_id ? '<div class="nube-estado" data-nube></div>' : ''}`;
+    ${p.escuela_id ? '<div class="nube-estado" data-nube></div>' : ''}
+    ${p.escuela_id && !(state && state.groups && state.groups.length) ? '<div class="cuenta-bajar" data-bajar hidden></div>' : ''}`;
   if (p.rol === 'director') html += seccionMaestros();
   if (p.rol === 'superadmin') html += seccionEscuelas();
   body().innerHTML = html + btnSalir();
   pintarNube();
   programar(200);
+  ofrecerBajar();
   if (p.rol === 'director') await cargarMaestros(sb, p.escuela_id);
   if (p.rol === 'superadmin') await cargarEscuelas(sb);
 }
@@ -77,6 +81,21 @@ function pintarNube() {
   el.innerHTML = `<span>${escapeHtml(txt)}</span>${['mal', 'espera', 'ok'].includes(cls) && estado.fase !== 'otra-cuenta' ? '<button class="link-btn" data-act="subir">Guardar ahora</button>' : ''}`;
 }
 alCambiarEstado(() => { if ($('#cuenta').open) pintarNube(); });
+
+// Dispositivo sin listas: si la cuenta tiene clases guardadas, ofrecer bajarlas.
+async function ofrecerBajar() {
+  const box = body().querySelector('[data-bajar]');
+  if (!box) return;
+  let n = 0;
+  try { n = await clasesEnLaNube(); } catch { return; }
+  if (!n) return;
+  box.hidden = false;
+  const aviso = body().querySelector('[data-nube]');
+  if (aviso) aviso.hidden = true;
+  box.innerHTML = `<b>Tienes ${n} ${n === 1 ? 'clase guardada' : 'clases guardadas'} en tu cuenta</b>
+    <small>Bájalas a este celular para seguir pasando lista y calificando aquí. Necesitas internet solo para bajarlas.</small>
+    <button class="btn primary" data-act="bajar">Bajar a este celular</button><p class="hint" data-avance></p>`;
+}
 
 const btnSalir = () => '<button class="btn cuenta-salir" data-act="salir">Cerrar sesión</button>';
 
@@ -236,6 +255,20 @@ $('#cuenta-body').addEventListener('click', async (e) => {
   const act = b.dataset.act;
   const token = (b.closest('[data-token]') || {}).dataset?.token;
   if (act === 'subir') sincronizar();
+  if (act === 'bajar') {
+    const av = body().querySelector('[data-avance]');
+    b.disabled = true;
+    try {
+      const n = await bajarDeLaNube((t) => { if (av) av.textContent = t; });
+      $('#cuenta').close();
+      render();
+      toast(`Listo: ${n} ${n === 1 ? 'clase bajada' : 'clases bajadas'} a este celular`);
+    } catch (ex) {
+      console.error(ex);
+      if (av) av.textContent = errorLegible(ex);
+      b.disabled = false;
+    }
+  }
   if (act === 'copiar') copiar(enlace(token));
   if (act === 'compartir') compartir(token);
   if (act === 'borrar-inv') {
@@ -318,3 +351,6 @@ $('#inv-form').addEventListener('submit', async (e) => {
     btn.disabled = false;
   }
 });
+
+// Pantalla inicial (sin Excel): entrar con la cuenta para bajar los datos.
+$('#upload-cuenta').addEventListener('click', openCuenta);

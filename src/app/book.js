@@ -5,6 +5,8 @@ import { $, toast } from './util.js';
 // ---------- Cuadernillo (PDF por grupo) ----------
 // El PDF es grande para localStorage: se guarda en IndexedDB, una entrada por grupo (nombre de la hoja),
 // así sigue ahí aunque se vuelva a subir el Excel. Se muestra con PDF.js para que se vea igual en Android y iPhone.
+// La sincronización se entera de que cambió un cuadernillo (sin importar sync.js aquí, para no crear un ciclo).
+const avisarCuadernillo = () => window.dispatchEvent(new Event('cuadernillo-cambio'));
 export const bookDB = (() => {
   let p;
   const open = () => (p = p || new Promise((res, rej) => {
@@ -217,6 +219,7 @@ $('#book-file').addEventListener('change', async (e) => {
   try {
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     await bookDB.put(book.key, rec);
+    avisarCuadernillo();
   } catch (err) {
     console.error(err);
     toast('No hay espacio suficiente en el dispositivo para guardar el PDF');
@@ -232,6 +235,7 @@ $('#book-remove').addEventListener('click', async () => {
   const name = book.rec ? book.rec.name : 'el cuadernillo';
   if (!(await confirmBulk(`¿Quitar el cuadernillo de ${gname(group())}?`, `Se borra “${name}” de este dispositivo. Puedes volver a subirlo cuando quieras.`, 'Sí, quitar', true))) return;
   await bookDB.del(key).catch(() => {});
+  avisarCuadernillo();
   closeBookDoc();
   book.rec = null;
   $('#book-sub').textContent = gname(group());

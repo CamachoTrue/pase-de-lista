@@ -25,6 +25,14 @@ const SUPABASE_STUB = `
   create function auth.uid() returns uuid language sql stable as $$ select (auth.jwt() ->> 'sub')::uuid $$;
   grant usage on schema auth to anon, authenticated;
   grant usage on schema public to anon, authenticated;
+  create schema storage;
+  create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text);
+  create function storage.foldername(name text) returns text[] language sql immutable as
+    $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
+  alter table storage.objects enable row level security;
+  grant usage on schema storage to authenticated;
+  grant select, insert, update, delete on storage.objects to authenticated;
 `;
 
 // Corre una consulta como un usuario (o anon) y regresa filas; o el error si la rechaza.
@@ -252,6 +260,16 @@ test('sincronizar: secciones, días y trabajos dejan el día tal como viene', as
   await as(U.maeB, 'select guardar_dias($1::jsonb)', [dia({ [a1]: 'F' })]);
   await as(U.maeB, 'select guardar_dias($1::jsonb)', [dia({})]);
   assert.deepEqual(await caps(), antes);
+});
+
+test('archivos: cada maestro solo usa su propia carpeta', async () => {
+  const mia = `${ESC_A}/${U.maeA1.id}/excel/lista.xlsx`;
+  await as(U.maeA1, `insert into storage.objects (bucket_id, name) values ('archivos', $1)`, [mia]);
+  await fails(U.maeA1, `insert into storage.objects (bucket_id, name) values ('archivos', $1)`, [`${ESC_A}/${U.dirA.id}/excel/x.xlsx`], /row-level security/);
+  await fails(U.maeA1, `insert into storage.objects (bucket_id, name) values ('archivos', $1)`, [`${ESC_B}/${U.maeA1.id}/excel/x.xlsx`], /row-level security/);
+  assert.equal((await as(U.maeA1, 'select name from storage.objects')).length, 1);
+  assert.equal((await as(U.dirA, 'select name from storage.objects')).length, 0);
+  assert.equal((await as(U.maeB, 'select name from storage.objects')).length, 0);
 });
 
 test('todas las tablas tienen RLS activo', async () => {

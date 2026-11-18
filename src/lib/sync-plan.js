@@ -80,3 +80,66 @@ export function planDias(g) {
 
 // Días de un trabajo ya con id: uno por trabajo.
 export const diasDeTrabajos = (g, t) => t.works.map((w) => ({ seccion: t.sec.nube_id, fecha: t.fecha, trabajo: w.nube_id, valores: valores(g, 'trab', w.vals) }));
+
+// ---------- Bajar de la nube (dispositivo nuevo) ----------
+const normNombre = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+const valorLocal = (type, v) => (type === 'asist' || type === 'sino' ? v : Number(v));
+
+// Llena un grupo leído del Excel (g) con lo que hay en la nube para su clase. Lo que traía el Excel en
+// columnas de la app se reemplaza por la nube. Alumnos inscritos que no están en el Excel (agregados en
+// la app) se agregan al final. Al terminar, todo queda marcado como ya subido.
+export function armarGrupo(g, { clase, secciones, inscripciones, trabajos, capturas }) {
+  g.subject = clase.materia || undefined;
+  if (!g.subject) delete g.subject;
+  const ordenadas = [...secciones].sort((a, b) => a.orden - b.orden);
+  // Datos que traía el Excel en columnas de la app: se quitan (la nube manda).
+  for (const s of g.sections || []) delete g[s.id];
+  g.sections = ordenadas.map((s) => ({
+    id: s.plantilla === 'asist' ? 'records' : `n_${s.id.replace(/-/g, '').slice(0, 12)}`,
+    name: s.nombre, type: s.plantilla, nube_id: s.id, ...(s.plantilla === 'sino' ? { min: s.minimo || 4 } : {}),
+  }));
+  const local = Object.fromEntries(g.sections.map((s) => [s.nube_id, s]));
+  g.grading = { w: {}, retardo: clase.retardo, escala: clase.escala };
+  for (const s of ordenadas) if (Number(s.porcentaje) > 0) g.grading.w[local[s.id].id] = Number(s.porcentaje);
+  g.sections.forEach((s) => (g[s.id] = {}));
+  // Alumnos: por número de lista y nombre; si no, por nombre.
+  const filaDe = {};
+  const libres = [...g.students];
+  for (const i of inscripciones) {
+    const nombre = normNombre(i.nombre);
+    let s = libres.find((x) => String(x.no) === String(i.numero_lista) && normNombre(x.name) === nombre)
+      || libres.find((x) => normNombre(x.name) === nombre);
+    if (!s) {
+      const row = Math.max(g.headerRow, ...g.students.map((x) => x.row)) + 1;
+      s = { row, no: i.numero_lista, name: i.nombre, added: true };
+      g.students.push(s);
+    } else libres.splice(libres.indexOf(s), 1);
+    s.alumno_id = i.alumno_id;
+    filaDe[i.alumno_id] = s.row;
+  }
+  // Trabajos por sección y fecha, en orden.
+  const works = {};
+  for (const t of [...trabajos].sort((a, b) => a.orden - b.orden)) {
+    const s = local[t.seccion_id];
+    if (!s) continue;
+    const lista = (g[s.id][t.fecha] = g[s.id][t.fecha] || []);
+    const w = { title: t.titulo || '', vals: {}, nube_id: t.id };
+    lista.push(w);
+    works[t.id] = w;
+  }
+  for (const c of capturas) {
+    const s = local[c.seccion_id];
+    const row = filaDe[c.alumno_id];
+    if (!s || row == null) continue;
+    const v = valorLocal(s.type, c.valor);
+    if (s.type === 'trab') { if (works[c.trabajo_id]) works[c.trabajo_id].vals[row] = v; }
+    else (g[s.id][c.fecha] = g[s.id][c.fecha] || {})[row] = v;
+  }
+  // Todo lo que llegó ya está en la nube: se marca como subido.
+  g.nube = { clase_id: clase.id, grupo_id: clase.grupo_id, h: {} };
+  const ps = planSecciones(g);
+  if (ps) g.nube.h.__secciones = ps.hash;
+  const p = planDias(g);
+  [...p.dias, ...p.trabajos].forEach((x) => { if (x.hash) g.nube.h[x.key] = x.hash; });
+  return g;
+}
