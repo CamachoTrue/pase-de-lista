@@ -46,7 +46,9 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
 - Si se vuelve a subir un Excel exportado por la app, las fechas registradas se recuperan.
 
 Los datos se guardan en el dispositivo (localStorage); el Excel solo se genera al exportar.
-Funciona sin internet una vez abierta.
+Funciona sin internet una vez abierta. Al abrir descarga ~34 KB; ExcelJS y PDF.js se cargan solo al usarse.
+
+Reglas del proyecto y equipo de agentes (frontend, backend, QA, diseño, rendimiento, seguridad): ver `CLAUDE.md`.
 
 ## Correr en local
 ```bash
@@ -54,6 +56,7 @@ npm install
 npm run dev      # app en http://localhost:5173
 npm test         # pruebas de la lógica de Excel y calificaciones
 npm run build    # versión para publicar, en dist/
+npm run check    # pruebas + build + presupuesto de peso (antes de cada commit)
 ```
 
 ## Estructura

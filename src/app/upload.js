@@ -1,7 +1,7 @@
 import { ASIST_ID, DEFAULT_CODES, normalizeGroup, parseWorkbook } from '../lib/excel-core.js';
 import { render } from './main-view.js';
 import { fixGrading, save, setState, state, todayISO } from './state.js';
-import { $, bufToB64, toast } from './util.js';
+import { $, bufToB64, loadExcel, toast } from './util.js';
 
 // ---------- Subir archivo ----------
 $('#file-input').addEventListener('change', async (e) => {
@@ -10,7 +10,7 @@ $('#file-input').addEventListener('change', async (e) => {
   if (!file) return;
   try {
     const buf = await file.arrayBuffer();
-    const wb = new ExcelJS.Workbook();
+    const wb = new (await loadExcel()).Workbook();
     await wb.xlsx.load(buf);
     const codes = (state && state.codes) || { ...DEFAULT_CODES };
     // Si el grupo ya existía (misma hoja), conserva sus secciones, porcentajes y materia.

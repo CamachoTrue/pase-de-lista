@@ -1,7 +1,7 @@
 import { exportGroupReport, groupReport, round1 } from '../lib/excel-core.js';
 import { gname, group, ui } from './state.js';
 import { openStudent, renderStudent } from './student-report.js';
-import { $, deliverFile, escapeHtml, toast } from './util.js';
+import { $, deliverFile, escapeHtml, loadExcel, toast } from './util.js';
 
 // ---------- Resumen del grupo (semáforo) ----------
 export let grFilter = 'all';
@@ -62,8 +62,8 @@ $('#gr-preview').addEventListener('click', async () => {
   const btn = $('#gr-preview');
   btn.disabled = true;
   try {
-    const buf = await exportGroupReport(ExcelJS, g, g.grading);
-    const wb = new ExcelJS.Workbook();
+    const buf = await exportGroupReport(await loadExcel(), g, g.grading);
+    const wb = new (await loadExcel()).Workbook();
     await wb.xlsx.load(buf);
     $('#gr-sheet-table').innerHTML = sheetToHtml(wb.worksheets[0]);
     $('#gr-sheet-sub').textContent = `Resumen ${gname(g)}.xlsx`;
@@ -131,7 +131,7 @@ $('#gr-export').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Generando…';
   try {
-    const out = await exportGroupReport(ExcelJS, g, g.grading);
+    const out = await exportGroupReport(await loadExcel(), g, g.grading);
     const safe = (t) => String(t).replace(/[\\/:*?"<>|]+/g, ' ').trim();
     await deliverFile(out, `Resumen ${safe(gname(g))}.xlsx`);
     toast('Resumen del grupo generado');

@@ -1,6 +1,6 @@
 import { READ, STATUSES, cellText, exportWorkbook, groupDates, sheetLayout, worksOf } from '../lib/excel-core.js';
 import { LABELS, gname, group, optionOf, secs, state } from './state.js';
-import { $, b64ToBuf, deliverFile, escapeHtml, toast } from './util.js';
+import { $, b64ToBuf, deliverFile, escapeHtml, loadExcel, toast } from './util.js';
 
 // ---------- Exportar ----------
 $('#export-btn').addEventListener('click', () => doExport($('#export-btn')));
@@ -14,8 +14,8 @@ export async function openPreview() {
   const g = group();
   let ws;
   try {
-    const out = await exportWorkbook(ExcelJS, b64ToBuf(state.fileB64), [g], state.codes);
-    const wb = new ExcelJS.Workbook();
+    const out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), [g], state.codes);
+    const wb = new (await loadExcel()).Workbook();
     await wb.xlsx.load(out);
     ws = wb.getWorksheet(g.sheet);
   } catch (err) {
@@ -104,7 +104,7 @@ export async function openPreview() {
 export async function doExport(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
   try {
-    const out = await exportWorkbook(ExcelJS, b64ToBuf(state.fileB64), state.groups, state.codes);
+    const out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), state.groups, state.codes);
     await deliverFile(out, state.fileName.replace(/\.xlsx$/i, '') + ' - asistencia.xlsx');
     toast('Excel generado');
   } catch (err) {

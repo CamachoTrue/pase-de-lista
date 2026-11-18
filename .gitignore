@@ -3,3 +3,5 @@ node_modules/
 *.xlsx
 .vercel
 dist/
+.env
+.env.*

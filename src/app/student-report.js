@@ -1,6 +1,6 @@
 import { exportStudent, finalGrade, round1, studentReport, weightOf } from '../lib/excel-core.js';
 import { gname, group, ui } from './state.js';
-import { $, deliverFile, escapeHtml, normalize, toast } from './util.js';
+import { $, deliverFile, escapeHtml, loadExcel, normalize, toast } from './util.js';
 
 // ---------- Resumen por alumno ----------
 // Para quejas o dudas del alumno o de los padres: todo lo capturado de un alumno y su Excel individual.
@@ -71,7 +71,7 @@ $('#student-export').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Generando…';
   try {
-    const out = await exportStudent(ExcelJS, g, s.row, g.grading);
+    const out = await exportStudent(await loadExcel(), g, s.row, g.grading);
     const safe = (t) => String(t).replace(/[\\/:*?"<>|]+/g, ' ').trim();
     await deliverFile(out, `${safe(s.name)} - ${safe(gname(g))} - resumen.xlsx`);
     toast('Excel del alumno generado');

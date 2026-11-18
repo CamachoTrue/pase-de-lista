@@ -44,3 +44,15 @@ export function toast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
 }
+
+// ExcelJS pesa ~900 KB: se carga solo al subir, exportar o ver un Excel, no al abrir la app.
+// El service worker ya lo tiene guardado, así que también funciona sin internet.
+let excelReady = null;
+export const loadExcel = () => (excelReady = excelReady || new Promise((res, rej) => {
+  if (window.ExcelJS) { res(window.ExcelJS); return; }
+  const sc = document.createElement('script');
+  sc.src = 'vendor/exceljs.min.js';
+  sc.onload = () => res(window.ExcelJS);
+  sc.onerror = () => { excelReady = null; rej(new Error('No se pudo cargar el lector de Excel')); };
+  document.head.appendChild(sc);
+}));
