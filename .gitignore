@@ -2,4 +2,4 @@
 node_modules/
 *.xlsx
 .vercel
-.vercel
+dist/

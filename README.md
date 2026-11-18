@@ -50,11 +50,23 @@ Funciona sin internet una vez abierta.
 
 ## Correr en local
 ```bash
-python3 -m http.server 5173
+npm install
+npm run dev      # app en http://localhost:5173
+npm test         # pruebas de la lógica de Excel y calificaciones
+npm run build    # versión para publicar, en dist/
 ```
-y abrir http://localhost:5173
 
 ## Estructura
-- `index.html`, `css/styles.css`, `js/app.js` — interfaz
-- `js/excel-core.js` — lectura/escritura del Excel (ExcelJS 4.4.0 en `vendor/`)
-- `manifest.json`, `sw.js`, `icons/` — instalación como app
+- `index.html` — pantallas y diálogos
+- `src/main.js` — arranque (migra datos guardados de versiones anteriores y dibuja la app)
+- `src/app/` — un módulo por función:
+  `state` (datos guardados y secciones del grupo actual) · `util` · `dialogs` (confirmaciones) · `upload` (subir Excel) ·
+  `main-view` (pestañas, resumen del día, cambio de grupo/fecha) · `card` (pase uno por uno y lista) ·
+  `compact` (Sí/No, 0/50/100, disciplina, 0-100, varios trabajos) · `students` (agregar/quitar) ·
+  `export` (vista previa y Excel) · `book` (cuadernillo PDF) · `subject` · `grades` (secciones y calificaciones) ·
+  `group-report` (semáforo) · `student-report` · `menu` · `settings`
+- `src/lib/excel-core.js` — lectura/escritura del Excel, secciones y calificaciones (sin pantalla; lo usan las pruebas)
+- `src/styles.css` — estilos
+- `public/` — `manifest.json`, `sw.js` (el build le escribe la lista de archivos y la versión), `icons/`,
+  `vendor/` (ExcelJS 4.4.0 y PDF.js 3.11.174)
+- `tests/` — pruebas con una lista ficticia (`node --test`)

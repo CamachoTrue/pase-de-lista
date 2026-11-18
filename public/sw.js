@@ -1,18 +1,7 @@
 // Service worker: guarda la app para que funcione sin internet.
-const CACHE = 'pase-de-lista-v34';
-const ASSETS = [
-  './',
-  'index.html',
-  'css/styles.css',
-  'js/app.js',
-  'js/excel-core.js',
-  'vendor/exceljs.min.js',
-  'vendor/pdfjs/pdf.min.js',
-  'vendor/pdfjs/pdf.worker.min.js',
-  'manifest.json',
-  'icons/icon-192.png',
-  'icons/icon-512.png',
-];
+// La lista de archivos y la versión las escribe el build (vite.config.js); no se editan a mano.
+const CACHE = 'pase-de-lista-__VERSION__';
+const ASSETS = __ASSETS__;
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
