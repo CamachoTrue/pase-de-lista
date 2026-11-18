@@ -301,6 +301,27 @@ test('resúmenes: el maestro sube el de su clase y el director de su escuela lo 
   await fails(U.maeB, `insert into resumenes (clase_id, escuela_id, datos) values ($1, $2, '{}')`, [c.id, c.escuela_id], /row-level security/);
 });
 
+test('cambios por dispositivo: cada clase sabe qué dispositivo la cambió', async () => {
+  const disp = async (d) => db.query("select set_config('request.headers', $1, false)", [JSON.stringify({ 'x-dispositivo': d })]);
+  const [c] = await as(U.maeA1, 'select id, cambios from clases limit 1');
+  const [s] = await as(U.maeA1, 'select id from secciones where clase_id = $1 limit 1', [c.id]);
+  await disp('celular');
+  await as(U.maeA1, `select guardar_dias($1::jsonb)`, [JSON.stringify([{ seccion: s.id, fecha: '2026-11-20', valores: {} }])]);
+  await as(U.maeA1, `insert into capturas (escuela_id, clase_id, seccion_id, alumno_id, fecha, valor)
+    select s.escuela_id, s.clase_id, s.id, a.id, '2026-11-21', 'F' from secciones s, alumnos a where s.id = $1 and a.escuela_id = s.escuela_id`, [s.id]);
+  let [x] = await as(U.maeA1, 'select cambios from clases where id = $1', [c.id]);
+  assert.ok(x.cambios.celular, 'marca del celular');
+  assert.equal(x.cambios.compu, undefined);
+  await disp('compu');
+  await as(U.maeA1, `update clases set materia = 'Literatura II' where id = $1`, [c.id]);
+  [x] = await as(U.maeA1, 'select cambios from clases where id = $1', [c.id]);
+  assert.ok(x.cambios.compu && x.cambios.celular, 'las dos marcas');
+  // Otro maestro no puede ver las marcas de la clase ajena.
+  assert.equal((await as(U.maeB, 'select cambios from clases where id = $1', [c.id])).length, 0);
+  await fails(U.maeA1, `select privado.marcar_clase($1)`, [c.id], /permission denied/);
+  await db.query("select set_config('request.headers', '', false)");
+});
+
 test('eliminar mi cuenta: el independiente borra todo; el de escuela solo su usuario', async () => {
   await fails(U.super, 'select eliminar_mi_cuenta()', [], /administrador general/);
   await fails(null, 'select eliminar_mi_cuenta()', [], /permission denied/);

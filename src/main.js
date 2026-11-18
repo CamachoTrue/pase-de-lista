@@ -30,6 +30,8 @@ if (state) {
   delete state.grading;
 }
 render();
+// Cambios que llegaron de otro dispositivo.
+window.addEventListener('nube-cambio', () => render());
 
 // Enlace de invitación (?invitacion=TOKEN): abre la pantalla para crear la cuenta.
 const invitacion = new URLSearchParams(location.search).get('invitacion');

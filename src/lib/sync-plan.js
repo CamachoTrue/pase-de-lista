@@ -81,6 +81,17 @@ export function planDias(g) {
 // Días de un trabajo ya con id: uno por trabajo.
 export const diasDeTrabajos = (g, t) => t.works.map((w) => ({ seccion: t.sec.nube_id, fecha: t.fecha, trabajo: w.nube_id, valores: valores(g, 'trab', w.vals) }));
 
+// ---------- Cambios hechos en otro dispositivo ----------
+// clase.cambios = { dispositivo: fecha ISO }. La fecha más reciente de todos (o de los otros).
+export const ultimoCambio = (cambios, sinEste = null) =>
+  Object.entries(cambios || {}).filter(([d]) => d !== sinEste).map(([, f]) => f).sort().at(-1) || null;
+// ¿Hay que bajar la clase? Sí, si otro dispositivo la cambió después de lo que ya tiene este.
+export function hayQueBajar(g, cambios, este) {
+  if (!g.nube || !g.nube.clase_id) return false;
+  const otro = ultimoCambio(cambios, este);
+  return !!otro && (!g.nube.visto || new Date(otro) > new Date(g.nube.visto));
+}
+
 // ---------- Bajar de la nube (dispositivo nuevo) ----------
 const normNombre = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
 const valorLocal = (type, v) => (type === 'asist' || type === 'sino' ? v : Number(v));
@@ -91,11 +102,15 @@ const valorLocal = (type, v) => (type === 'asist' || type === 'sino' ? v : Numbe
 export function armarGrupo(g, { clase, secciones, inscripciones, trabajos, capturas, cierres = [] }) {
   g.subject = clase.materia || undefined;
   if (!g.subject) delete g.subject;
+  // Si el grupo ya estaba ligado a la nube (actualizar con cambios de otro dispositivo), se conservan
+  // los ids locales de sus secciones y el cuadernillo ya bajado.
+  const idPrevio = Object.fromEntries((g.sections || []).filter((s) => s.nube_id).map((s) => [s.nube_id, s.id]));
+  const pdf = g.nube && g.nube.pdf ? { pdf: g.nube.pdf, pdf_nube: g.nube.pdf_nube } : {};
   const ordenadas = [...secciones].sort((a, b) => a.orden - b.orden);
   // Datos que traía el Excel en columnas de la app: se quitan (la nube manda).
   for (const s of g.sections || []) delete g[s.id];
   g.sections = ordenadas.map((s) => ({
-    id: s.plantilla === 'asist' ? 'records' : `n_${s.id.replace(/-/g, '').slice(0, 12)}`,
+    id: idPrevio[s.id] || (s.plantilla === 'asist' ? 'records' : `n_${s.id.replace(/-/g, '').slice(0, 12)}`),
     name: s.nombre, type: s.plantilla, nube_id: s.id, ...(s.plantilla === 'sino' ? { min: s.minimo || 4 } : {}),
   }));
   const local = Object.fromEntries(g.sections.map((s) => [s.nube_id, s]));
@@ -107,7 +122,8 @@ export function armarGrupo(g, { clase, secciones, inscripciones, trabajos, captu
   const libres = [...g.students];
   for (const i of inscripciones) {
     const nombre = normNombre(i.nombre);
-    let s = libres.find((x) => String(x.no) === String(i.numero_lista) && normNombre(x.name) === nombre)
+    let s = libres.find((x) => x.alumno_id === i.alumno_id)
+      || libres.find((x) => String(x.no) === String(i.numero_lista) && normNombre(x.name) === nombre)
       || libres.find((x) => normNombre(x.name) === nombre);
     if (!s) {
       const row = Math.max(g.headerRow, ...g.students.map((x) => x.row)) + 1;
@@ -146,7 +162,7 @@ export function armarGrupo(g, { clase, secciones, inscripciones, trabajos, captu
     reabierto_en: c.reabierto_en || null, nube_id: c.id, nube_reabierto: !!c.reabierto_en,
   }));
   // Todo lo que llegó ya está en la nube: se marca como subido.
-  g.nube = { clase_id: clase.id, grupo_id: clase.grupo_id, h: {} };
+  g.nube = { clase_id: clase.id, grupo_id: clase.grupo_id, h: {}, ...pdf, ...(clase.cambios ? { visto: ultimoCambio(clase.cambios) } : {}) };
   if (cfg) g.nube.h.__semestral = huella(JSON.stringify(cfg));
   const ps = planSecciones(g);
   if (ps) g.nube.h.__secciones = ps.hash;

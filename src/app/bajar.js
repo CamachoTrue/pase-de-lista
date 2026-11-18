@@ -48,7 +48,7 @@ export async function bajarDeLaNube(avance = () => {}) {
   const buf = await blob.arrayBuffer();
 
   avance('Bajando tus clases…');
-  const clases = await todas(() => sb.from('clases').select('id, grupo_id, materia, retardo, escala, config_semestral, grupos(nombre)').eq('maestro_id', uid).order('creado_en'));
+  const clases = await todas(() => sb.from('clases').select('id, grupo_id, materia, retardo, escala, config_semestral, cambios, grupos(nombre)').eq('maestro_id', uid).order('creado_en'));
   const ids = clases.map((c) => c.id);
   const secciones = ids.length ? await todas(() => sb.from('secciones').select('id, clase_id, nombre, plantilla, porcentaje, minimo, orden').in('clase_id', ids)) : [];
   const secIds = secciones.map((s) => s.id);
@@ -97,6 +97,7 @@ export async function bajarDeLaNube(avance = () => {}) {
       const rec = { name: k.nombre, size: k.tamano, data: await pdf.arrayBuffer(), page: k.pagina || 1, added: Date.now() };
       await bookDB.put(g.sheet, rec);
       g.nube.pdf = huella(`${rec.name}|${rec.size}|${rec.added}`);
+      g.nube.pdf_nube = `${k.nombre}|${k.tamano}`;
     } catch (e) { console.error(e); }
   }
   save(true);

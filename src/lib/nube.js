@@ -21,11 +21,24 @@ const almacen = {
 // ¿Hay una sesión guardada? (sin cargar la librería)
 export const haySesion = () => !!almacen.getItem(SESION);
 
+// Identificador de este dispositivo (no es personal): la nube anota qué dispositivo cambió cada clase
+// para que los demás sepan que hay algo nuevo que bajar, sin volver a bajar sus propios cambios.
+const DISP = 'cuenta.dispositivo';
+export function dispositivo() {
+  let d = seguro(() => localStorage.getItem(DISP));
+  if (!d) {
+    d = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`).slice(0, 36);
+    seguro(() => localStorage.setItem(DISP, d));
+  }
+  return d;
+}
+
 let cliente = null;
 export async function nube() {
   if (!cliente) {
     cliente = import('@supabase/supabase-js').then(({ createClient }) => createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: { storage: almacen, storageKey: SESION, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+      global: { headers: { 'x-dispositivo': dispositivo() } },
     })).catch((e) => { cliente = null; throw e; });
   }
   return cliente;

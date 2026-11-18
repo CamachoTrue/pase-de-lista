@@ -1,10 +1,11 @@
 // ---------- Sincronización con la cuenta ----------
 // Todo se guarda primero en el celular (así funciona sin internet). Si hay sesión, lo que cambió se
 // sube solo unos segundos después, al volver el internet y al abrir la app.
-import { alGuardar, save, state } from './state.js';
-import { errorLegible, haySesion, nube } from '../lib/nube.js';
-import { diasDeTrabajos, faltaImportar, huella, planDias, planSecciones, resumenClase } from '../lib/sync-plan.js';
-import { b64ToBuf } from './util.js';
+import { alGuardar, fixGrading, save, state } from './state.js';
+import { dispositivo, errorLegible, haySesion, nube } from '../lib/nube.js';
+import { armarGrupo, diasDeTrabajos, faltaImportar, hayQueBajar, huella, planDias, planSecciones, resumenClase } from '../lib/sync-plan.js';
+import { ASIST_ID, normalizeGroup } from '../lib/excel-core.js';
+import { b64ToBuf, toast } from './util.js';
 import { bookDB } from './book-db.js';
 
 const LOTE = 60; // días por llamada
@@ -46,10 +47,14 @@ export async function sincronizar() {
     await bajarPeriodos(sb, perfil[0].escuela_id);
     for (const g of state.groups) await subirGrupo(sb, g);
     for (const g of state.groups) await subirSemestral(sb, g, perfil[0].escuela_id, session.user.id);
-    for (const g of state.groups) await subirResumen(sb, g, perfil[0].escuela_id);
     const carpeta = `${perfil[0].escuela_id}/${session.user.id}`;
     await subirExcel(sb, carpeta);
     await subirCuadernillos(sb, carpeta, perfil[0].escuela_id);
+    // Primero se sube lo de este dispositivo y después se baja lo que cambió en otro: así lo capturado
+    // aquí nunca se pierde y, si los dos cambiaron el mismo día, gana el último que se guardó en la nube.
+    const n = await bajarCambios(sb, session.user.id);
+    for (const g of state.groups) await subirResumen(sb, g, perfil[0].escuela_id);
+    if (n) toast(n === 1 ? 'Se actualizó 1 grupo con lo capturado en otro dispositivo' : `Se actualizaron ${n} grupos con lo capturado en otro dispositivo`);
     estado.fase = 'listo';
     estado.ultimo = Date.now();
     estado.error = '';
@@ -232,18 +237,120 @@ async function subirCuadernillos(sb, carpeta, escuela) {
       const r = await sb.from('cuadernillos').upsert({ escuela_id: escuela, clase_id: clase, nombre: rec.name, ruta, tamano: rec.size, pagina: rec.page || 1 }, { onConflict: 'clase_id' });
       if (r.error) throw r.error;
       g.nube.pdf = marca;
+      g.nube.pdf_nube = `${rec.name}|${rec.size}`;
       save(true);
     } else if (g.nube.pdf) {
       await st.remove([ruta]);
       await sb.from('cuadernillos').delete().eq('clase_id', clase);
       delete g.nube.pdf;
+      delete g.nube.pdf_nube;
       save(true);
     }
   }
 }
 
+// ---------- Bajar lo que cambió en otro dispositivo ----------
+const PAGINA = 1000;
+async function todas(consulta) {
+  const out = [];
+  for (let desde = 0; ; desde += PAGINA) {
+    const { data, error } = await consulta().range(desde, desde + PAGINA - 1);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < PAGINA) return out;
+  }
+}
+
+// Ediciones hechas en este dispositivo (para no reemplazar un grupo mientras alguien captura).
+let ediciones = 0;
+const ocupado = () => !!document.querySelector('dialog[open]:not(#cuenta)');
+
+async function cambiosEnLaNube(sb, uid) {
+  const { data, error } = await sb.from('clases').select('id, cambios').eq('maestro_id', uid);
+  if (error) throw error;
+  return Object.fromEntries(data.map((c) => [c.id, c.cambios]));
+}
+
+async function bajarCambios(sb, uid) {
+  if (!state.groups.some((g) => g.nube && g.nube.clase_id)) return 0;
+  const cambios = await cambiosEnLaNube(sb, uid);
+  const este = dispositivo();
+  let n = 0;
+  for (const g of state.groups) {
+    if (!hayQueBajar(g, cambios[g.nube && g.nube.clase_id], este)) continue;
+    if (await bajarClase(sb, g)) n++;
+  }
+  if (n) window.dispatchEvent(new Event('nube-cambio'));
+  return n;
+}
+
+// Baja una clase completa y la pone en el grupo (el mismo objeto). Regresa false si mientras bajaba
+// alguien capturó algo aquí: se deja para la siguiente vuelta.
+async function bajarClase(sb, g) {
+  const id = g.nube.clase_id;
+  const antes = ediciones;
+  const { data: clase, error } = await sb.from('clases').select('id, grupo_id, materia, retardo, escala, config_semestral, cambios').eq('id', id).maybeSingle();
+  if (error) throw error;
+  if (!clase) return false;
+  const secciones = await todas(() => sb.from('secciones').select('id, clase_id, nombre, plantilla, porcentaje, minimo, orden').eq('clase_id', id).order('id'));
+  const secIds = secciones.map((s) => s.id);
+  const inscripciones = await todas(() => sb.from('inscripciones').select('grupo_id, alumno_id, numero_lista, alumnos(nombre)').eq('grupo_id', clase.grupo_id).is('baja', null).order('alumno_id'));
+  const trabajos = secIds.length ? await todas(() => sb.from('trabajos').select('id, seccion_id, fecha, titulo, orden').in('seccion_id', secIds).order('id')) : [];
+  const capturas = await todas(() => sb.from('capturas').select('clase_id, seccion_id, alumno_id, fecha, trabajo_id, valor').eq('clase_id', id).order('id'));
+  const cierres = await todas(() => sb.from('cierres').select('id, clase_id, tipo, parcial, calificaciones, cerrado_en, reabierto_en').eq('clase_id', id).order('id'));
+  const { data: cuad } = await sb.from('cuadernillos').select('nombre, ruta, tamano, pagina').eq('clase_id', id).maybeSingle();
+  if (ediciones !== antes || ocupado()) return false;
+
+  armarGrupo(g, {
+    clase, secciones, trabajos, capturas, cierres,
+    inscripciones: inscripciones.map((i) => ({ alumno_id: i.alumno_id, numero_lista: i.numero_lista, nombre: i.alumnos.nombre })),
+  });
+  g.grading = fixGrading(g.grading);
+  normalizeGroup(g, g.grading);
+  if (state.groups[state.ui.group] === g && !(g.sections || []).some((s) => s.id === state.ui.tab)) state.ui.tab = ASIST_ID;
+  save(true);
+
+  // Cuadernillo: si otro dispositivo lo puso, lo cambió o lo quitó.
+  try {
+    if (cuad) {
+      const marca = `${cuad.nombre}|${cuad.tamano}`;
+      if (g.nube.pdf_nube !== marca) {
+        const { data: pdf, error: e } = await sb.storage.from('archivos').download(cuad.ruta);
+        if (e) throw e;
+        const rec = { name: cuad.nombre, size: cuad.tamano, data: await pdf.arrayBuffer(), page: cuad.pagina || 1, added: Date.now() };
+        await bookDB.put(g.sheet, rec);
+        g.nube.pdf = huella(`${rec.name}|${rec.size}|${rec.added}`);
+        g.nube.pdf_nube = marca;
+      }
+    } else if (g.nube.pdf) {
+      await bookDB.del(g.sheet);
+      delete g.nube.pdf;
+      delete g.nube.pdf_nube;
+    }
+  } catch (e) { console.error(e); }
+  save(true);
+  return true;
+}
+
+// Revisión ligera (una consulta): al volver a la app y cada 30 s mientras está abierta. Si otro
+// dispositivo cambió algo, se sincroniza completo (sube lo de aquí y baja lo de allá).
+async function revisar() {
+  if (!state || !state.groups || !haySesion() || !navigator.onLine || corriendo || document.hidden) return;
+  if (!state.groups.some((g) => g.nube && g.nube.clase_id)) return;
+  try {
+    const sb = await nube();
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session || (state.nube_usuario && state.nube_usuario !== session.user.id)) return;
+    const cambios = await cambiosEnLaNube(sb, session.user.id);
+    const este = dispositivo();
+    if (state.groups.some((g) => hayQueBajar(g, cambios[g.nube && g.nube.clase_id], este))) sincronizar();
+  } catch { /* sin conexión: se intenta en la siguiente vuelta */ }
+}
+setInterval(revisar, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(revisar, 500); });
+
 // Cada cambio guardado programa una subida; también al volver el internet y al abrir la app.
-alGuardar(() => programar());
+alGuardar(() => { ediciones++; programar(); });
 window.addEventListener('online', () => programar(1000));
 window.addEventListener('cuadernillo-cambio', () => programar(1500));
 if (haySesion()) setTimeout(() => programar(500), 2500);

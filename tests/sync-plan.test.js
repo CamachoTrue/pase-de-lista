@@ -141,3 +141,46 @@ test('resumen de la clase para el director', async () => {
   assert.equal(datos.alumnos['al-6'].e, 'rojo');
   assert.equal(datos.alumnos['al-6'].F, 2);
 });
+
+test('cambios de otro dispositivo: solo se baja si otro cambió después', async () => {
+  const { hayQueBajar, ultimoCambio } = await import('../src/lib/sync-plan.js');
+  const g = { nube: { clase_id: 'c1' } };
+  const cambios = { yo: '2026-11-20T10:00:05.123456+00:00', compu: '2026-11-20T10:00:01.000001+00:00' };
+  assert.equal(ultimoCambio(cambios), cambios.yo);
+  assert.equal(ultimoCambio(cambios, 'yo'), cambios.compu);
+  assert.equal(hayQueBajar(g, cambios, 'yo'), true); // nunca ha visto nada de la compu
+  g.nube.visto = cambios.yo;
+  assert.equal(hayQueBajar(g, cambios, 'yo'), false); // ya bajó todo hasta su último cambio
+  assert.equal(hayQueBajar(g, { yo: cambios.yo }, 'yo'), false); // sus propios cambios no cuentan
+  assert.equal(hayQueBajar(g, { ...cambios, compu: '2026-11-20T10:03:00+00:00' }, 'yo'), true);
+  assert.equal(hayQueBajar({ nube: {} }, cambios, 'yo'), false); // grupo sin clase en la nube
+});
+
+test('actualizar un grupo ya ligado conserva sus secciones, alumnos y cuadernillo', async () => {
+  const { armarGrupo } = await import('../src/lib/sync-plan.js');
+  const g = grupo();
+  subir(g);
+  g.nube.pdf = 'marca-local';
+  g.nube.pdf_nube = 'libro.pdf|100';
+  const ids = g.sections.map((s) => s.id);
+  // En la compu: BETO llegó con retardo, nuevo día y cambiaron el nombre de ANA en la lista.
+  const nube = {
+    clase: { id: 'clase', grupo_id: 'g1', materia: '', retardo: 100, escala: 10, cambios: { compu: '2026-11-21T08:00:00+00:00' } },
+    secciones: g.sections.map((s, i) => ({ id: s.nube_id, nombre: s.name, plantilla: s.type, porcentaje: (g.grading.w[s.id] || 0), minimo: s.type === 'sino' ? 4 : null, orden: i })),
+    inscripciones: [{ alumno_id: 'al-5', numero_lista: '1', nombre: 'ANA MARÍA' }, { alumno_id: 'al-6', numero_lista: '2', nombre: 'BETO' }],
+    trabajos: [],
+    capturas: [
+      { seccion_id: 'sec-records', alumno_id: 'al-5', fecha: '2026-11-20', trabajo_id: null, valor: 'A' },
+      { seccion_id: 'sec-records', alumno_id: 'al-6', fecha: '2026-11-20', trabajo_id: null, valor: 'R' },
+      { seccion_id: 'sec-records', alumno_id: 'al-6', fecha: '2026-11-21', trabajo_id: null, valor: 'F' },
+    ],
+  };
+  armarGrupo(g, nube);
+  assert.deepEqual(g.sections.map((s) => s.id), ids);
+  assert.deepEqual(g.records, { '2026-11-20': { 5: 'A', 6: 'R' }, '2026-11-21': { 6: 'F' } });
+  assert.deepEqual(g.students.map((s) => [s.row, s.alumno_id, !!s.added]), [[5, 'al-5', false], [6, 'al-6', false]]);
+  assert.deepEqual([g.nube.pdf, g.nube.pdf_nube, g.nube.visto], ['marca-local', 'libro.pdf|100', '2026-11-21T08:00:00+00:00']);
+  assert.equal(planSecciones(g), null);
+  const p = planDias(g);
+  assert.deepEqual([p.dias.length, p.trabajos.length, faltaImportar(g)], [0, 0, false]);
+});
