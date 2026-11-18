@@ -130,6 +130,7 @@
   <!-- Menú -->
   <dialog id="menu">
     <h2>Opciones</h2>
+    <button class="menu-item cuenta-item" data-action="cuenta" id="menu-cuenta">Mi cuenta</button>
     <button class="menu-item" data-action="subject">Materia de este grupo</button>
     <button class="menu-item" data-action="grades">Secciones y calificaciones</button>
     <button class="menu-item" data-action="group-report">Resumen del grupo (semáforo)</button>
@@ -325,6 +326,44 @@
       <button class="btn" data-action="close">Cerrar</button>
       <button class="btn primary" id="gr-sheet-export">Exportar Excel</button>
     </div>
+  </dialog>
+
+  <!-- Mi cuenta: entrar, ver la escuela, invitar maestros (director) y escuelas (superadmin) -->
+  <dialog id="cuenta" class="fullscreen">
+    <div class="preview-head">
+      <div>
+        <h2>Mi cuenta</h2>
+        <p class="hint" id="cuenta-sub"></p>
+      </div>
+      <button class="icon-btn" data-action="close" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="cuenta-body" id="cuenta-body">
+      <p class="hint">Cargando…</p>
+    </div>
+  </dialog>
+
+  <!-- Aceptar una invitación (se abre con el enlace que manda el director) -->
+  <dialog id="invitacion">
+    <h2 id="inv-titulo">Invitación</h2>
+    <p class="hint" id="inv-texto"></p>
+    <form id="inv-form" class="cuenta-form" autocomplete="on">
+      <label class="field">Tu nombre completo
+        <input id="inv-nombre" autocomplete="name" required>
+      </label>
+      <label class="field">Correo
+        <input id="inv-correo" type="email" autocomplete="username" readonly>
+      </label>
+      <label class="field">Crea una contraseña (mínimo 8)
+        <input id="inv-pass" type="password" autocomplete="new-password" minlength="8" required>
+      </label>
+      <label class="check"><input type="checkbox" id="inv-recordar" checked> Mantener la sesión iniciada en este celular</label>
+      <p class="form-error" id="inv-error"></p>
+      <div class="row">
+        <button type="button" class="btn" data-action="close">Ahora no</button>
+        <button type="submit" class="btn primary" id="inv-ok">Crear mi cuenta</button>
+      </div>
+    </form>
+    <div class="row" id="inv-cerrar"><button class="btn" data-action="close">Cerrar</button></div>
   </dialog>
 
   <!-- Agregar alumno nuevo -->

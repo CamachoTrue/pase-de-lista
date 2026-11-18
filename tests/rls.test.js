@@ -186,6 +186,16 @@ test('lo cerrado no se edita; el maestro no ve el precio de su escuela', async (
   assert.equal((await as(U.dirA, `select count(*)::int n from historial where tabla = 'alumnos'`))[0].n, 1);
 });
 
+test('enlace de invitación: muestra escuela y correo solo con el token; mi_perfil', async () => {
+  const [inv] = await as(U.dirB, `insert into invitaciones (escuela_id, correo) values ('${ESC_B}', 'nueva@prueba.mx') returning token`);
+  const [v] = await as(null, 'select * from ver_invitacion($1)', [inv.token]);
+  assert.deepEqual([v.escuela, v.correo, v.rol, v.valida], ['Prepa B', 'nueva@prueba.mx', 'maestro', true]);
+  assert.equal((await as(null, 'select * from ver_invitacion($1)', ['00000000-0000-0000-0000-000000000999'])).length, 0);
+  await fails(null, 'select * from mi_perfil()', [], /permission denied/);
+  const [p] = await as(U.maeB, 'select * from mi_perfil()');
+  assert.deepEqual([p.escuela, p.rol, p.clave], ['Prepa B', 'maestro', 'ESCB']);
+});
+
 test('todas las tablas tienen RLS activo', async () => {
   const r = await db.query(`select relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity`);

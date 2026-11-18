@@ -447,3 +447,31 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .sec-min .mini-num { width: 40px; padding: 4px; text-align: center; font-weight: 700; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); }
 .sec-add { width: 100%; margin-top: 8px; border-style: dashed; font-weight: 700; }
 .sr-days th.wrap { white-space: normal; min-width: 0; font-size: .72rem; line-height: 1.15; }
+
+/* Mi cuenta */
+.cuenta-body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px; }
+.cuenta-form .field input, .cuenta-body .field input { text-transform: none; }
+.cuenta-form .field input.mayus { text-transform: uppercase; }
+.check { display: flex; align-items: center; gap: 8px; font-size: .9rem; margin: 8px 0; }
+.check input { width: 20px; height: 20px; accent-color: var(--primary); }
+.cuenta-card { background: var(--bg); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.cuenta-card b { font-size: 1.05rem; }
+.cuenta-card small { color: var(--muted); }
+.rol-badge { align-self: flex-start; margin-top: 6px; font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--A-soft); color: var(--A); }
+.cuenta-escuela { margin-top: 6px; font-weight: 600; }
+.cuenta-sec { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.cuenta-sec h3 { margin: 0; font-size: 1rem; }
+.cuenta-2col { display: grid; grid-template-columns: 1fr 110px; gap: 8px; }
+.cuenta-lista { max-height: none; }
+.cuenta-lista li { align-items: center; cursor: default; font-weight: 400; }
+.cuenta-lista li.titulo { font-weight: 700; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; background: var(--bg); }
+.cuenta-lista .nm { flex: 1; min-width: 0; font-weight: 600; }
+.cuenta-lista .nm small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; overflow: hidden; text-overflow: ellipsis; }
+.danger-text { color: var(--F); }
+.cuenta-enlace { border: 1.5px solid var(--primary); background: var(--A-soft); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.cuenta-enlace small { color: var(--muted); }
+.cuenta-enlace input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: .8rem; }
+.cuenta-enlace .row { margin-top: 4px; }
+.cuenta-salir { margin-top: 8px; }
+.cuenta-item { font-weight: 700; }
+.cuenta-form .btn.big, .cuenta-form .btn.primary { width: 100%; }
