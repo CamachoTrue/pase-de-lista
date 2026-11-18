@@ -475,3 +475,9 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .cuenta-salir { margin-top: 8px; }
 .cuenta-item { font-weight: 700; }
 .cuenta-form .btn.big, .cuenta-form .btn.primary { width: 100%; }
+.nube-estado { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: .88rem; padding: 10px 12px; border-radius: 10px; background: var(--bg); color: var(--muted); }
+.nube-estado.ok { color: var(--A); background: var(--A-soft); }
+.nube-estado.subiendo { color: var(--J); background: var(--J-soft); }
+.nube-estado.espera { color: var(--R); background: var(--R-soft); }
+.nube-estado.mal { color: var(--F); background: var(--F-soft); }
+.nube-estado .link-btn { padding: 0; }

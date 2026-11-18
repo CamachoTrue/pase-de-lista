@@ -5,6 +5,8 @@
 import { $, escapeHtml, toast } from './util.js';
 import { confirmBulk } from './dialogs.js';
 import { errorLegible, nube, recordar, setRecordar } from '../lib/nube.js';
+import { alCambiarEstado, estado, programar, sincronizar } from './sync.js';
+import { state } from './state.js';
 
 const ROL = { superadmin: 'Administrador general', director: 'Director', maestro: 'Maestro' };
 const body = () => $('#cuenta-body');
@@ -42,13 +44,39 @@ async function renderCuenta() {
       <span class="rol-badge">${ROL[p.rol]}</span>
       ${p.escuela ? `<div class="cuenta-escuela">${escapeHtml(p.escuela)} · ${escapeHtml(p.clave)}</div>` : ''}
     </div>
-    <p class="hint">Por ahora tus listas y calificaciones siguen guardándose en este celular. Pronto también se guardarán en tu cuenta.</p>`;
+    ${p.escuela_id ? '<div class="nube-estado" data-nube></div>' : ''}`;
   if (p.rol === 'director') html += seccionMaestros();
   if (p.rol === 'superadmin') html += seccionEscuelas();
   body().innerHTML = html + btnSalir();
+  pintarNube();
+  programar(200);
   if (p.rol === 'director') await cargarMaestros(sb, p.escuela_id);
   if (p.rol === 'superadmin') await cargarEscuelas(sb);
 }
+
+// Estado de la copia en la nube de lo capturado en este celular.
+function textoNube() {
+  const grupos = (state && state.groups) ? state.groups.length : 0;
+  if (!grupos) return ['', 'Aún no hay listas en este celular. Cuando subas tu Excel se guardarán también en tu cuenta.'];
+  const hace = estado.ultimo ? new Date(estado.ultimo).toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' }) : '';
+  switch (estado.fase) {
+    case 'subiendo': return ['subiendo', `Guardando en tu cuenta…${estado.subidos ? ` (${estado.subidos} días)` : ''}`];
+    case 'sin-conexion': return ['espera', 'Sin internet: lo capturado está seguro en este celular y se guardará en tu cuenta al volver la conexión.'];
+    case 'error': return ['mal', `No se pudo guardar en tu cuenta: ${estado.error}`];
+    case 'otra-cuenta': return ['mal', 'Las listas de este celular son de otra cuenta, así que no se suben a esta.'];
+    case 'sin-escuela': return ['espera', 'Tu cuenta aún no pertenece a una escuela.'];
+    case 'listo': return ['ok', `Todo guardado en tu cuenta ✓${hace ? ` · ${hace}` : ''}`];
+    default: return ['', 'Tus listas se guardan en este celular y en tu cuenta.'];
+  }
+}
+function pintarNube() {
+  const el = body().querySelector('[data-nube]');
+  if (!el) return;
+  const [cls, txt] = textoNube();
+  el.className = `nube-estado ${cls}`;
+  el.innerHTML = `<span>${escapeHtml(txt)}</span>${['mal', 'espera', 'ok'].includes(cls) && estado.fase !== 'otra-cuenta' ? '<button class="link-btn" data-act="subir">Guardar ahora</button>' : ''}`;
+}
+alCambiarEstado(() => { if ($('#cuenta').open) pintarNube(); });
 
 const btnSalir = () => '<button class="btn cuenta-salir" data-act="salir">Cerrar sesión</button>';
 
@@ -207,6 +235,7 @@ $('#cuenta-body').addEventListener('click', async (e) => {
   if (!b) return;
   const act = b.dataset.act;
   const token = (b.closest('[data-token]') || {}).dataset?.token;
+  if (act === 'subir') sincronizar();
   if (act === 'copiar') copiar(enlace(token));
   if (act === 'compartir') compartir(token);
   if (act === 'borrar-inv') {
@@ -281,6 +310,7 @@ $('#inv-form').addEventListener('submit', async (e) => {
     $('#invitacion').close();
     toast('¡Listo! Tu cuenta quedó creada');
     openCuenta();
+    programar(300);
   } catch (ex) {
     console.error(ex);
     err.textContent = /ya pertenece/.test(ex.message) ? 'Esta cuenta ya pertenece a una escuela.' : errorLegible(ex);

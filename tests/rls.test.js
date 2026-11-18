@@ -196,6 +196,64 @@ test('enlace de invitación: muestra escuela y correo solo con el token; mi_perf
   assert.deepEqual([p.escuela, p.rol, p.clave], ['Prepa B', 'maestro', 'ESCB']);
 });
 
+test('sincronizar: importar grupo reconoce alumnos y es repetible', async () => {
+  const lista = [{ numero: '1', nombre: 'alumna uno corregida' }, { numero: '2', nombre: 'Bruno  Núñez' }];
+  const [{ importar_grupo: r1 }] = await as(U.maeA1, `select importar_grupo('V205', 'Ética', $1::jsonb)`, [JSON.stringify(lista)]);
+  const [existente] = (await db.query(`select id from alumnos where nombre = 'ALUMNA UNO CORREGIDA'`)).rows;
+  assert.equal(r1.alumnos[0], existente.id);
+  const [nuevo] = (await db.query('select clave, nombre from alumnos where id = $1', [r1.alumnos[1]])).rows;
+  assert.deepEqual([nuevo.clave, nuevo.nombre], ['ESCA-V205-002', 'Bruno  Núñez']);
+  const [{ importar_grupo: r2 }] = await as(U.maeA1, `select importar_grupo('V205', 'Ética', $1::jsonb)`, [JSON.stringify(lista)]);
+  assert.deepEqual([r2.clase_id, r2.alumnos], [r1.clase_id, r1.alumnos]);
+  assert.equal(await count(U.maeA1, 'clases'), 2); // Literatura y Ética
+  // Otra escuela no puede importar a este grupo: crea el suyo.
+  const [{ importar_grupo: rb }] = await as(U.maeB, `select importar_grupo('V205', '', $1::jsonb)`, [JSON.stringify(lista)]);
+  assert.notEqual(rb.grupo_id, r1.grupo_id);
+});
+
+test('sincronizar: secciones, días y trabajos dejan el día tal como viene', async () => {
+  const lista = [{ numero: '1', nombre: 'alumna uno corregida' }, { numero: '2', nombre: 'Bruno  Núñez' }];
+  const [{ importar_grupo: r }] = await as(U.maeA1, `select importar_grupo('V205', 'Ética', $1::jsonb)`, [JSON.stringify(lista)]);
+  const [a1, a2] = r.alumnos;
+  const secs = [
+    { local: 'records', nombre: 'Asistencia', plantilla: 'asist', porcentaje: 50, orden: 0 },
+    { local: 'trab', nombre: 'Tareas', plantilla: 'trab', porcentaje: 50, orden: 1 },
+  ];
+  const [{ guardar_secciones: ids }] = await as(U.maeA1, 'select guardar_secciones($1, $2, 100, 10, $3::jsonb)', [r.clase_id, 'Ética', JSON.stringify(secs)]);
+  const hist = async () => (await db.query(`select count(*)::int n from historial where tabla = 'capturas'`)).rows[0].n;
+  const caps = async () => (await db.query('select alumno_id, valor from capturas where seccion_id = $1 order by valor', [ids.records])).rows;
+  const dia = (valores) => JSON.stringify([{ seccion: ids.records, fecha: '2026-11-20', valores }]);
+  const h0 = await hist();
+  await as(U.maeA1, 'select guardar_dias($1::jsonb)', [dia({ [a1]: 'A', [a2]: 'F' })]);
+  assert.equal((await caps()).length, 2);
+  await as(U.maeA1, 'select guardar_dias($1::jsonb)', [dia({ [a1]: 'A', [a2]: 'F' })]);
+  assert.equal(await hist(), h0, 'repetir lo mismo no debe ensuciar el historial');
+  await as(U.maeA1, 'select guardar_dias($1::jsonb)', [dia({ [a1]: 'A', [a2]: 'R' })]);
+  assert.equal(await hist(), h0 + 1);
+  await as(U.maeA1, 'select guardar_dias($1::jsonb)', [dia({ [a1]: 'A' })]);
+  assert.deepEqual((await caps()).map((x) => x.valor), ['A']);
+  assert.equal(await hist(), h0 + 2);
+  // Trabajos: dos el mismo día, luego se quita uno (y sus calificaciones).
+  const tr = (trabajos) => JSON.stringify([{ seccion: ids.trab, fecha: '2026-11-20', trabajos }]);
+  const [{ guardar_trabajos: [t] }] = await as(U.maeA1, 'select guardar_trabajos($1::jsonb)', [tr([{ titulo: 'Unit 1' }, { titulo: '' }])]);
+  assert.equal(t.ids.length, 2);
+  await as(U.maeA1, 'select guardar_dias($1::jsonb)', [JSON.stringify(t.ids.map((id, i) => ({ seccion: ids.trab, fecha: '2026-11-20', trabajo: id, valores: { [a1]: String(50 * (i + 1)) } })))]);
+  assert.equal((await db.query('select count(*)::int n from capturas where seccion_id = $1', [ids.trab])).rows[0].n, 2);
+  await as(U.maeA1, 'select guardar_trabajos($1::jsonb)', [tr([{ id: t.ids[0], titulo: 'Unit 1 (corregido)' }])]);
+  assert.equal((await db.query('select count(*)::int n from capturas where seccion_id = $1', [ids.trab])).rows[0].n, 1);
+  assert.equal((await db.query('select titulo from trabajos where id = $1', [t.ids[0]])).rows[0].titulo, 'Unit 1 (corregido)');
+  // Renombrar e intercambiar secciones; quitar una borra sus capturas.
+  const [{ guardar_secciones: ids2 }] = await as(U.maeA1, 'select guardar_secciones($1, $2, 50, 100, $3::jsonb)', [r.clase_id, 'Ética',
+    JSON.stringify([{ id: ids.records, local: 'records', nombre: 'Asistencia', plantilla: 'asist', porcentaje: 100, orden: 0 }])]);
+  assert.equal(ids2.records, ids.records);
+  assert.equal((await db.query('select count(*)::int n from secciones where clase_id = $1', [r.clase_id])).rows[0].n, 1);
+  // Otro maestro no puede escribir ni borrar en esa clase: no ve la sección, así que no cambia nada.
+  const antes = await caps();
+  await as(U.maeB, 'select guardar_dias($1::jsonb)', [dia({ [a1]: 'F' })]);
+  await as(U.maeB, 'select guardar_dias($1::jsonb)', [dia({})]);
+  assert.deepEqual(await caps(), antes);
+});
+
 test('todas las tablas tienen RLS activo', async () => {
   const r = await db.query(`select relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity`);

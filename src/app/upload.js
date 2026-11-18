@@ -26,8 +26,10 @@ $('#file-input').addEventListener('change', async (e) => {
       normalizeGroup(g);
       g.grading = fixGrading(prev && prev.grading);
       if (prev && prev.subject) g.subject = prev.subject; // la materia también se conserva
+      // La clase en la nube también: se vuelve a subir todo (la base de datos no duplica nada).
+      if (prev && prev.nube && prev.nube.clase_id) g.nube = { clase_id: prev.nube.clase_id, grupo_id: prev.nube.grupo_id, h: {} };
     });
-    setState({ fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, ui: { group: 0, date: todayISO(), tab: ASIST_ID } });
+    setState({ fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, ui: { group: 0, date: todayISO(), tab: ASIST_ID }, nube_usuario: state && state.nube_usuario });
     save();
     const total = groups.reduce((n, g) => n + g.students.length, 0);
     toast(`${groups.length} grupo(s), ${total} alumnos cargados`);

@@ -80,9 +80,14 @@ export function load() {
   } catch (e) { /* almacenamiento no disponible */ }
   return null;
 }
-export function save() {
+// Quien quiera enterarse de cada cambio guardado (la sincronización con la nube).
+const oyentes = [];
+export const alGuardar = (fn) => oyentes.push(fn);
+// silencioso: guardar sin avisar (la propia sincronización guarda sus marcas así, para no repetirse).
+export function save(silencioso = false) {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
   catch (e) { toast('No se pudo guardar en el dispositivo'); }
+  if (!silencioso) oyentes.forEach((fn) => fn());
 }
 
 export const todayISO = () => {

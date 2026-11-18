@@ -16,6 +16,7 @@ import './app/student-report.js';
 import './app/menu.js';
 import './app/grades.js';
 import './app/settings.js';
+import './app/sync.js';
 
 // ---------- Inicio ----------
 if (state) {
