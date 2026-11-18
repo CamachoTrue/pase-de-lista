@@ -301,6 +301,29 @@ test('resúmenes: el maestro sube el de su clase y el director de su escuela lo 
   await fails(U.maeB, `insert into resumenes (clase_id, escuela_id, datos) values ($1, $2, '{}')`, [c.id, c.escuela_id], /row-level security/);
 });
 
+test('eliminar mi cuenta: el independiente borra todo; el de escuela solo su usuario', async () => {
+  await fails(U.super, 'select eliminar_mi_cuenta()', [], /administrador general/);
+  await fails(null, 'select eliminar_mi_cuenta()', [], /permission denied/);
+  // Independiente: se va todo lo suyo.
+  const [me] = await as(U.indiv, 'select escuela_id from usuarios');
+  await as(U.indiv, `insert into grupos (escuela_id, nombre) values ($1, 'G1')`, [me.escuela_id]);
+  await as(U.indiv, `insert into alumnos (escuela_id, clave, nombre) values ($1, 'X-G1-001', 'ALUMNO X')`, [me.escuela_id]);
+  await as(U.indiv, `insert into clases (escuela_id, grupo_id, maestro_id) select escuela_id, id, $1 from grupos`, [U.indiv.id]);
+  assert.equal((await as(U.indiv, 'select eliminar_mi_cuenta() r'))[0].r, 'todo');
+  for (const t of ['escuelas', 'grupos', 'alumnos', 'clases', 'semestres', 'historial']) {
+    assert.equal((await db.query(`select count(*)::int n from ${t} where escuela_id = $1`.replace('escuelas where escuela_id', 'escuelas where id'), [me.escuela_id])).rows[0].n, 0, t);
+  }
+  assert.equal((await db.query('select count(*)::int n from auth.users where id = $1', [U.indiv.id])).rows[0].n, 0);
+  // Maestro de escuela: su clase y calificaciones se quedan para la escuela, sin maestro.
+  const antes = await count(U.dirA, 'capturas');
+  assert.equal((await as(U.maeA1, 'select eliminar_mi_cuenta() r'))[0].r, 'cuenta');
+  assert.equal((await db.query('select count(*)::int n from usuarios where id = $1', [U.maeA1.id])).rows[0].n, 0);
+  assert.equal(await count(U.dirA, 'capturas'), antes);
+  const clases = await as(U.dirA, 'select maestro_id from clases');
+  assert.ok(clases.length >= 1 && clases.every((c) => c.maestro_id === null));
+  assert.equal((await as(U.maeB, 'select count(*)::int n from escuelas'))[0].n, 1); // otras escuelas intactas
+});
+
 test('todas las tablas tienen RLS activo', async () => {
   const r = await db.query(`select relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity`);

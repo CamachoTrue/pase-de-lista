@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Pase de Lista</title>
+  <title>Clase al Día</title>
+  <meta name="apple-mobile-web-app-title" content="Clase al Día">
   <meta name="theme-color" content="#1f7a4d">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon-192.png">
@@ -16,7 +17,7 @@
   <section id="screen-upload" class="screen" hidden>
     <div class="upload-card">
       <div class="logo">✓</div>
-      <h1>Pase de Lista</h1>
+      <h1>Clase al Día</h1>
       <p>Sube el Excel con la lista de alumnos. Cada hoja del archivo se toma como un grupo.</p>
       <label class="btn primary big">
         Subir archivo Excel
@@ -369,6 +370,7 @@
         <input id="inv-pass" type="password" autocomplete="new-password" minlength="8" required>
       </label>
       <label class="check"><input type="checkbox" id="inv-recordar" checked> Mantener la sesión iniciada en este celular</label>
+      <p class="hint cuenta-legal">Al crear tu cuenta aceptas los <a href="/terminos" target="_blank" rel="noopener">términos</a> y el <a href="/privacidad" target="_blank" rel="noopener">aviso de privacidad</a>.</p>
       <p class="form-error" id="inv-error"></p>
       <div class="row">
         <button type="button" class="btn" data-action="close">Ahora no</button>

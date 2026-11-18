@@ -1,0 +1,16 @@
+/* Páginas legales de Clase al Día (aviso de privacidad y términos). */
+:root { --bg: #f4f6f5; --surface: #fff; --text: #1d2420; --muted: #5d6762; --accent: #1f7a4d; --border: #dfe5e2; }
+@media (prefers-color-scheme: dark) { :root { --bg: #121614; --surface: #1b211e; --text: #e8eeea; --muted: #a3ada8; --accent: #5cc48e; --border: #2c3531; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: 24px 16px 60px; }
+header { margin-bottom: 20px; }
+header a { color: var(--accent); text-decoration: none; font-weight: 600; }
+h1 { font-size: 1.6rem; line-height: 1.25; margin: 12px 0 4px; }
+h2 { font-size: 1.1rem; margin: 28px 0 6px; }
+p, li { color: var(--text); }
+.fecha { color: var(--muted); margin: 0 0 16px; }
+.caja { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+a { color: var(--accent); }
+ul { padding-left: 22px; }
+footer { margin-top: 40px; color: var(--muted); font-size: 14px; }

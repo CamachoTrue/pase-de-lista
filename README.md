@@ -1,4 +1,4 @@
-# Pase de Lista
+# Clase al Día (antes «Pase de Lista»)
 
 App web instalable (PWA) para pasar lista desde un Excel. Funciona en computadora y en celular.
 

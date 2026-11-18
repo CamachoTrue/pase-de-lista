@@ -533,3 +533,7 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .cuenta-indep .btn { align-self: flex-start; }
 .esc-form .cuenta-2col { grid-template-columns: 1fr 1fr; }
 .dir-link { text-align: center; text-decoration: none; }
+
+.cuenta-eliminar { margin-top: 18px; color: var(--F, #c62f2f); border-color: currentColor; background: transparent; }
+.cuenta-legal { text-align: center; margin-top: 10px; }
+.cuenta-legal a { color: inherit; }

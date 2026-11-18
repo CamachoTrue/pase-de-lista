@@ -6,12 +6,13 @@ import { $, escapeHtml, toast } from './util.js';
 import { confirmBulk } from './dialogs.js';
 import { errorLegible, nube, recordar, setRecordar } from '../lib/nube.js';
 import { alCambiarEstado, estado, programar, sincronizar } from './sync.js';
-import { state } from './state.js';
+import { save, state } from './state.js';
 import { bajarDeLaNube, clasesEnLaNube } from './bajar.js';
 import { render } from './main-view.js';
 
 const ROL = { superadmin: 'Administrador general', director: 'Director', maestro: 'Maestro' };
 const body = () => $('#cuenta-body');
+let perfil = null; // el de la sesión, para "Eliminar mi cuenta"
 const fecha = (iso) => new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
 const enlace = (token) => `${location.origin}/?invitacion=${token}`;
 
@@ -26,6 +27,7 @@ async function renderCuenta() {
   let sb;
   try { sb = await nube(); } catch { return sinConexion(); }
   const { data: { session } } = await sb.auth.getSession();
+  perfil = null;
   if (!session) return renderEntrar();
   const { data, error } = await sb.rpc('mi_perfil');
   if (error) {
@@ -37,9 +39,10 @@ async function renderCuenta() {
   if (!p) {
     $('#cuenta-sub').textContent = session.user.email;
     body().innerHTML = `<div class="cuenta-card"><b>Tu cuenta aún no pertenece a una escuela</b>
-      <small>Abre el enlace de invitación que te mandó tu director, o pídele uno.</small></div>${btnSalir()}`;
+      <small>Abre el enlace de invitación que te mandó tu director, o pídele uno.</small></div>${btnSalir()}${btnEliminar()}`;
     return;
   }
+  perfil = p;
   $('#cuenta-sub').textContent = p.correo;
   let html = `<div class="cuenta-card">
       <b>${escapeHtml(p.nombre)}</b><small>${escapeHtml(p.correo)}</small>
@@ -52,7 +55,7 @@ async function renderCuenta() {
   if (p.rol === 'director' || p.rol === 'superadmin') html += '<a class="btn primary dir-link" href="/director" target="_blank" rel="noopener">Abrir panel de la escuela ↗</a>';
   if (p.rol === 'director') html += seccionPeriodos() + seccionMaestros();
   if (p.rol === 'superadmin') html += seccionEscuelas();
-  body().innerHTML = html + btnSalir();
+  body().innerHTML = html + btnSalir() + (p.rol === 'superadmin' ? '' : btnEliminar());
   pintarNube();
   programar(200);
   ofrecerBajar();
@@ -117,6 +120,61 @@ function avisoSuscripcion(p) {
 }
 
 const btnSalir = () => '<button class="btn cuenta-salir" data-act="salir">Cerrar sesión</button>';
+const btnEliminar = () => `<button class="btn cuenta-eliminar" data-act="eliminar">Eliminar mi cuenta</button>
+  <p class="hint cuenta-legal"><a href="/privacidad" target="_blank" rel="noopener">Aviso de privacidad</a> · <a href="/terminos" target="_blank" rel="noopener">Términos</a></p>`;
+
+// Eliminar mi cuenta (lo piden Apple y Google). El independiente borra todo lo suyo de la nube; el de
+// una escuela borra su usuario y las calificaciones se quedan con la escuela. El celular conserva sus listas.
+async function eliminarCuenta(b) {
+  const indep = !perfil || perfil.paquete === 'individual';
+  const texto = indep
+    ? 'Se borran de la nube tu cuenta, tus grupos, alumnos, calificaciones y archivos. Las listas que están en este celular se quedan aquí.'
+    : `Se borran tu nombre, correo y contraseña. Las listas y calificaciones que capturaste son registros de ${perfil.escuela} y se quedan con la escuela. Lo que está en este celular se queda aquí.`;
+  if (!(await confirmBulk('¿Eliminar tu cuenta?', texto, 'Sí, eliminar', true))) return;
+  if (!(await confirmBulk('¿Seguro?', 'Esto no se puede deshacer.', 'Eliminar para siempre', true))) return;
+  b.disabled = true;
+  try {
+    const sb = await nube();
+    const { data: { session } } = await sb.auth.getSession();
+    if (indep && perfil && perfil.escuela_id && session) await borrarArchivos(sb, `${perfil.escuela_id}/${session.user.id}`);
+    const { error } = await sb.rpc('eliminar_mi_cuenta');
+    if (error) throw error;
+    desvincular();
+    await sb.auth.signOut({ scope: 'local' });
+    $('#cuenta').close();
+    toast('Tu cuenta se eliminó');
+  } catch (ex) {
+    console.error(ex);
+    toast(errorLegible(ex));
+    b.disabled = false;
+  }
+}
+
+async function borrarArchivos(sb, carpeta) {
+  const st = sb.storage.from('archivos');
+  for (const sub of ['excel', 'cuadernillos']) {
+    const { data } = await st.list(`${carpeta}/${sub}`, { limit: 1000 });
+    const rutas = (data || []).map((f) => `${carpeta}/${sub}/${f.name}`);
+    if (rutas.length) await st.remove(rutas);
+  }
+}
+
+// Las listas del celular dejan de apuntar a la cuenta borrada (para poder usar otra después).
+function desvincular() {
+  if (!state) return;
+  const limpiar = (o) => {
+    if (Array.isArray(o)) { o.forEach(limpiar); return; }
+    if (!o || typeof o !== 'object') return;
+    for (const k of ['nube', 'nube_id', 'alumno_id', 'nube_reabierto']) delete o[k];
+    Object.values(o).forEach(limpiar);
+  };
+  limpiar(state.groups);
+  delete state.nube_usuario;
+  delete state.nube_excel;
+  // Los parciales que puso la escuela pasan a ser del maestro (ya puede editarlos).
+  if (state.periodos && state.periodos.origen === 'escuela') { state.periodos.origen = 'maestro'; delete state.periodos.id; }
+  save(true);
+}
 
 function sinConexion(correo) {
   body().innerHTML = `<div class="cuenta-card"><b>${correo ? 'Sesión iniciada' : 'Sin conexión'}</b>
@@ -147,6 +205,7 @@ function renderRegistro() {
       <label class="field">Crea una contraseña (mínimo 8)<input name="pass" type="password" autocomplete="new-password" minlength="8" required></label>
       <label class="check"><input type="checkbox" name="recordar" checked> Mantener la sesión iniciada en este celular</label>
       <p class="form-error" data-error></p>
+      <p class="hint cuenta-legal">Al crear tu cuenta aceptas los <a href="/terminos" target="_blank" rel="noopener">términos</a> y el <a href="/privacidad" target="_blank" rel="noopener">aviso de privacidad</a>.</p>
       <button class="btn primary big" type="submit">Crear cuenta (30 días gratis)</button>
       <button class="btn" type="button" data-act="volver-entrar">Ya tengo cuenta: entrar</button>
     </form>`;
@@ -422,6 +481,7 @@ $('#cuenta-body').addEventListener('click', async (e) => {
   const token = (b.closest('[data-token]') || {}).dataset?.token;
   if (act === 'subir') sincronizar();
   if (act === 'registro') renderRegistro();
+  if (act === 'eliminar') eliminarCuenta(b);
   if (act === 'volver-entrar') renderEntrar();
   if (act === 'bajar') {
     const av = body().querySelector('[data-avance]');

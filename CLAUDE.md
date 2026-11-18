@@ -1,4 +1,4 @@
-# Pase de Lista — reglas del proyecto
+# Clase al Día (antes «Pase de Lista») — reglas del proyecto
 
 App web instalable (PWA) para que maestros de preparatoria pasen lista y califiquen desde el celular.
 Publicada en https://pase-de-lista-omega.vercel.app (Vercel publica solo cada push a `main`).
@@ -52,3 +52,8 @@ pantalla de 375 px, toques grandes, textos en español claro y sin tecnicismos.
 
 Flujo normal de una función: `disenador` (si cambia la interfaz) → `frontend`/`backend` → `qa`
 (+ `rendimiento` y `seguridad` cuando aplique) → el dueño aprueba → se mezcla a `main`.
+
+## Legal
+- Aviso de privacidad y términos: `public/privacidad.html` y `public/terminos.html` (/privacidad, /terminos). Responsable hoy: persona física (Luis Orlando Camacho Chaires, Navojoa); cuando haya empresa y correo profesional, cambiarlo en ambas páginas y su fecha.
+- "Eliminar mi cuenta" (Mi cuenta) → RPC `eliminar_mi_cuenta` (migración 9). No quitarlo: lo exigen Apple y Google.
+- No cambiar las claves de localStorage ('paseDeLista.v1', 'cuenta.sesion') por el cambio de nombre: se perderían los datos de los maestros.
