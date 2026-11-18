@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1f7a4d">
+  <title>Panel de la escuela</title>
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="/src/styles.css">
+  <link rel="stylesheet" href="/src/director/director.css">
+</head>
+<body class="dir-body">
+  <header class="dir-top">
+    <div>
+      <h1>Panel de la escuela</h1>
+      <p class="hint" id="dir-sub">Cargando…</p>
+    </div>
+    <div class="dir-top-acc">
+      <select id="dir-escuela" hidden aria-label="Escuela"></select>
+      <button class="btn" id="dir-recargar" hidden>Actualizar</button>
+      <a class="btn" href="/">Ir a la app</a>
+    </div>
+  </header>
+  <main class="dir-main" id="dir-main">
+    <p class="hint">Cargando…</p>
+  </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/src/director/main.js"></script>
+</body>
+</html>

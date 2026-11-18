@@ -11,6 +11,7 @@ en orden; nunca se cambian a mano en el panel.
 | `…0005_archivos.sql` | Bucket privado `archivos`: `<escuela>/<usuario>/excel/…` y `/cuadernillos/<clase>.pdf`, cada quien su carpeta |
 | `…0006_cierres_parcial.sql` | Cierres con número de parcial y nombre de semestre (fechas propias del maestro) |
 | `…0007_panel.sql` | Precios de lista, `panel_escuelas()`, `registrar_pago()`, `mi_perfil()` con activa/vence, prueba gratis del individual |
+| `…0008_resumenes.sql` | Resumen por clase (lo calcula el celular del maestro) para el panel del director |
 | `…0004_sincronizar.sql` | `importar_grupo`, `guardar_secciones`, `guardar_trabajos`, `guardar_dias` (security invoker: aplica RLS) |
 
 ## Probar en local (sin tocar el proyecto real)

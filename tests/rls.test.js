@@ -292,6 +292,15 @@ test('panel del administrador: escuelas con cobro, pagos y precios de lista', as
   assert.equal((await as(U.maeA1, 'select * from precios_lista')).length, 2);
 });
 
+test('resúmenes: el maestro sube el de su clase y el director de su escuela lo lee', async () => {
+  const [c] = await as(U.maeA1, 'select id, escuela_id from clases limit 1');
+  await as(U.maeA1, `insert into resumenes (clase_id, escuela_id, datos, ultima_captura) values ($1, $2, '{"escala":10}', '2026-11-18')
+    on conflict (clase_id) do update set datos = excluded.datos`, [c.id, c.escuela_id]);
+  assert.equal((await as(U.dirA, 'select * from resumenes')).length, 1);
+  assert.equal((await as(U.dirB, 'select * from resumenes')).length, 0);
+  await fails(U.maeB, `insert into resumenes (clase_id, escuela_id, datos) values ($1, $2, '{}')`, [c.id, c.escuela_id], /row-level security/);
+});
+
 test('todas las tablas tienen RLS activo', async () => {
   const r = await db.query(`select relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity`);

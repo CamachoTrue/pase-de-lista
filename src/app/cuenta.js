@@ -49,6 +49,7 @@ async function renderCuenta() {
     ${avisoSuscripcion(p)}
     ${p.escuela_id ? '<div class="nube-estado" data-nube></div>' : ''}
     ${p.escuela_id && !(state && state.groups && state.groups.length) ? '<div class="cuenta-bajar" data-bajar hidden></div>' : ''}`;
+  if (p.rol === 'director' || p.rol === 'superadmin') html += '<a class="btn primary dir-link" href="/director" target="_blank" rel="noopener">Abrir panel de la escuela ↗</a>';
   if (p.rol === 'director') html += seccionPeriodos() + seccionMaestros();
   if (p.rol === 'superadmin') html += seccionEscuelas();
   body().innerHTML = html + btnSalir();

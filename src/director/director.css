@@ -1,0 +1,39 @@
+/* Panel del director: pensado para computadora, funciona en celular */
+.dir-body { padding: 0; }
+.dir-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 20px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 3; }
+.dir-top h1 { margin: 0; font-size: 1.25rem; }
+.dir-top .hint { margin: 2px 0 0; }
+.dir-top-acc { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dir-top-acc select { padding: 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); max-width: 260px; }
+.dir-top-acc .btn { text-decoration: none; padding: 8px 14px; }
+.dir-main { max-width: 1200px; margin: 0 auto; padding: 16px 20px 40px; display: flex; flex-direction: column; gap: 14px; }
+.dir-login { max-width: 380px; }
+.dir-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.dir-tiles .gr-tile { background: var(--surface); border: 1px solid var(--border); }
+.dir-tiles .gr-tile.rojo { background: var(--F-soft); }
+.dir-tiles .gr-tile.amar { background: var(--R-soft); }
+.dir-tiles .gr-tile.amar b { color: var(--R); }
+.dir-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.dir-vista { display: flex; flex-direction: column; gap: 10px; }
+.dir-vista .preview-scroll { max-height: none; }
+.dir-tabla { width: 100%; font-size: 13px; }
+.dir-tabla th { text-align: left; }
+.dir-tabla td { white-space: normal; vertical-align: middle; }
+.dir-tabla td small { display: block; color: #6b7570; font-size: 11px; }
+.dir-tabla td.v small { display: inline; }
+.dir-click { cursor: pointer; }
+tr.dir-click:hover td, td.dir-click:hover, li.dir-click:hover { background: #eef6f1; }
+td.dir-click { color: #1f7a4d; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.dir-sem span { display: inline-block; min-width: 24px; text-align: center; border-radius: 6px; padding: 1px 4px; margin-right: 3px; font-weight: 700; font-size: 12px; }
+.dir-sem .rojo { background: #fbe5e5; color: #c62f2f; }
+.dir-sem .amarillo { background: #fbf0dc; color: #9a6413; }
+.dir-sem .verde { background: #e3f4ea; color: #1f8a4c; }
+.dir-atraso { color: #9a6413; font-weight: 600; }
+.dir-rojo { color: #c62f2f; font-weight: 700; }
+.dir-motivo { color: #555; font-size: 12px; }
+.dir-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #aaa; }
+.dir-dot.rojo { background: #c62f2f; } .dir-dot.amarillo { background: #d4a017; } .dir-dot.verde { background: #1f8a4c; }
+.dir-h2 { margin: 4px 0; font-size: 1.1rem; }
+.dir-h2 small { color: var(--muted); font-weight: 400; font-size: .85rem; }
+@media (max-width: 560px) { .dir-main { padding: 12px; } .dir-top { padding: 12px; } }
+.dir-top-acc a.btn { color: var(--text); }

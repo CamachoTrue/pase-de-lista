@@ -43,6 +43,9 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
   "Crear mi cuenta" con 30 días gratis. Si la suscripción vence, la app avisa y deja de subir (los datos siguen en el celular).
 - **Panel del administrador general** (Mi cuenta, rol superadmin): alta de escuelas con invitación al director, paquete,
   cuentas, precio especial por escuela, vencimiento, activar/desactivar, registrar pagos y precios de lista.
+- **Panel del director** (`/director`, también desde Mi cuenta): indicadores de la escuela, clases con promedio,
+  asistencia, semáforo y última captura; maestros (quién va atrasado); alumnos en riesgo; buscar un alumno y ver todas sus
+  materias. Lee los resúmenes que suben los celulares de los maestros al sincronizar (tabla `resumenes`).
 - **Confirmación de cambios**: si un alumno ya tenía marca y se elige otra, se pide confirmar.
 - **Vista de lista** para revisar y corregir; tocar un nombre regresa al pase uno por uno desde ahí.
 - **Agregar / quitar alumnos**: los nuevos se agregan al final de la lista del grupo.

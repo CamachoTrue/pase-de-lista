@@ -532,3 +532,4 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .cuenta-indep { margin-top: 12px; gap: 6px; }
 .cuenta-indep .btn { align-self: flex-start; }
 .esc-form .cuenta-2col { grid-template-columns: 1fr 1fr; }
+.dir-link { text-align: center; text-decoration: none; }

@@ -34,5 +34,6 @@ function serviceWorkerAssets() {
 export default defineConfig({
   plugins: [serviceWorkerAssets()],
   server: { port: 5173 },
-  build: { outDir: 'dist', emptyOutDir: true },
+  // Dos páginas: la app (index.html) y el panel del director (director.html → /director en Vercel).
+  build: { outDir: 'dist', emptyOutDir: true, rollupOptions: { input: { main: 'index.html', director: 'director.html' } } },
 });

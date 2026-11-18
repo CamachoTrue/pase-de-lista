@@ -1,7 +1,7 @@
 // Qué falta subir de un grupo a la nube (lógica pura, con pruebas en tests/sync-plan.test.js).
 // Por cada (sección, fecha) se guarda una huella de lo que ya se subió (g.nube.h); si lo de hoy es
 // distinto, ese día se vuelve a mandar completo y la base de datos lo deja exactamente igual.
-import { sectionsOf, worksOf, weightOf, secMin } from './excel-core.js';
+import { sectionsOf, worksOf, weightOf, secMin, groupReport, finalGrade, enPeriodo, periodosListos, semestral, round1 } from './excel-core.js';
 
 export function huella(texto) {
   let h = 5381;
@@ -153,4 +153,34 @@ export function armarGrupo(g, { clase, secciones, inscripciones, trabajos, captu
   const p = planDias(g);
   [...p.dias, ...p.trabajos].forEach((x) => { if (x.hash) g.nube.h[x.key] = x.hash; });
   return g;
+}
+
+// ---------- Resumen de la clase para el panel del director ----------
+// Por alumno: f calificación, a % asistencia, F faltas, e semáforo, r motivos, p parciales, s semestral.
+export function resumenClase(g, periodos) {
+  const gr = g.grading || {};
+  const rep = groupReport(g, gr);
+  const listos = periodosListos(periodos);
+  const cierre = (tipo, n) => (g.cierres || []).filter((c) => c.tipo === tipo && (c.parcial ?? null) === n && !c.reabierto_en).at(-1);
+  const alumnos = {};
+  let ultima = null;
+  for (const s of sectionsOf(g)) for (const d of Object.keys(g[s.id] || {})) if (!ultima || d > ultima) ultima = d;
+  rep.rows.forEach((row) => {
+    const st = row.student;
+    if (!st.alumno_id) return;
+    const x = { f: row.final, a: row.att == null ? null : round1(row.att), F: row.counts.F, e: row.status, r: row.reasons };
+    if (listos) {
+      x.p = periodos.parciales.map((p) => {
+        const c = cierre('parcial', p.numero);
+        return c && c.calificaciones[st.row] ? c.calificaciones[st.row].final : finalGrade(enPeriodo(g, p.inicio, p.fin), st.row, gr).final;
+      });
+      const cs = cierre('semestre', null);
+      x.s = cs && cs.calificaciones[st.row] ? cs.calificaciones[st.row].reportada : semestral(g, st.row, gr, periodos, g.semestral).reportada;
+    }
+    alumnos[st.alumno_id] = x;
+  });
+  return {
+    datos: { escala: rep.escala, graded: rep.graded, alumnos, semestre: (periodos && periodos.semestre) || '', parcialesCerrados: (g.cierres || []).filter((c) => !c.reabierto_en).map((c) => c.tipo === 'semestre' ? 'S' : c.parcial) },
+    ultima,
+  };
 }

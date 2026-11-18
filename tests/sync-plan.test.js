@@ -127,3 +127,17 @@ test('bajar de la nube arma el grupo igual y lo deja como ya subido', async () =
   const p = planDias(g);
   assert.deepEqual([p.dias.length, p.trabajos.length, faltaImportar(g)], [0, 0, false]);
 });
+
+test('resumen de la clase para el director', async () => {
+  const { resumenClase } = await import('../src/lib/sync-plan.js');
+  const g = grupo();
+  g.students.forEach((s) => (s.alumno_id = `al-${s.row}`));
+  g.grading = { w: { records: 100 }, retardo: 100, escala: 10 };
+  g.records['2026-11-21'] = { 5: 'A', 6: 'F' };
+  const per = { semestre: 'S', parciales: [{ numero: 1, inicio: '2026-11-01', fin: '2026-11-30' }] };
+  const { datos, ultima } = resumenClase(g, per);
+  assert.equal(ultima, '2026-11-21');
+  assert.deepEqual(datos.alumnos['al-5'], { f: 10, a: 100, F: 0, e: 'verde', r: [], p: [10], s: 10 });
+  assert.equal(datos.alumnos['al-6'].e, 'rojo');
+  assert.equal(datos.alumnos['al-6'].F, 2);
+});

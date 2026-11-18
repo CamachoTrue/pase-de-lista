@@ -3,7 +3,7 @@
 // sube solo unos segundos después, al volver el internet y al abrir la app.
 import { alGuardar, save, state } from './state.js';
 import { errorLegible, haySesion, nube } from '../lib/nube.js';
-import { diasDeTrabajos, faltaImportar, huella, planDias, planSecciones } from '../lib/sync-plan.js';
+import { diasDeTrabajos, faltaImportar, huella, planDias, planSecciones, resumenClase } from '../lib/sync-plan.js';
 import { b64ToBuf } from './util.js';
 import { bookDB } from './book-db.js';
 
@@ -46,6 +46,7 @@ export async function sincronizar() {
     await bajarPeriodos(sb, perfil[0].escuela_id);
     for (const g of state.groups) await subirGrupo(sb, g);
     for (const g of state.groups) await subirSemestral(sb, g, perfil[0].escuela_id, session.user.id);
+    for (const g of state.groups) await subirResumen(sb, g, perfil[0].escuela_id);
     const carpeta = `${perfil[0].escuela_id}/${session.user.id}`;
     await subirExcel(sb, carpeta);
     await subirCuadernillos(sb, carpeta, perfil[0].escuela_id);
@@ -180,6 +181,19 @@ async function subirSemestral(sb, g, escuela, uid) {
       save(true);
     }
   }
+}
+
+// Resumen de la clase para el panel del director (solo si cambió).
+async function subirResumen(sb, g, escuela) {
+  const clase = g.nube && g.nube.clase_id;
+  if (!clase) return;
+  const { datos, ultima } = resumenClase(g, state.periodos);
+  const hs = huella(JSON.stringify([datos, ultima]));
+  if (g.nube.h.__resumen === hs) return;
+  const { error } = await sb.from('resumenes').upsert({ clase_id: clase, escuela_id: escuela, datos, ultima_captura: ultima, actualizado_en: new Date().toISOString() }, { onConflict: 'clase_id' });
+  if (error) throw error;
+  g.nube.h.__resumen = hs;
+  save(true);
 }
 
 // ---------- Archivos: Excel original y cuadernillos (Supabase Storage, carpeta propia) ----------
