@@ -329,18 +329,24 @@
     return out;
   }
 
-  // Calificación final en la escala elegida (10 o 100). Las secciones sin datos aún no cuentan
-  // y su porcentaje se reparte entre las demás, para que siempre haya una calificación al día.
+  // Calificación final en la escala elegida (10 o 100): el alumno empieza con todo y solo se le descuenta
+  // lo que ya perdió. Una sección sin datos todavía no descuenta (cuenta completa); p. ej. participaciones
+  // al 50 % con valor de 10 % = −5 → 95. Con todas las secciones capturadas es el promedio ponderado normal.
+  // Sin ningún dato en las secciones con porcentaje no hay calificación (null).
   function finalGrade(g, row, grading) {
     grading = Object.assign({}, DEFAULT_GRADING, grading);
     const parts = gradeParts(g, row, grading);
     let sum = 0;
     let wsum = 0;
+    let any = false;
     for (const s of sectionsOf(g)) {
       const w = weightOf(grading, s);
-      if (w > 0 && parts[s.id] != null) { sum += w * parts[s.id]; wsum += w; }
+      if (w <= 0) continue;
+      wsum += w;
+      if (parts[s.id] != null) any = true;
+      sum += w * (parts[s.id] != null ? parts[s.id] : 100);
     }
-    const final = wsum ? round1(((sum / wsum) * (Number(grading.escala) || 10)) / 100) : null;
+    const final = wsum && any ? round1(((sum / wsum) * (Number(grading.escala) || 10)) / 100) : null;
     return { parts, final };
   }
 
@@ -636,7 +642,7 @@
     put(y, 1, `Calificación final (sobre ${r.grading.escala})`, { bold: true, box: true, fill: YEL });
     ws.mergeCells(y, 1, y, 2);
     put(y, 3, r.final == null ? (r.graded ? 'Sin datos' : 'Sin porcentajes') : r.final, { bold: true, box: true, fill: YEL, align: 'center' });
-    put(y, 4, r.graded ? 'Las secciones sin datos aún no cuentan.' : 'El maestro aún no define cuánto vale cada sección.', { box: true, fill: YEL });
+    put(y, 4, r.graded ? 'Empieza con la calificación completa; las secciones sin datos todavía no descuentan.' : 'El maestro aún no define cuánto vale cada sección.', { box: true, fill: YEL });
     if (nCols > 4) ws.mergeCells(y, 4, y, nCols);
     y += 2;
 

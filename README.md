@@ -23,7 +23,7 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
   puede **agregar, quitar y renombrar** secciones y elegir la **plantilla** de cada una: Sí/No (con mínimo de "Sí" para el 100 %),
   0/50/100 (varios por día, con título), Disciplina (todos 10, marcar 0) o Calificación de 0 a 100 (como examen).
   Asistencia (A/F/R/J) siempre está. Por defecto: Asistencia, Lecturas, Trabajos, Disciplina y Examen.
-  Cada sección es una pestaña y lleva su porcentaje; la calificación se calcula sola (las secciones sin datos aún no cuentan).
+  Cada sección es una pestaña y lleva su porcentaje; la calificación se calcula sola: el alumno empieza con todo y solo se le descuenta lo que pierde (una sección sin datos todavía no descuenta; con todo capturado es el promedio ponderado).
   En el Excel van al final, por sección y total (sobre 10 o 100). Quitar una sección con datos pide confirmación.
 - **Resumen del grupo** (⋮ → Resumen del grupo): alumnos, asistencia promedio, promedio general, faltas y alumnos en riesgo,
   con semáforo por alumno (rojo: calificación < 60 % o asistencia < 80 %; amarillo: < 80 % o < 90 %; verde: lo demás).
