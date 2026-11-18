@@ -8,6 +8,7 @@ import { openAddStudent, openRemoveStudent } from './students.js';
 import { openSubject } from './subject.js';
 import { $ } from './util.js';
 import { openCuenta } from './cuenta.js';
+import { openSemestral } from './semestral.js';
 
 // ---------- Menú y diálogos ----------
 export const menu = $('#menu');
@@ -33,6 +34,7 @@ menu.addEventListener('click', (e) => {
   if (action === 'subject') openSubject();
   if (action === 'settings') openSettings();
   if (action === 'cuenta') openCuenta();
+  if (action === 'semestral') openSemestral();
   if (action === 'new-file') {
     if (confirm('Se reemplazará la lista actual y su asistencia guardada. Exporta antes si la necesitas. ¿Continuar?')) {
       $('#file-input').click();

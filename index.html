@@ -135,6 +135,7 @@
     <button class="menu-item cuenta-item" data-action="cuenta" id="menu-cuenta">Mi cuenta</button>
     <button class="menu-item" data-action="subject">Materia de este grupo</button>
     <button class="menu-item" data-action="grades">Secciones y calificaciones</button>
+    <button class="menu-item" data-action="semestral">Calificación semestral</button>
     <button class="menu-item" data-action="group-report">Resumen del grupo (semáforo)</button>
     <button class="menu-item" data-action="student">Resumen por alumno</button>
     <button class="menu-item" data-action="book">Cuadernillo del grupo (PDF)</button>
@@ -205,7 +206,16 @@
           <select name="escala"><option value="10">10</option><option value="100">100</option></select>
         </label>
       </div>
+      <details class="periodos" id="periodos">
+        <summary>Parciales del semestre <span class="hint" id="per-resumen"></span></summary>
+        <p class="hint" id="per-nota">Las capturas se acomodan solas en su parcial según la fecha. Valen para todos tus grupos.</p>
+        <label class="per-sem">Semestre <input name="semestre" placeholder="Ago–Dic 2026" maxlength="40"></label>
+        <div class="per-row"><b>Parcial 1</b><input type="date" name="p1i" aria-label="Inicio del parcial 1"><span>a</span><input type="date" name="p1f" aria-label="Fin del parcial 1"></div>
+        <div class="per-row"><b>Parcial 2</b><input type="date" name="p2i" aria-label="Inicio del parcial 2"><span>a</span><input type="date" name="p2f" aria-label="Fin del parcial 2"></div>
+        <div class="per-row"><b>Parcial 3</b><input type="date" name="p3i" aria-label="Inicio del parcial 3"><span>a</span><input type="date" name="p3f" aria-label="Fin del parcial 3"></div>
+      </details>
     </form>
+    <div class="per-bar"><div class="per-tabs" id="per-tabs"></div><div class="per-cierre" id="per-cierre"></div></div>
     <div class="preview-scroll"><table class="sheet grades-table" id="grades-table"></table></div>
     <div class="row">
       <button class="btn" data-action="close">Cerrar</button>
@@ -366,6 +376,22 @@
       </div>
     </form>
     <div class="row" id="inv-cerrar"><button class="btn" data-action="close">Cerrar</button></div>
+  </dialog>
+
+  <!-- Calificación semestral: promedio de parciales o parciales + examen final; cerrar el semestre -->
+  <dialog id="semestral" class="fullscreen">
+    <div class="preview-head">
+      <div>
+        <h2>Calificación semestral</h2>
+        <p class="hint" id="sem-sub"></p>
+      </div>
+      <button class="icon-btn" data-action="close" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="sem-body" id="sem-body"></div>
+    <div class="row">
+      <button class="btn" data-action="close">Cerrar</button>
+      <button class="btn primary" id="sem-cerrar">Cerrar semestre</button>
+    </div>
   </dialog>
 
   <!-- Agregar alumno nuevo -->

@@ -14,7 +14,7 @@ export async function openPreview() {
   const g = group();
   let ws;
   try {
-    const out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), [g], state.codes);
+    const out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), [g], state.codes, null, state.periodos);
     const wb = new (await loadExcel()).Workbook();
     await wb.xlsx.load(out);
     ws = wb.getWorksheet(g.sheet);
@@ -25,7 +25,7 @@ export async function openPreview() {
   }
 
   const dates = groupDates(g);
-  const layout = sheetLayout(g, g.grading);
+  const layout = sheetLayout(g, g.grading, state.periodos);
   const byCol = new Map(layout.map((x) => [x.col, x]));
   const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col));
   const isCur = (c) => byCol.has(c) && byCol.get(c).date === state.ui.date;
@@ -104,7 +104,7 @@ export async function openPreview() {
 export async function doExport(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
   try {
-    const out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), state.groups, state.codes);
+    const out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), state.groups, state.codes, null, state.periodos);
     await deliverFile(out, state.fileName.replace(/\.xlsx$/i, '') + ' - asistencia.xlsx');
     toast('Excel generado');
   } catch (err) {

@@ -48,13 +48,13 @@ async function renderCuenta() {
     </div>
     ${p.escuela_id ? '<div class="nube-estado" data-nube></div>' : ''}
     ${p.escuela_id && !(state && state.groups && state.groups.length) ? '<div class="cuenta-bajar" data-bajar hidden></div>' : ''}`;
-  if (p.rol === 'director') html += seccionMaestros();
+  if (p.rol === 'director') html += seccionPeriodos() + seccionMaestros();
   if (p.rol === 'superadmin') html += seccionEscuelas();
   body().innerHTML = html + btnSalir();
   pintarNube();
   programar(200);
   ofrecerBajar();
-  if (p.rol === 'director') await cargarMaestros(sb, p.escuela_id);
+  if (p.rol === 'director') { await cargarPeriodos(sb, p.escuela_id); await cargarMaestros(sb, p.escuela_id); }
   if (p.rol === 'superadmin') await cargarEscuelas(sb);
 }
 
@@ -151,6 +151,49 @@ async function cargarMaestros(sb, escuela) {
       <span class="nm">${escapeHtml(u.nombre)}<small>${escapeHtml(u.correo)} · ${ROL[u.rol]}${u.activo ? '' : ' · desactivada'}</small></span></li>`).join('');
 }
 
+// ---------- Director: parciales del semestre (para toda la escuela) ----------
+function seccionPeriodos() {
+  const filas = [1, 2, 3].map((n) => `<div class="per-row"><b>Parcial ${n}</b><input type="date" name="p${n}i" aria-label="Inicio del parcial ${n}"><span>a</span><input type="date" name="p${n}f" aria-label="Fin del parcial ${n}"></div>`).join('');
+  return `<section class="cuenta-sec">
+      <h3>Parciales del semestre</h3>
+      <p class="hint">Las fechas valen para todos los maestros de tu escuela: cada captura cae sola en su parcial.</p>
+      <form class="cuenta-form" data-form="periodos">
+        <label class="per-sem">Semestre <input name="semestre" required placeholder="Ago–Dic 2026" maxlength="40"></label>
+        ${filas}
+        <button class="btn primary" type="submit">Guardar parciales</button>
+        <p class="form-error" data-error></p>
+      </form>
+    </section>`;
+}
+async function cargarPeriodos(sb, escuela) {
+  const f = body().querySelector('[data-form="periodos"]');
+  const { data } = await sb.from('semestres').select('id, nombre, parciales(numero, inicio, fin)').eq('escuela_id', escuela).order('inicio', { ascending: false }).limit(1);
+  const s = data && data[0];
+  if (!s || !f) return;
+  f.elements.semestre.value = s.nombre;
+  for (const p of s.parciales) {
+    if (!f.elements[`p${p.numero}i`]) continue;
+    f.elements[`p${p.numero}i`].value = p.inicio;
+    f.elements[`p${p.numero}f`].value = p.fin;
+  }
+}
+async function guardarPeriodos(sb, f) {
+  const { data: perfil } = await sb.rpc('mi_perfil');
+  const escuela = perfil[0].escuela_id;
+  const pars = [1, 2, 3].map((n) => ({ numero: n, inicio: f.elements[`p${n}i`].value, fin: f.elements[`p${n}f`].value })).filter((p) => p.inicio && p.fin);
+  if (!pars.length) throw new Error('Escribe las fechas de al menos un parcial.');
+  if (pars.some((p) => p.fin < p.inicio)) throw new Error('Cada parcial debe terminar después de empezar.');
+  const nombre = f.elements.semestre.value.trim();
+  const inicio = pars.map((p) => p.inicio).sort()[0];
+  const fin = pars.map((p) => p.fin).sort().at(-1);
+  const { data: sem, error } = await sb.from('semestres').upsert({ escuela_id: escuela, nombre, inicio, fin }, { onConflict: 'escuela_id,nombre' }).select('id').single();
+  if (error) throw error;
+  const r = await sb.from('parciales').upsert(pars.map((p) => ({ ...p, escuela_id: escuela, semestre_id: sem.id })), { onConflict: 'semestre_id,numero' });
+  if (r.error) throw r.error;
+  const quitar = [1, 2, 3, 4, 5, 6].filter((n) => !pars.some((p) => p.numero === n));
+  await sb.from('parciales').delete().eq('semestre_id', sem.id).in('numero', quitar);
+}
+
 // ---------- Superadmin: escuelas ----------
 function seccionEscuelas() {
   return `<section class="cuenta-sec">
@@ -217,6 +260,9 @@ $('#cuenta-body').addEventListener('submit', async (e) => {
       if (error) throw error;
       toast('Sesión iniciada');
       await renderCuenta();
+    } else if (f.dataset.form === 'periodos') {
+      await guardarPeriodos(sb, f);
+      toast('Parciales guardados para toda la escuela');
     } else if (f.dataset.form === 'invitar') {
       const { data: perfil } = await sb.rpc('mi_perfil');
       const correo = v('correo').toLowerCase();

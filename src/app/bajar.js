@@ -48,7 +48,7 @@ export async function bajarDeLaNube(avance = () => {}) {
   const buf = await blob.arrayBuffer();
 
   avance('Bajando tus clases…');
-  const clases = await todas(() => sb.from('clases').select('id, grupo_id, materia, retardo, escala, grupos(nombre)').eq('maestro_id', uid).order('creado_en'));
+  const clases = await todas(() => sb.from('clases').select('id, grupo_id, materia, retardo, escala, config_semestral, grupos(nombre)').eq('maestro_id', uid).order('creado_en'));
   const ids = clases.map((c) => c.id);
   const secciones = ids.length ? await todas(() => sb.from('secciones').select('id, clase_id, nombre, plantilla, porcentaje, minimo, orden').in('clase_id', ids)) : [];
   const secIds = secciones.map((s) => s.id);
@@ -57,6 +57,7 @@ export async function bajarDeLaNube(avance = () => {}) {
   avance('Bajando calificaciones y asistencias…');
   const capturas = ids.length ? await todas(() => sb.from('capturas').select('clase_id, seccion_id, alumno_id, fecha, trabajo_id, valor').in('clase_id', ids).order('id')) : [];
 
+  const cierres = ids.length ? await todas(() => sb.from('cierres').select('id, clase_id, tipo, parcial, calificaciones, cerrado_en, reabierto_en').in('clase_id', ids)) : [];
   avance('Armando tus grupos…');
   const ExcelJS = await loadExcel();
   const wb = new ExcelJS.Workbook();
@@ -74,6 +75,7 @@ export async function bajarDeLaNube(avance = () => {}) {
       inscripciones: inscripciones.filter((i) => i.grupo_id === c.grupo_id).map((i) => ({ alumno_id: i.alumno_id, numero_lista: i.numero_lista, nombre: i.alumnos.nombre })),
       trabajos: trabajos.filter((t) => secciones.some((s) => s.id === t.seccion_id && s.clase_id === c.id)),
       capturas: capturas.filter((x) => x.clase_id === c.id),
+      cierres: cierres.filter((x) => x.clase_id === c.id),
     });
   }
   const fileB64 = bufToB64(buf);

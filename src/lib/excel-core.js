@@ -188,7 +188,7 @@ function parseWorkbook(wb, codes = DEFAULT_CODES, sectionsFor = null) {
     for (let c = hdr.col + 1; c <= lastCol; c++) {
       const ht = norm(cellText(ws.getCell(hdr.row, c).value));
       // Calificaciones: se reconocen para poder reescribirlas.
-      if (/^CALIFICACION SOBRE \d+$/.test(ht) || LEGACY_GRADE.test(ht) ||
+      if (/^CALIFICACION SOBRE \d+$/.test(ht) || /^PARCIAL \d+$/.test(ht) || /^SEMESTRAL SOBRE \d+$/.test(ht) || LEGACY_GRADE.test(ht) ||
         sections.some((s) => new RegExp(`^${reEsc(norm(s.name))} \\d+(\\.\\d+)?%$`).test(ht))) {
         dateCols.push(c);
         continue;
@@ -348,7 +348,7 @@ function finalGrade(g, row, grading) {
 // ---------- Acomodo de columnas ----------
 // Lista de columnas que escribe la app: { col, kind, sec, date, work, block, first, last, label }.
 // kind: 'day' (asistencia y Sí/No por fecha) · 'trab' · 'disc-count' · 'disc-dates' · 'num' · 'grade' (key: id o 'final').
-function sheetLayout(g, grading) {
+function sheetLayout(g, grading, periodos = null) {
   grading = grading || g.grading;
   const secs = sectionsOf(g);
   const out = [];
@@ -409,12 +409,18 @@ function sheetLayout(g, grading) {
     const ps = secs.filter((s) => weightOf(grading, s) > 0);
     ps.forEach((s, i) => out.push({ col: col++, kind: 'grade', key: s.id, sec: s, block: 'grade', first: i === 0, label: `${s.name}\n${weightOf(grading, s)}%` }));
     out.push({ col: col++, kind: 'grade', key: 'final', block: 'grade', first: true, last: true, label: `Calificación\nsobre ${Number(grading.escala) || 10}` });
+    // Con parciales definidos: la calificación de cada parcial y la semestral (cerradas si ya se cerraron).
+    if (periodosListos(periodos)) {
+      out[out.length - 1].last = false;
+      periodos.parciales.forEach((p, i) => out.push({ col: col++, kind: 'grade', key: `p${p.numero}`, parcial: p, block: 'grade', first: i === 0, label: `Parcial ${p.numero}` }));
+      out.push({ col: col++, kind: 'grade', key: 'semestral', block: 'grade', first: true, last: true, label: `Semestral\nsobre ${Number(grading.escala) || 10}` });
+    }
   }
   return out;
 }
 
 // Escribe los datos en una copia del Excel original y devuelve el buffer .xlsx
-async function exportWorkbook(ExcelJS, originalBuffer, groups, codes = DEFAULT_CODES, grading = null) {
+async function exportWorkbook(ExcelJS, originalBuffer, groups, codes = DEFAULT_CODES, grading = null, periodos = null) {
   codes = Object.assign({}, DEFAULT_CODES, codes);
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(originalBuffer);
@@ -458,7 +464,7 @@ async function exportWorkbook(ExcelJS, originalBuffer, groups, codes = DEFAULT_C
     }
 
     const gg = g.grading || grading;
-    const layout = sheetLayout(g, gg);
+    const layout = sheetLayout(g, gg, periodos);
     const headerSrc = ws.getCell(g.headerRow, g.nameCol);
     if (layout.length) {
       const hr = ws.getRow(g.headerRow);
@@ -495,6 +501,14 @@ async function exportWorkbook(ExcelJS, originalBuffer, groups, codes = DEFAULT_C
         } else if (kind.startsWith('disc')) {
           const z = discDates(g, s.row, sec.id);
           v = kind === 'disc-count' ? z.length : (z.map(shortDate).join(', ') || null);
+        } else if (kind === 'grade' && x.parcial) {
+          const c = cierreVigente(g, 'parcial', x.parcial.numero);
+          const raw = c && c.calificaciones[s.row] ? c.calificaciones[s.row].final : finalGrade(enPeriodo(g, x.parcial.inicio, x.parcial.fin), s.row, gg).final;
+          v = raw == null ? null : round1(raw);
+        } else if (kind === 'grade' && x.key === 'semestral') {
+          const c = cierreVigente(g, 'semestre', null);
+          v = c && c.calificaciones[s.row] ? c.calificaciones[s.row].reportada : semestral(g, s.row, gg, periodos, g.semestral).reportada;
+          if (v == null) v = null;
         } else if (kind === 'grade') {
           const r = gradeOf(s.row);
           const raw = isFinal ? r.final : r.parts[x.key];
@@ -804,9 +818,68 @@ function exportGroupReport(ExcelJS, g, grading) {
   return wb.xlsx.writeBuffer();
 }
 
+
+// ---------- Parciales y semestre ----------
+// periodos = { semestre, inicio, fin, parciales: [{ numero, inicio, fin }] } (fechas ISO, inclusivas).
+// Vista del grupo solo con las fechas de un periodo (para calcular la calificación de un parcial).
+function enPeriodo(g, desde, hasta) {
+  const v = Object.assign({}, g);
+  for (const s of sectionsOf(g)) {
+    const datos = g[s.id] || {};
+    v[s.id] = {};
+    for (const d of Object.keys(datos)) if ((!desde || d >= desde) && (!hasta || d <= hasta)) v[s.id][d] = datos[d];
+  }
+  return v;
+}
+const periodosListos = (p) => !!(p && Array.isArray(p.parciales) && p.parciales.length && p.parciales.every((x) => x.inicio && x.fin));
+// Parcial al que pertenece una fecha (número) o null.
+const parcialDe = (p, fecha) => (periodosListos(p) ? (p.parciales.find((x) => fecha >= x.inicio && fecha <= x.fin) || {}).numero || null : null);
+
+// Cierre vigente (no reabierto) de un parcial o del semestre.
+const cierreVigente = (g, tipo, n) => (g.cierres || []).filter((c) => c.tipo === tipo && (c.parcial ?? null) === n && !c.reabierto_en).at(-1) || null;
+const SEMESTRAL = { modo: 'promedio', pesoParciales: 60, pesoFinal: 40, exentoDesde: null, minimo: null, redondeo: 'decimal', reprobado5: false };
+// Calificación semestral de un alumno. config: SEMESTRAL + final: { fila: 0-100 }.
+function semestral(g, row, grading, periodos, config) {
+  grading = Object.assign({}, DEFAULT_GRADING, grading);
+  const c = Object.assign({}, SEMESTRAL, config);
+  const escala = Number(grading.escala) || 10;
+  const parciales = periodosListos(periodos)
+    ? periodos.parciales.map((x) => {
+      // Un parcial cerrado vale lo que quedó al cerrarlo.
+      const c = cierreVigente(g, 'parcial', x.numero);
+      return c && c.calificaciones[row] ? c.calificaciones[row].final : finalGrade(enPeriodo(g, x.inicio, x.fin), row, grading).final;
+    })
+    : [];
+  const con = parciales.filter((v) => v != null);
+  const promedio = con.length ? round1(con.reduce((a, b) => a + b, 0) / con.length) : null;
+  const minimo = c.minimo != null ? Number(c.minimo) : escala * 0.6;
+  let exento = false;
+  let finalEsc = null;
+  let valor = promedio;
+  if (c.modo === 'final' && promedio != null) {
+    exento = c.exentoDesde != null && c.exentoDesde !== '' && promedio >= Number(c.exentoDesde);
+    const f = (c.final || {})[row];
+    finalEsc = f != null && f !== '' ? round1((Number(f) * escala) / 100) : null;
+    if (!exento) {
+      const pp = Number(c.pesoParciales) || 0;
+      const pf = Number(c.pesoFinal) || 0;
+      valor = finalEsc == null || !(pp + pf) ? null : round1((promedio * pp + finalEsc * pf) / (pp + pf));
+    }
+  }
+  let reportada = valor;
+  if (valor != null && c.redondeo === 'entero') reportada = Math.round(valor);
+  if (valor != null && c.reprobado5 && escala === 10 && valor < minimo) reportada = 5;
+  return {
+    parciales, promedio, final: finalEsc, exento, valor, reportada, minimo,
+    aprobado: reportada == null ? null : reportada >= minimo,
+    faltaFinal: c.modo === 'final' && promedio != null && !exento && finalEsc == null,
+  };
+}
+
 export {
     STATUSES, READ, WORK, DEFAULT_CODES, TYPES, ASIST_ID, DEFAULT_SECTIONS, sectionsOf, newSectionId, secMin,
     parseWorkbook, exportWorkbook, groupDates, sheetLayout, worksOf, normalizeWorks, normalizeGroup, hasData, discDates, datesOf, shortDate,
     DEFAULT_GRADING, gradeParts, finalGrade, gradingOn, weightOf, round1, parseHeader, parseDateHeader, cellText,
     studentReport, exportStudent, groupReport, exportGroupReport,
+    enPeriodo, periodosListos, parcialDe, SEMESTRAL, semestral,
 };

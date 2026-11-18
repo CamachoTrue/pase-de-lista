@@ -88,7 +88,7 @@ const valorLocal = (type, v) => (type === 'asist' || type === 'sino' ? v : Numbe
 // Llena un grupo leído del Excel (g) con lo que hay en la nube para su clase. Lo que traía el Excel en
 // columnas de la app se reemplaza por la nube. Alumnos inscritos que no están en el Excel (agregados en
 // la app) se agregan al final. Al terminar, todo queda marcado como ya subido.
-export function armarGrupo(g, { clase, secciones, inscripciones, trabajos, capturas }) {
+export function armarGrupo(g, { clase, secciones, inscripciones, trabajos, capturas, cierres = [] }) {
   g.subject = clase.materia || undefined;
   if (!g.subject) delete g.subject;
   const ordenadas = [...secciones].sort((a, b) => a.orden - b.orden);
@@ -135,8 +135,19 @@ export function armarGrupo(g, { clase, secciones, inscripciones, trabajos, captu
     if (s.type === 'trab') { if (works[c.trabajo_id]) works[c.trabajo_id].vals[row] = v; }
     else (g[s.id][c.fecha] = g[s.id][c.fecha] || {})[row] = v;
   }
+  // Calificación semestral (cómo se saca y exámenes finales) y cierres, con alumnos → filas.
+  const aFila = (obj) => Object.fromEntries(Object.entries(obj || {}).filter(([a]) => filaDe[a] != null).map(([a, v]) => [filaDe[a], v]));
+  const cfg = clase.config_semestral && Object.keys(clase.config_semestral).length ? clase.config_semestral : null;
+  if (cfg) g.semestral = { ...cfg, final: aFila(cfg.final) };
+  g.cierres = [...cierres].sort((a, b) => (a.cerrado_en < b.cerrado_en ? -1 : 1)).map((c) => ({
+    tipo: c.tipo, parcial: c.parcial ?? null, cerrado_en: c.cerrado_en,
+    calificaciones: Object.fromEntries(Object.entries(aFila(c.calificaciones)).map(([row, v]) => [row, v && v.partes
+      ? { ...v, partes: Object.fromEntries(Object.entries(v.partes).map(([k, x]) => [(local[k] || {}).id || k, x])) } : v])),
+    reabierto_en: c.reabierto_en || null, nube_id: c.id, nube_reabierto: !!c.reabierto_en,
+  }));
   // Todo lo que llegó ya está en la nube: se marca como subido.
   g.nube = { clase_id: clase.id, grupo_id: clase.grupo_id, h: {} };
+  if (cfg) g.nube.h.__semestral = huella(JSON.stringify(cfg));
   const ps = planSecciones(g);
   if (ps) g.nube.h.__secciones = ps.hash;
   const p = planDias(g);

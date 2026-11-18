@@ -122,3 +122,58 @@ test('resumen por alumno y del grupo generan su Excel', async () => {
   assert.equal(ws.getCell('B6').value, 'Literatura');
   assert.ok((await L.exportGroupReport(ExcelJS, g, W)).byteLength > 1000);
 });
+
+test('parciales y calificación semestral', () => {
+  const g = { sheet: 'X', students: [{ row: 5, no: '1', name: 'A' }, { row: 6, no: '2', name: 'B' }] };
+  L.normalizeGroup(g);
+  const per = { semestre: 'Ago–Dic 2026', parciales: [
+    { numero: 1, inicio: '2026-08-17', fin: '2026-09-30' },
+    { numero: 2, inicio: '2026-10-01', fin: '2026-11-10' },
+    { numero: 3, inicio: '2026-11-11', fin: '2026-12-18' },
+  ] };
+  const gr = { w: { exam: 100 }, retardo: 100, escala: 10 };
+  g.exam['2026-09-10'] = { 5: 80, 6: 50 };
+  g.exam['2026-10-20'] = { 5: 90, 6: 60 };
+  g.exam['2026-12-01'] = { 5: 100, 6: 70 };
+  assert.equal(L.parcialDe(per, '2026-10-20'), 2);
+  assert.equal(L.finalGrade(L.enPeriodo(g, '2026-10-01', '2026-11-10'), 5, gr).final, 9);
+  // Promedio de parciales.
+  let r = L.semestral(g, 5, gr, per, {});
+  assert.deepEqual([r.parciales, r.promedio, r.reportada, r.aprobado], [[8, 9, 10], 9, 9, true]);
+  r = L.semestral(g, 6, gr, per, {});
+  assert.deepEqual([r.promedio, r.aprobado], [6, true]);
+  // Parciales 60 % + examen final 40 %, exento con 8.5 o más.
+  const cfg = { modo: 'final', pesoParciales: 60, pesoFinal: 40, exentoDesde: 8.5, final: { 6: 40 } };
+  r = L.semestral(g, 5, gr, per, cfg);
+  assert.deepEqual([r.exento, r.reportada], [true, 9]);
+  r = L.semestral(g, 6, gr, per, cfg);
+  assert.deepEqual([r.exento, r.final, r.valor, r.aprobado], [false, 4, 5.2, false]);
+  // Redondeo a entero y reprobados como 5.
+  r = L.semestral(g, 6, gr, per, { ...cfg, redondeo: 'entero', reprobado5: true, final: { 6: 55 } });
+  assert.deepEqual([r.valor, r.reportada], [5.8, 5]);
+  // Sin examen final capturado: falta.
+  r = L.semestral(g, 6, gr, per, { ...cfg, final: {} });
+  assert.deepEqual([r.faltaFinal, r.reportada], [true, null]);
+});
+
+test('el Excel lleva parciales y semestral, y se reconocen al volver a subirlo', async () => {
+  const buf = await listaFicticia();
+  const g = L.parseWorkbook(await load(buf))[0];
+  L.normalizeGroup(g);
+  g.grading = { w: { exam: 100 }, retardo: 100, escala: 10 };
+  const per = { semestre: 'S', parciales: [{ numero: 1, inicio: '2026-08-01', fin: '2026-09-30' }, { numero: 2, inicio: '2026-10-01', fin: '2026-12-31' }] };
+  const [a] = g.students;
+  g.exam['2026-09-10'] = { [a.row]: 80 };
+  g.exam['2026-10-10'] = { [a.row]: 100 };
+  g.cierres = [{ tipo: 'parcial', parcial: 1, calificaciones: { [a.row]: { final: 7 } }, reabierto_en: null }];
+  const out = await L.exportWorkbook(ExcelJS, buf, [g], L.DEFAULT_CODES, null, per);
+  const ws = (await load(out)).getWorksheet('V205');
+  const lay = L.sheetLayout(g, g.grading, per);
+  const col = (k) => lay.find((x) => x.key === k).col;
+  assert.equal(ws.getCell(g.headerRow, col('p1')).value, 'Parcial 1');
+  assert.equal(ws.getCell(a.row, col('p1')).value, 7, 'parcial 1 cerrado manda');
+  assert.equal(ws.getCell(a.row, col('p2')).value, 10);
+  assert.equal(ws.getCell(a.row, col('semestral')).value, 8.5);
+  const g2 = L.parseWorkbook(await load(out), L.DEFAULT_CODES, () => g.sections)[0];
+  assert.equal(g2.dateCols.length, lay.length);
+});

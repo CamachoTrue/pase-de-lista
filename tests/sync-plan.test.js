@@ -109,7 +109,11 @@ test('bajar de la nube arma el grupo igual y lo deja como ya subido', async () =
       { seccion_id: 's-tar', alumno_id: 'a2', fecha: '2026-11-20', trabajo_id: 't2', valor: '50' },
     ],
   };
+  nube.clase.config_semestral = { modo: 'final', pesoParciales: 60, pesoFinal: 40, final: { a2: 75 } };
+  nube.cierres = [{ id: 'k1', tipo: 'parcial', parcial: 1, calificaciones: { a1: { final: 9, partes: { 's-asist': 100 } } }, cerrado_en: '2026-10-01T00:00:00Z', reabierto_en: null }];
   armarGrupo(g, nube);
+  assert.deepEqual(g.semestral.final, { 6: 75 });
+  assert.deepEqual(g.cierres.map((c) => [c.tipo, c.parcial, c.calificaciones, c.nube_id]), [['parcial', 1, { 5: { final: 9, partes: { records: 100 } } }, 'k1']]);
   assert.equal(g.subject, 'Ética');
   assert.deepEqual(g.sections.map((s) => [s.name, s.type]), [['Asistencia', 'asist'], ['Participación', 'sino'], ['Tareas', 'trab']]);
   assert.equal(g.sections[1].min, 3);

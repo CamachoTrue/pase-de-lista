@@ -1,4 +1,5 @@
-import { ASIST_ID, TYPES, finalGrade, newSectionId, normalizeGroup, round1, secMin, sectionsOf, weightOf } from '../lib/excel-core.js';
+import { ASIST_ID, TYPES, enPeriodo, finalGrade, newSectionId, normalizeGroup, periodosListos, round1, secMin, sectionsOf, weightOf } from '../lib/excel-core.js';
+import { cerrar, cierreActivo, fechaCorta, reabrir } from './cierres.js';
 import { confirmBulk } from './dialogs.js';
 import { refresh } from './main-view.js';
 import { gname, group, save, secById, state } from './state.js';
@@ -8,7 +9,10 @@ import { $, escapeHtml, normalize, toast } from './util.js';
 // Cada grupo tiene sus secciones (nombre + plantilla) y cuánto vale cada una. Todo se edita en un
 // borrador: la tabla se actualiza al instante, pero solo se guarda con "Guardar".
 export let gradeDraft = null; // { sections, grading }
-export const snapshot = (g) => JSON.parse(JSON.stringify({ sections: sectionsOf(g), grading: g.grading }));
+export const snapshot = (g) => JSON.parse(JSON.stringify({ sections: sectionsOf(g), grading: g.grading, periodos: state.periodos || null }));
+// Periodo que se ve en la tabla: 0 = todo; 1-3 = parcial.
+let periodoVista = 0;
+const periodosDeEscuela = () => !!(state.periodos && state.periodos.origen === 'escuela');
 export const sameDraft = () => JSON.stringify(gradeDraft) === JSON.stringify(snapshot(group()));
 // Grupo "de prueba" con el borrador, para calcular la tabla sin tocar el grupo real.
 export const draftGroup = () => Object.assign({}, group(), { sections: gradeDraft.sections });
@@ -26,10 +30,68 @@ export function openGrades() {
   const f = $('#grades-form');
   f.elements.retardo.value = String(gradeDraft.grading.retardo);
   f.elements.escala.value = String(gradeDraft.grading.escala);
+  pintarPeriodos();
   renderSecList();
   renderGrades();
   $('#grades').showModal();
 }
+// Fechas de los parciales en el formulario (deshabilitadas si las define la escuela).
+function pintarPeriodos() {
+  const f = $('#grades-form');
+  const p = gradeDraft.periodos || {};
+  const pars = p.parciales || [];
+  f.elements.semestre.value = p.semestre || '';
+  [1, 2, 3].forEach((n) => {
+    const x = pars.find((y) => y.numero === n) || {};
+    f.elements[`p${n}i`].value = x.inicio || '';
+    f.elements[`p${n}f`].value = x.fin || '';
+  });
+  const deEscuela = periodosDeEscuela();
+  ['semestre', 'p1i', 'p1f', 'p2i', 'p2f', 'p3i', 'p3f'].forEach((k) => (f.elements[k].disabled = deEscuela));
+  $('#per-nota').textContent = deEscuela
+    ? 'Las fechas de los parciales las define tu escuela.'
+    : 'Las capturas se acomodan solas en su parcial según la fecha. Valen para todos tus grupos.';
+  $('#per-resumen').textContent = periodosListos(p) ? `· ${p.semestre || 'definidos'}` : '· sin definir';
+}
+function leerPeriodos() {
+  const f = $('#grades-form');
+  const parciales = [1, 2, 3].map((n) => ({ numero: n, inicio: f.elements[`p${n}i`].value, fin: f.elements[`p${n}f`].value }))
+    .filter((x) => x.inicio || x.fin);
+  gradeDraft.periodos = parciales.length || f.elements.semestre.value.trim()
+    ? { semestre: f.elements.semestre.value.trim(), parciales, origen: 'maestro' } : null;
+}
+$('#grades-form').addEventListener('input', (e) => {
+  if (!/^(semestre|p\d[if])$/.test(e.target.name || '')) return;
+  leerPeriodos();
+  renderGrades();
+});
+$('#per-tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-p]');
+  if (!b) return;
+  periodoVista = Number(b.dataset.p);
+  renderGrades();
+});
+$('#per-cierre').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-cierre]');
+  if (!b) return;
+  const g = group();
+  if (!sameDraft()) { toast('Guarda los cambios antes de cerrar el parcial'); return; }
+  if (b.dataset.cierre === 'cerrar') {
+    const p = state.periodos.parciales.find((x) => x.numero === periodoVista);
+    if (!(await confirmBulk(`¿Cerrar el parcial ${periodoVista}?`, 'Las calificaciones de este parcial quedan guardadas como definitivas para este grupo. Si hay que corregir algo, se puede reabrir.', 'Sí, cerrar'))) return;
+    const vista = enPeriodo(g, p.inicio, p.fin);
+    const cal = {};
+    g.students.forEach((s) => { const r = finalGrade(vista, s.row, g.grading); cal[s.row] = { final: r.final, partes: r.parts }; });
+    cerrar(g, 'parcial', periodoVista, cal);
+    toast(`Parcial ${periodoVista} cerrado`);
+  } else {
+    const c = cierreActivo(g, 'parcial', periodoVista);
+    if (!c || !(await confirmBulk(`¿Reabrir el parcial ${periodoVista}?`, 'Las calificaciones vuelven a calcularse con lo capturado. Queda registrado que se reabrió.', 'Sí, reabrir', true))) return;
+    reabrir(c);
+    toast(`Parcial ${periodoVista} reabierto`);
+  }
+  renderGrades();
+});
 export function renderSecList() {
   const g = group();
   $('#sec-list').innerHTML = gradeDraft.sections.map((x, i) => {
@@ -115,6 +177,7 @@ $('#grades-save').addEventListener('click', async () => {
   g.grading = JSON.parse(JSON.stringify(gradeDraft.grading));
   Object.keys(g.grading.w).forEach((id) => { if (!g.sections.some((x) => x.id === id)) delete g.grading.w[id]; });
   normalizeGroup(g);
+  if (!periodosDeEscuela()) state.periodos = gradeDraft.periodos ? JSON.parse(JSON.stringify(gradeDraft.periodos)) : null;
   gradeDraft = snapshot(g);
   if (!secById(state.ui.tab)) state.ui.tab = ASIST_ID;
   save();
@@ -146,6 +209,19 @@ export function renderGrades() {
   btn.disabled = saved;
   btn.textContent = saved ? 'Guardado ✓' : 'Guardar';
   $('#grades-sub').textContent = `${gname(g)} · ${g.students.length} alumnos · sobre ${gr.escala}`;
+  // Pestañas de periodo (si hay parciales definidos) y su cierre.
+  const per = gradeDraft.periodos;
+  const listos = periodosListos(per);
+  if (!listos) periodoVista = 0;
+  $('#per-tabs').innerHTML = listos
+    ? [0, ...per.parciales.map((x) => x.numero)].map((n) => `<button type="button" class="per-tab ${n === periodoVista ? 'on' : ''}" data-p="${n}">${n ? `Parcial ${n}${cierreActivo(g, 'parcial', n) ? ' 🔒' : ''}` : 'Todo'}</button>`).join('')
+    : '';
+  const cierre = periodoVista ? cierreActivo(g, 'parcial', periodoVista) : null;
+  $('#per-cierre').innerHTML = !periodoVista ? ''
+    : cierre ? `<span>🔒 Cerrado el ${fechaCorta(cierre.cerrado_en)}: calificaciones definitivas.</span><button type="button" class="link-btn" data-cierre="reabrir">Reabrir</button>`
+      : `<button type="button" class="btn per-cerrar" data-cierre="cerrar">Cerrar parcial ${periodoVista}</button>`;
+  const pv = periodoVista && listos ? per.parciales.find((x) => x.numero === periodoVista) : null;
+  const vista = pv ? enPeriodo(dg, pv.inicio, pv.fin) : dg;
   const parts = dg.sections.filter((x) => weightOf(gr, x) > 0);
   if (!parts.length) {
     $('#grades-table').innerHTML = '<tbody><tr><td class="grades-empty">Escribe cuánto vale cada sección para ver las calificaciones.</td></tr></tbody>';
@@ -157,7 +233,7 @@ export function renderGrades() {
     parts.map((x) => `<th>${escapeHtml(x.name || 'Sin nombre')}<br><small>${weightOf(gr, x)}%${x.type === 'sino' ? ` · mín. ${secMin(x)}` : ''}</small></th>`).join('') +
     '</tr></thead><tbody>';
   for (const st of g.students) {
-    const r = finalGrade(dg, st.row, gr);
+    const r = cierre && cierre.calificaciones[st.row] ? { final: cierre.calificaciones[st.row].final, parts: cierre.calificaciones[st.row].partes || {} } : finalGrade(vista, st.row, gr);
     html += `<tr><td class="stick">${escapeHtml(st.no)}</td><td class="stick name">${escapeHtml(st.name)}</td><td class="v final">${fmt(r.final)}</td>` +
       parts.map((x) => `<td class="v">${fmt(r.parts[x.id])}</td>`).join('') +
       '</tr>';

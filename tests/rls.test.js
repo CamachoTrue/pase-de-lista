@@ -182,6 +182,8 @@ test('paquete individual: el maestro es su escuela y administra sus periodos', a
 
 test('lo cerrado no se edita; el maestro no ve el precio de su escuela', async () => {
   await as(U.maeA1, `insert into cierres (escuela_id, clase_id, tipo, calificaciones, cerrado_por) select escuela_id, id, 'semestre', '{"a":9}', '${U.maeA1.id}' from clases`);
+  await as(U.maeA1, `insert into cierres (escuela_id, clase_id, tipo, parcial, calificaciones, cerrado_por) select escuela_id, id, 'parcial', 2, '{}', '${U.maeA1.id}' from clases`);
+  await fails(U.maeA1, `insert into cierres (escuela_id, clase_id, tipo, calificaciones, cerrado_por) select escuela_id, id, 'parcial', '{}', '${U.maeA1.id}' from clases`, [], /check/);
   await fails(U.maeA1, `update cierres set calificaciones = '{"a":10}'`, [], /permission denied/);
   await as(U.maeA1, `update cierres set reabierto_en = now(), reabierto_por = '${U.maeA1.id}'`);
   await fails(U.maeA1, 'delete from cierres', [], /permission denied/);

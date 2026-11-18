@@ -9,6 +9,7 @@ en orden; nunca se cambian a mano en el panel.
 | `…0002_permisos.sql` | Row Level Security por escuela y rol, historial automático, invitaciones y registro individual |
 | `…0003_invitacion_publica.sql` | `ver_invitacion(token)` para el enlace (sin sesión) y `mi_perfil()` |
 | `…0005_archivos.sql` | Bucket privado `archivos`: `<escuela>/<usuario>/excel/…` y `/cuadernillos/<clase>.pdf`, cada quien su carpeta |
+| `…0006_cierres_parcial.sql` | Cierres con número de parcial y nombre de semestre (fechas propias del maestro) |
 | `…0004_sincronizar.sql` | `importar_grupo`, `guardar_secciones`, `guardar_trabajos`, `guardar_dias` (security invoker: aplica RLS) |
 
 ## Probar en local (sin tocar el proyecto real)

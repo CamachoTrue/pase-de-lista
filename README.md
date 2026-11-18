@@ -33,6 +33,11 @@ App web instalable (PWA) para pasar lista desde un Excel. Funciona en computador
 - **Cuadernillo del grupo** (⋮ → Cuadernillo del grupo): el maestro sube un PDF por grupo y lo lee en el celular
   (página, zoom, botón "Ver grande" para ver solo el PDF en pantalla completa, recuerda dónde se quedó). Se guarda en el dispositivo (IndexedDB), funciona sin internet y
   se conserva aunque se vuelva a subir el Excel. Visor: PDF.js 3.11.174 en `vendor/pdfjs/`.
+- **Parciales y semestre**: en Secciones y calificaciones → *Parciales del semestre* se ponen las fechas de los 3 parciales
+  (si el maestro tiene cuenta en una escuela, las pone el director en Mi cuenta). La tabla de calificaciones se puede ver por
+  parcial y cada parcial se puede **cerrar** (calificaciones definitivas) y reabrir. En ⋮ → *Calificación semestral* el
+  maestro elige promedio de parciales o parciales + examen final (pesos, exentos desde X, mínimo aprobatorio, entero o
+  decimal, reprobados como 5) y cierra el semestre. El Excel lleva Parcial 1–3 y Semestral.
 - **Confirmación de cambios**: si un alumno ya tenía marca y se elige otra, se pide confirmar.
 - **Vista de lista** para revisar y corregir; tocar un nombre regresa al pase uno por uno desde ahí.
 - **Agregar / quitar alumnos**: los nuevos se agregan al final de la lista del grupo.

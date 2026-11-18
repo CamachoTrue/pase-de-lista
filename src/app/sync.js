@@ -40,7 +40,9 @@ export async function sincronizar() {
     if (error) throw error;
     if (!perfil || !perfil[0] || !perfil[0].escuela_id) { estado.fase = 'sin-escuela'; return; }
     state.nube_usuario = session.user.id;
+    await bajarPeriodos(sb, perfil[0].escuela_id);
     for (const g of state.groups) await subirGrupo(sb, g);
+    for (const g of state.groups) await subirSemestral(sb, g, perfil[0].escuela_id, session.user.id);
     const carpeta = `${perfil[0].escuela_id}/${session.user.id}`;
     await subirExcel(sb, carpeta);
     await subirCuadernillos(sb, carpeta, perfil[0].escuela_id);
@@ -111,6 +113,69 @@ async function subirGrupo(sb, g) {
     estado.subidos += lote.length;
     save(true);
     avisar();
+  }
+}
+
+// ---------- Parciales, calificación semestral y cierres ----------
+// Fechas de parciales que definió la escuela (el director): mandan sobre las del maestro.
+async function bajarPeriodos(sb, escuela) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const { data: sems, error } = await sb.from('semestres').select('id, nombre, inicio, fin, parciales(numero, inicio, fin)').eq('escuela_id', escuela).order('inicio', { ascending: false });
+  if (error) throw error;
+  if (!sems || !sems.length) {
+    if (state.periodos && state.periodos.origen === 'escuela') { state.periodos = null; save(true); }
+    return;
+  }
+  const s = sems.find((x) => x.inicio <= hoy && hoy <= x.fin) || sems[0];
+  const periodos = { semestre: s.nombre, id: s.id, origen: 'escuela',
+    parciales: [...s.parciales].sort((a, b) => a.numero - b.numero).map((p) => ({ numero: p.numero, inicio: p.inicio, fin: p.fin })) };
+  if (JSON.stringify(periodos) !== JSON.stringify(state.periodos)) { state.periodos = periodos; save(true); }
+}
+
+// { fila: x } → { alumno_id: x }
+const porAlumno = (g, obj) => {
+  const id = Object.fromEntries(g.students.filter((s) => s.alumno_id).map((s) => [s.row, s.alumno_id]));
+  return Object.fromEntries(Object.entries(obj || {}).filter(([row]) => id[row]).map(([row, v]) => [id[row], v]));
+};
+
+// En la nube, el desglose por sección de un cierre usa el id de la sección en la nube (igual en todos los celulares).
+const conPartesNube = (g, cal) => {
+  const nubeDe = Object.fromEntries((g.sections || []).map((s) => [s.id, s.nube_id || s.id]));
+  return Object.fromEntries(Object.entries(cal || {}).map(([row, v]) => [row, v && v.partes
+    ? { ...v, partes: Object.fromEntries(Object.entries(v.partes).map(([k, x]) => [nubeDe[k] || k, x])) } : v]));
+};
+
+async function subirSemestral(sb, g, escuela, uid) {
+  const clase = g.nube && g.nube.clase_id;
+  if (!clase) return;
+  // Cómo se saca la semestral (y los exámenes finales), en la clase.
+  if (g.semestral) {
+    const cfg = { ...g.semestral, final: porAlumno(g, g.semestral.final) };
+    const hs = huella(JSON.stringify(cfg));
+    if (g.nube.h.__semestral !== hs) {
+      const { error } = await sb.from('clases').update({ config_semestral: cfg }).eq('id', clase);
+      if (error) throw error;
+      g.nube.h.__semestral = hs;
+      save(true);
+    }
+  }
+  // Cierres nuevos y reaperturas.
+  for (const c of g.cierres || []) {
+    if (!c.nube_id) {
+      const { data, error } = await sb.from('cierres').insert({
+        escuela_id: escuela, clase_id: clase, tipo: c.tipo, parcial: c.parcial || null, semestre: (state.periodos && state.periodos.semestre) || '',
+        calificaciones: porAlumno(g, conPartesNube(g, c.calificaciones)), cerrado_por: uid, cerrado_en: c.cerrado_en,
+      }).select('id').single();
+      if (error) throw error;
+      c.nube_id = data.id;
+      save(true);
+    }
+    if (c.reabierto_en && !c.nube_reabierto) {
+      const { error } = await sb.from('cierres').update({ reabierto_en: c.reabierto_en, reabierto_por: uid }).eq('id', c.nube_id);
+      if (error) throw error;
+      c.nube_reabierto = true;
+      save(true);
+    }
   }
 }
 
