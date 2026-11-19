@@ -2,7 +2,7 @@
 // Todo se guarda primero en el celular (así funciona sin internet). Si hay sesión, lo que cambió se
 // sube solo unos segundos después, al volver el internet y al abrir la app.
 import { alGuardar, fixGrading, save, state } from './state.js';
-import { dispositivo, errorLegible, guardarRol, haySesion, nube } from '../lib/nube.js';
+import { dispositivo, errorLegible, guardarPaquete, guardarRol, haySesion, nube } from '../lib/nube.js';
 import { armarGrupo, diasDeTrabajos, faltaImportar, hayQueBajar, huella, planDias, planSecciones, resumenClase } from '../lib/sync-plan.js';
 import { ASIST_ID, DEFAULT_CODES, normalizeGroup } from '../lib/excel-core.js';
 import { b64ToBuf, toast } from './util.js';
@@ -45,6 +45,7 @@ export async function sincronizar() {
     // Suscripción vencida o escuela desactivada: no se sube nada (los datos siguen en el celular).
     const p0 = perfil[0];
     guardarRol(p0.rol);
+    guardarPaquete(p0.paquete);
     if (!p0.activa || (p0.vence_el && p0.vence_el < new Date().toISOString().slice(0, 10))) { estado.fase = 'vencida'; return; }
     state.nube_usuario = session.user.id;
     await bajarPeriodos(sb, perfil[0].escuela_id);

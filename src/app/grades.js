@@ -4,6 +4,7 @@ import { confirmBulk } from './dialogs.js';
 import { refresh } from './main-view.js';
 import { gname, group, save, secById, state } from './state.js';
 import { $, escapeHtml, normalize, toast } from './util.js';
+import { paqueteGuardado } from '../lib/nube.js';
 
 // ---------- Secciones y calificaciones ----------
 // Cada grupo tiene sus secciones (nombre + plantilla) y cuánto vale cada una. Todo se edita en un
@@ -13,6 +14,10 @@ export const snapshot = (g) => JSON.parse(JSON.stringify({ sections: sectionsOf(
 // Periodo que se ve en la tabla: 0 = todo; 1-3 = parcial.
 let periodoVista = 0;
 const periodosDeEscuela = () => !!(state.periodos && state.periodos.origen === 'escuela');
+// Maestro de una escuela (con director): las fechas normalmente las pone el director. Se pueden
+// cambiar, pero primero se avisa. El maestro independiente las cambia libremente.
+const deUnaEscuela = () => paqueteGuardado() === 'empresarial';
+let desbloqueado = false;
 export const sameDraft = () => JSON.stringify(gradeDraft) === JSON.stringify(snapshot(group()));
 // Grupo "de prueba" con el borrador, para calcular la tabla sin tocar el grupo real.
 export const draftGroup = () => Object.assign({}, group(), { sections: gradeDraft.sections });
@@ -26,6 +31,7 @@ export function secDataCount(g, sec) {
 
 export function openGrades() {
   gradeDraft = snapshot(group());
+  desbloqueado = false;
   $('#grades-scope').textContent = `Secciones de ${gname(group())} y cuánto vale cada una. Cada grupo tiene las suyas.`;
   const f = $('#grades-form');
   f.elements.retardo.value = String(gradeDraft.grading.retardo);
@@ -47,10 +53,13 @@ function pintarPeriodos() {
     f.elements[`p${n}f`].value = x.fin || '';
   });
   const deEscuela = periodosDeEscuela();
-  ['semestre', 'p1i', 'p1f', 'p2i', 'p2f', 'p3i', 'p3f'].forEach((k) => (f.elements[k].disabled = deEscuela));
+  const avisar = !deEscuela && deUnaEscuela() && !desbloqueado;
+  ['semestre', 'p1i', 'p1f', 'p2i', 'p2f', 'p3i', 'p3f'].forEach((k) => (f.elements[k].disabled = deEscuela || avisar));
   $('#per-nota').textContent = deEscuela
-    ? 'Las fechas de los parciales las define tu escuela.'
+    ? 'Las fechas de los parciales las puso tu director para toda la escuela. Si alguna está mal, pídele que la cambie.'
+    : avisar ? 'En tu escuela, las fechas de los parciales normalmente las pone el director para todos. Tu director aún no las ha puesto.'
     : 'Las capturas se acomodan solas en su parcial según la fecha. Valen para todos tus grupos.';
+  $('#per-desbloquear').hidden = !avisar;
   $('#per-resumen').textContent = periodosListos(p) ? `· ${p.semestre || 'definidos'}` : '· sin definir';
 }
 function leerPeriodos() {
@@ -60,6 +69,14 @@ function leerPeriodos() {
   gradeDraft.periodos = parciales.length || f.elements.semestre.value.trim()
     ? { semestre: f.elements.semestre.value.trim(), parciales, origen: 'maestro' } : null;
 }
+$('#per-desbloquear').addEventListener('click', async () => {
+  if (!(await confirmBulk('¿Seguro que quieres cambiar los parciales?',
+    'Por lo general las fechas las pone el director para toda la escuela. Si las pone después, las suyas reemplazan las tuyas.',
+    'Sí, cambiarlas yo'))) return;
+  desbloqueado = true;
+  pintarPeriodos();
+  $('#grades-form').elements.semestre.focus();
+});
 $('#grades-form').addEventListener('input', (e) => {
   if (!/^(semestre|p\d[if])$/.test(e.target.name || '')) return;
   leerPeriodos();

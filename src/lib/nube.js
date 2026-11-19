@@ -27,6 +27,10 @@ export const haySesion = () => !DEMO && !!almacen.getItem(SESION);
 const ROL = 'cuenta.rol';
 export const rolGuardado = () => (DEMO ? rolDemo() : haySesion() ? seguro(() => localStorage.getItem(ROL)) : null);
 export const guardarRol = (r) => !DEMO && seguro(() => (r ? localStorage.setItem(ROL, r) : localStorage.removeItem(ROL)));
+// Paquete de la cuenta: 'empresarial' = de una escuela (con director); 'individual' = independiente.
+const PAQUETE = 'cuenta.paquete';
+export const paqueteGuardado = () => (DEMO ? (DEMO === 'independiente' ? 'individual' : 'empresarial') : haySesion() ? seguro(() => localStorage.getItem(PAQUETE)) : null);
+export const guardarPaquete = (p) => !DEMO && seguro(() => (p ? localStorage.setItem(PAQUETE, p) : localStorage.removeItem(PAQUETE)));
 
 // Identificador de este dispositivo (no es personal): la nube anota qué dispositivo cambió cada clase
 // para que los demás sepan que hay algo nuevo que bajar, sin volver a bajar sus propios cambios.

@@ -4,6 +4,7 @@ import { openAddStudent, openRemoveStudent } from './students.js';
 import { openSubject } from './subject.js';
 import { $, toast } from './util.js';
 import { rolGuardado } from '../lib/nube.js';
+import { DEMO } from '../lib/demo.js';
 import { setVistaApp } from './state.js';
 import { render } from './main-view.js';
 
@@ -12,7 +13,11 @@ import { render } from './main-view.js';
 const abrir = (carga, fn) => carga().then((m) => m[fn]()).catch((e) => { console.error(e); toast('No se pudo abrir. Revisa tu conexión e inténtalo otra vez.'); });
 export const openCuenta = () => abrir(() => import('./cuenta.js'), 'openCuenta');
 export const menu = $('#menu');
-$('#menu-btn').addEventListener('click', () => { $('#menu-escuela').hidden = rolGuardado() !== 'director'; menu.showModal(); });
+$('#menu-btn').addEventListener('click', () => {
+  $('#menu-escuela').hidden = rolGuardado() !== 'director';
+  $('#menu-salir-demo').hidden = !DEMO;
+  menu.showModal();
+});
 document.querySelectorAll('dialog').forEach((d) =>
   d.addEventListener('click', (e) => {
     if (e.target === d || e.target.dataset.action === 'close') d.close();
@@ -35,6 +40,7 @@ menu.addEventListener('click', (e) => {
   if (action === 'settings') openSettings();
   if (action === 'cuenta') openCuenta();
   if (action === 'escuela') { setVistaApp('escuela'); render(); }
+  if (action === 'salir-demo') location.href = '/';
   if (action === 'semestral') abrir(() => import('./semestral.js'), 'openSemestral');
   if (action === 'new-file') {
     if (confirm('Se reemplazará la lista actual y su asistencia guardada. Exporta antes si la necesitas. ¿Continuar?')) {

@@ -4,7 +4,7 @@
 // la sincronización con la cuenta llega en la etapa 4.
 import { $, escapeHtml, toast } from './util.js';
 import { confirmBulk } from './dialogs.js';
-import { errorLegible, guardarRol, nube, recordar, rolGuardado, setRecordar } from '../lib/nube.js';
+import { errorLegible, guardarPaquete, guardarRol, nube, recordar, rolGuardado, setRecordar } from '../lib/nube.js';
 import { alCambiarEstado, estado, programar, sincronizar } from './sync.js';
 import { save, setVistaApp, state } from './state.js';
 import { DEMO, PERFIL_DEMO } from '../lib/demo.js';
@@ -29,7 +29,7 @@ async function renderCuenta() {
   try { sb = await nube(); } catch { return sinConexion(); }
   const { data: { session } } = await sb.auth.getSession();
   perfil = null;
-  if (!session) { cambiarRol(null); return renderEntrar(); }
+  if (!session) { cambiarRol(null); guardarPaquete(null); return renderEntrar(); }
   const { data, error } = await sb.rpc('mi_perfil');
   if (error) {
     if (/fetch|network/i.test(error.message || '')) return sinConexion(session.user.email);
@@ -38,6 +38,7 @@ async function renderCuenta() {
   }
   const p = data && data[0];
   cambiarRol(p ? p.rol : null);
+  guardarPaquete(p ? p.paquete : null);
   if (!p) {
     $('#cuenta-sub').textContent = session.user.email;
     body().innerHTML = `<div class="cuenta-card"><b>Tu cuenta aún no pertenece a una escuela</b>
@@ -447,7 +448,12 @@ $('#cuenta-body').addEventListener('click', async (e) => {
   if (!b) return;
   const act = b.dataset.act;
   if (act === 'ir-escuela') { setVistaApp('escuela'); $('#cuenta').close(); render(); return; }
-  if (DEMO) { toast(act === 'salir' || act === 'eliminar' ? 'Es una demostración: cierra esta pestaña para salir' : 'Demostración: aquí no se guarda nada'); return; }
+  if (DEMO) {
+    // Cerrar sesión en la demostración = volver a tu propia app (con tu cuenta y tus datos).
+    if (act === 'salir') { location.href = '/'; return; }
+    toast('Demostración: aquí no se guarda nada');
+    return;
+  }
   const token = (b.closest('[data-token]') || {}).dataset?.token;
   if (act === 'subir') sincronizar();
   if (act === 'registro') renderRegistro();
