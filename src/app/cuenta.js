@@ -6,7 +6,8 @@ import { $, escapeHtml, toast } from './util.js';
 import { confirmBulk } from './dialogs.js';
 import { errorLegible, guardarRol, nube, recordar, rolGuardado, setRecordar } from '../lib/nube.js';
 import { alCambiarEstado, estado, programar, sincronizar } from './sync.js';
-import { save, setVistaApp, state, ui } from './state.js';
+import { save, setVistaApp, state } from './state.js';
+import { DEMO, PERFIL_DEMO } from '../lib/demo.js';
 import { bajarDeLaNube, clasesEnLaNube } from './bajar.js';
 import { render } from './main-view.js';
 
@@ -17,6 +18,7 @@ const enlace = (token) => `${location.origin}/?invitacion=${token}`;
 
 export async function openCuenta() {
   $('#cuenta').showModal();
+  if (DEMO) { renderDemo(); return; }
   await renderCuenta();
 }
 
@@ -75,6 +77,7 @@ function textoNube() {
     case 'error': return ['mal', `No se pudo guardar en tu cuenta: ${estado.error}`];
     case 'otra-cuenta': return ['mal', 'Las listas de este celular son de otra cuenta, así que no se suben a esta.'];
     case 'sin-escuela': return ['espera', 'Tu cuenta aún no pertenece a una escuela.'];
+    case 'ejemplo': return ['espera', 'Estás usando la lista de ejemplo: no se guarda en tu cuenta. Cuando quieras, sube tu Excel con ⋮ → Cargar otro archivo.'];
     case 'vencida': return ['', '']; // ya lo dice el aviso de la suscripción
     case 'listo': return ['ok', `Todo guardado en tu cuenta ✓${hace ? ` · ${hace}` : ''}`];
     default: return ['', 'Tus listas se guardan en este celular y en tu cuenta.'];
@@ -222,64 +225,33 @@ function renderRegistro() {
 }
 
 // ---------- Director: maestros e invitaciones ----------
-// ---------- Superadmin: ver la app como cada rol (vista previa con datos de ejemplo) ----------
+// ---------- Superadmin: abrir la app como cada rol (demostración en otra pestaña) ----------
 function seccionVerComo() {
+  const ir = (rol, txt) => `<a class="btn" href="/?demo=${rol}" target="_blank" rel="noopener">${txt} ↗</a>`;
   return `<section class="cuenta-sec">
-      <h3>Ver la app como…</h3>
-      <p class="hint">Para darte una idea o enseñarla: así ve <i>Mi cuenta</i> cada tipo de usuario. Son datos de ejemplo y no se guarda nada.</p>
-      <div class="ver-como">
-        <button class="btn" data-act="ver-como" data-rol="director">Director</button>
-        <button class="btn" data-act="ver-como" data-rol="maestro">Maestro de escuela</button>
-        <button class="btn" data-act="ver-como" data-rol="individual">Maestro independiente</button>
-      </div>
-      <a class="btn dir-link" href="/director?ejemplo=1" target="_blank" rel="noopener">Panel del director con escuela de ejemplo ↗</a>
+      <h3>Abrir la app como…</h3>
+      <p class="hint">Se abre en otra pestaña tal como la ve alguien que entra con ese rol, con datos de ejemplo. Lo que hagas ahí se borra al cerrarla y no toca tus datos.</p>
+      <div class="ver-como">${ir('director', 'Director')}${ir('maestro', 'Maestro de escuela')}${ir('independiente', 'Maestro independiente')}</div>
     </section>`;
 }
 
+// «Mi cuenta» en la demostración: el perfil de ejemplo de ese rol.
 const enDias = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
-const EJEMPLO = {
-  director: { nombre: 'Mtra. Laura Gómez', correo: 'direccion@prepaejemplo.mx', rol: 'director', escuela: 'Preparatoria de Ejemplo', clave: 'EJEMPLO', paquete: 'empresarial' },
-  maestro: { nombre: 'Prof. Jorge Méndez', correo: 'jorge.mendez@prepaejemplo.mx', rol: 'maestro', escuela: 'Preparatoria de Ejemplo', clave: 'EJEMPLO', paquete: 'empresarial' },
-  individual: { nombre: 'Mtra. Ana Ruiz', correo: 'ana.ruiz@correo.com', rol: 'maestro', escuela: 'Mtra. Ana Ruiz', clave: 'I7K2Q9X', paquete: 'individual' },
-};
-const PUEDE = {
-  director: [
-    'Todo lo que hace un maestro, si también da clases.',
-    'Invitar maestros por enlace (WhatsApp) hasta las cuentas contratadas, y quitar invitaciones.',
-    'Poner las fechas de los 3 parciales del semestre para toda la escuela.',
-    'Abrir el panel de la escuela: alumnos, asistencia, promedios, semáforo de riesgo, maestros que no capturan y la ficha de cada alumno con todas sus materias.',
-  ],
-  maestro: [
-    'Subir su Excel con las listas: cada hoja es un grupo.',
-    'Pasar lista uno por uno o en lista completa (asistencia, falta, retardo, justificado), con o sin internet.',
-    'Calificar por secciones con porcentajes: lecturas, trabajos, disciplina, examen…',
-    'Ver parciales y calificación semestral (promedio o con examen final), cerrar y reabrir parciales.',
-    'Resumen por alumno y del grupo, exportar a Excel y ver el cuadernillo en PDF.',
-    'Todo se guarda en su cuenta y aparece en sus otros dispositivos.',
-  ],
-  individual: [
-    'Lo mismo que un maestro de escuela, pero sin director: él mismo pone sus parciales.',
-    'Se registra solo y tiene días de prueba gratis; después paga su suscripción.',
-    'No aparece en el panel de ninguna escuela.',
-  ],
-};
-const ROL_TXT = { director: 'director', maestro: 'maestro de escuela', individual: 'maestro independiente' };
-
-function renderVistaPrevia(tipo) {
-  const p = { ...EJEMPLO[tipo], escuela_id: 'ejemplo', activa: true, vence_el: tipo === 'individual' ? enDias(12) : null };
-  $('#cuenta-sub').textContent = `Vista previa · ${ROL_TXT[tipo]}`;
-  let html = `<div class="nube-estado espera vista-aviso"><span>Vista previa: así ve <i>Mi cuenta</i> un ${ROL_TXT[tipo]}. Datos de ejemplo; aquí no se guarda nada.</span>
-      <button class="link-btn" data-act="volver-panel">Volver a mi panel</button></div>
-    <div class="vista-previa">
+function renderDemo() {
+  const p = { ...PERFIL_DEMO[DEMO], escuela_id: 'demo', activa: true, vence_el: DEMO === 'independiente' ? enDias(12) : null };
+  $('#cuenta-sub').textContent = p.correo;
+  const listas = !!(state && state.groups && state.groups.length);
+  body().innerHTML = `<div class="cuenta-demo">
     <div class="cuenta-card">
       <b>${escapeHtml(p.nombre)}</b><small>${escapeHtml(p.correo)}</small>
       <span class="rol-badge">${ROL[p.rol]}</span>
       <div class="cuenta-escuela">${escapeHtml(p.escuela)} · ${escapeHtml(p.clave)}</div>
     </div>
     ${avisoSuscripcion(p)}
-    <div class="nube-estado ok"><span>Todo guardado en tu cuenta ✓ · 8:15 a.m.</span><button class="link-btn" data-act="subir">Guardar ahora</button></div>`;
-  html += `<section class="cuenta-sec"><h3>Lo que puede hacer</h3><ul class="vista-puede">${PUEDE[tipo].map((t) => `<li>${t}</li>`).join('')}</ul></section>`;
-  body().innerHTML = html + btnSalir() + btnEliminar() + '</div>';
+    <div class="nube-estado ${listas ? 'ok' : ''}"><span>${listas ? 'Todo guardado en tu cuenta ✓' : 'Aún no hay listas en este celular. Cuando subas tu Excel se guardarán también en tu cuenta.'}</span></div>
+    ${p.rol === 'director' ? `<button class="btn primary big" data-act="ir-escuela">Ir a mi escuela</button>
+      <p class="hint">Ahí ves el resumen de la escuela, invitas maestros, les das o quitas acceso y pones los parciales.</p>` : ''}
+    ${btnSalir()}${btnEliminar()}</div>`;
 }
 
 // ---------- Superadmin: escuelas ----------
@@ -390,7 +362,6 @@ async function copiar(texto) {
 $('#cuenta-body').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
-  if (f.closest('.vista-previa')) { toast('Vista previa: aquí no se guarda nada'); return; }
   const err = f.querySelector('[data-error]');
   const btn = f.querySelector('[type=submit]');
   err.textContent = '';
@@ -475,13 +446,8 @@ $('#cuenta-body').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const act = b.dataset.act;
-  if (act === 'volver-panel') { renderCuenta(); return; }
-  if (act === 'ver-como') {
-    if (b.dataset.rol === 'director') { $('#cuenta').close(); ui.escuela = 'ejemplo'; render(); return; }
-    renderVistaPrevia(b.dataset.rol); body().scrollTop = 0; return;
-  }
   if (act === 'ir-escuela') { setVistaApp('escuela'); $('#cuenta').close(); render(); return; }
-  if (b.closest('.vista-previa')) { toast('Vista previa: aquí no se hace nada'); return; }
+  if (DEMO) { toast(act === 'salir' || act === 'eliminar' ? 'Es una demostración: cierra esta pestaña para salir' : 'Demostración: aquí no se guarda nada'); return; }
   const token = (b.closest('[data-token]') || {}).dataset?.token;
   if (act === 'subir') sincronizar();
   if (act === 'registro') renderRegistro();

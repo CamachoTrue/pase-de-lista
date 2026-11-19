@@ -1,5 +1,6 @@
 import { ASIST_ID, DEFAULT_GRADING, sectionsOf } from '../lib/excel-core.js';
 import { toast } from './util.js';
+import { almacenApp, sufijoDemo } from '../lib/demo.js';
 
 export const LABELS = { A: 'Asistencia', F: 'Falta', R: 'Retardo', J: 'Justificado' };
 // Opciones de captura según la plantilla de la sección: valor guardado, texto del botón y color (clase A/F/R/J/N).
@@ -63,7 +64,7 @@ export const fixGrading = (gr) => JSON.parse(JSON.stringify({ ...DEFAULT_GRADING
 export const gname = (g) => (g.subject ? `${g.sheet} · ${g.subject}` : g.sheet);
 // En el selector: con materia se omite el número de alumnos para que quepa el nombre.
 export const glabel = (g) => (g.subject ? gname(g) : `${g.sheet} · ${g.students.length} alumnos`);
-export const STORE_KEY = 'paseDeLista.v1';
+export const STORE_KEY = `paseDeLista.v1${sufijoDemo}`;
 
 // ---------- Estado ----------
 // { fileName, fileB64, groups, codes, ui: { group, date } }
@@ -71,15 +72,15 @@ export let state = load();
 // Reemplaza todo el estado (al subir otro archivo).
 export function setState(s) { state = s; }
 // Estado de la pantalla que comparten varios módulos.
-export const ui = { view: 'card', cardIdx: 0, busy: false, studentRow: null, escuela: null };
+export const ui = { view: 'card', cardIdx: 0, busy: false, studentRow: null };
 // Director: ¿ve su escuela o sus grupos? (se recuerda en este dispositivo)
-const VISTA = 'app.vista';
-export const vistaApp = () => { try { return localStorage.getItem(VISTA); } catch { return null; } };
-export const setVistaApp = (v) => { try { localStorage.setItem(VISTA, v); } catch { /* sin almacenamiento */ } };
+const VISTA = `app.vista${sufijoDemo}`;
+export const vistaApp = () => { try { return almacenApp().getItem(VISTA); } catch { return null; } };
+export const setVistaApp = (v) => { try { almacenApp().setItem(VISTA, v); } catch { /* sin almacenamiento */ } };
 
 export function load() {
   try {
-    const raw = localStorage.getItem(STORE_KEY);
+    const raw = almacenApp().getItem(STORE_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) { /* almacenamiento no disponible */ }
   return null;
@@ -89,7 +90,7 @@ const oyentes = [];
 export const alGuardar = (fn) => oyentes.push(fn);
 // silencioso: guardar sin avisar (la propia sincronización guarda sus marcas así, para no repetirse).
 export function save(silencioso = false) {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+  try { almacenApp().setItem(STORE_KEY, JSON.stringify(state)); }
   catch (e) { toast('No se pudo guardar en el dispositivo'); }
   if (!silencioso) oyentes.forEach((fn) => fn());
 }

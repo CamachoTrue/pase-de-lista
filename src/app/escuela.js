@@ -3,11 +3,12 @@
 //   Resumen   → el mismo panel de /director (alumnos, asistencia, promedios, riesgo, maestros).
 //   Maestros  → invitar, ver invitaciones y dar o quitar acceso a cada maestro.
 //   Parciales → fechas de los parciales del semestre para toda la escuela.
-// Con ui.escuela === 'ejemplo' (el administrador la ve "como director") todo es de ejemplo y no se guarda nada.
+// En la demostración de director (/?demo=director) la escuela es de ejemplo y no se guarda nada.
 import '../director/director.css';
 import { crearPanel, escuelaDeEjemplo, leerEscuela } from '../director/panel.js';
 import { errorLegible, nube } from '../lib/nube.js';
-import { setVistaApp, ui } from './state.js';
+import { setVistaApp } from './state.js';
+import { DEMO } from '../lib/demo.js';
 import { $, escapeHtml, toast } from './util.js';
 import { render } from './main-view.js';
 import { openCuenta } from './menu.js';
@@ -15,7 +16,7 @@ import { openCuenta } from './menu.js';
 const ROL = { director: 'Director', maestro: 'Maestro' };
 const fecha = (iso) => new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
 const enlace = (token) => `${location.origin}/?invitacion=${token}`;
-const ejemplo = () => ui.escuela === 'ejemplo';
+const ejemplo = () => DEMO === 'director';
 const main = () => $('#esc-main');
 
 let pestaña = 'resumen';
@@ -26,9 +27,6 @@ let cargado = { resumen: false, maestros: false, parciales: false };
 export async function openEscuela() {
   $('#screen-escuela').hidden = false;
   if (!main().dataset.listo) armar();
-  $('#esc-aviso').innerHTML = ejemplo()
-    ? `<div class="nube-estado espera esc-ejemplo"><span>Vista previa: así ve la app un <b>director</b>. Datos de ejemplo; aquí no se guarda nada.</span>
-       <button class="link-btn" data-esc="salir-ejemplo">Salir de la vista previa</button></div>` : '';
   cargado = { resumen: false, maestros: false, parciales: false };
   perfil = null;
   await mostrarPestaña(pestaña);
@@ -248,16 +246,8 @@ $('#esc-tabs').addEventListener('click', (e) => {
 });
 $('#esc-cuenta').addEventListener('click', openCuenta);
 $('#esc-grupos').addEventListener('click', () => {
-  if (ejemplo()) { toast('Vista previa: aquí el director pasaría a sus grupos'); return; }
   setVistaApp('grupos');
   render();
-});
-$('#esc-aviso').addEventListener('click', (e) => {
-  if (!e.target.closest('[data-esc="salir-ejemplo"]')) return;
-  ui.escuela = null;
-  $('#screen-escuela').hidden = true;
-  render();
-  openCuenta();
 });
 
 main().addEventListener('click', async (e) => {
@@ -267,7 +257,7 @@ main().addEventListener('click', async (e) => {
   if (!b) return;
   const act = b.dataset.esc;
   if (act === 'actualizar') { cargado[pestaña] = false; await mostrarPestaña(pestaña); return; }
-  if (ejemplo()) { toast('Vista previa: aquí no se hace nada'); return; }
+  if (ejemplo()) { toast('Demostración: aquí no se guarda nada'); return; }
   const token = (b.closest('[data-token]') || {}).dataset?.token;
   if (act === 'copiar') copiar(enlace(token));
   if (act === 'enviar') compartir(token);
@@ -295,7 +285,7 @@ main().addEventListener('submit', async (e) => {
   const f = e.target;
   const err = f.querySelector('[data-error]');
   const btn = f.querySelector('[type=submit]');
-  if (ejemplo()) { toast('Vista previa: aquí no se guarda nada'); return; }
+  if (ejemplo()) { toast('Demostración: aquí no se guarda nada'); return; }
   err.textContent = '';
   btn.disabled = true;
   try {

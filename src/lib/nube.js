@@ -1,3 +1,5 @@
+import { DEMO, rolDemo } from './demo.js';
+
 // Conexión con Supabase. La librería (~40 KB) se carga solo cuando se usa la cuenta, no al abrir la app.
 // La URL y la clave publicable son públicas por diseño: los permisos los cuida la base de datos (RLS).
 export const SUPABASE_URL = 'https://nwgswikzkuuhhisdqbjq.supabase.co';
@@ -19,12 +21,12 @@ const almacen = {
   removeItem: (k) => seguro(() => { localStorage.removeItem(k); sessionStorage.removeItem(k); }),
 };
 // ¿Hay una sesión guardada? (sin cargar la librería)
-export const haySesion = () => !!almacen.getItem(SESION);
+export const haySesion = () => !DEMO && !!almacen.getItem(SESION);
 
 // Rol de la cuenta (para abrir la pantalla correcta sin esperar a internet).
 const ROL = 'cuenta.rol';
-export const rolGuardado = () => (haySesion() ? seguro(() => localStorage.getItem(ROL)) : null);
-export const guardarRol = (r) => seguro(() => (r ? localStorage.setItem(ROL, r) : localStorage.removeItem(ROL)));
+export const rolGuardado = () => (DEMO ? rolDemo() : haySesion() ? seguro(() => localStorage.getItem(ROL)) : null);
+export const guardarRol = (r) => !DEMO && seguro(() => (r ? localStorage.setItem(ROL, r) : localStorage.removeItem(ROL)));
 
 // Identificador de este dispositivo (no es personal): la nube anota qué dispositivo cambió cada clase
 // para que los demás sepan que hay algo nuevo que bajar, sin volver a bajar sus propios cambios.
@@ -40,6 +42,7 @@ export function dispositivo() {
 
 let cliente = null;
 export async function nube() {
+  if (DEMO) throw new Error('Demostración: sin conexión a la cuenta.');
   if (!cliente) {
     cliente = import('@supabase/supabase-js').then(({ createClient }) => createClient(SUPABASE_URL, SUPABASE_KEY, {
       auth: { storage: almacen, storageKey: SESION, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },

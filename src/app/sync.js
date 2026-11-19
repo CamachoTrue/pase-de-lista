@@ -37,6 +37,8 @@ export async function sincronizar() {
     if (!session) { estado.fase = 'inactivo'; return; }
     // Los datos de este celular son de una sola cuenta: si entra otra, no se mezclan.
     if (state.nube_usuario && state.nube_usuario !== session.user.id) { estado.fase = 'otra-cuenta'; return; }
+    // La lista de ejemplo no se sube (son alumnos inventados).
+    if (state.ejemplo) { estado.fase = 'ejemplo'; return; }
     const { data: perfil, error } = await sb.rpc('mi_perfil');
     if (error) throw error;
     if (!perfil || !perfil[0] || !perfil[0].escuela_id) { estado.fase = 'sin-escuela'; return; }

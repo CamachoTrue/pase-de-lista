@@ -539,8 +539,6 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .cuenta-legal a { color: inherit; }
 
 .ver-como { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-.vista-aviso { position: sticky; top: 0; z-index: 2; }
-.vista-puede { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 
 /* ---------- Computadora: el diseño es para celular; en pantallas grandes se aprovecha el ancho ---------- */
 .kbd-hint { display: none; }
@@ -590,8 +588,6 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 #esc-main { padding: 8px 14px; display: flex; flex-direction: column; gap: 12px; }
 #esc-main [data-pane] { display: flex; flex-direction: column; gap: 12px; }
 #esc-main [data-pane][hidden] { display: none; }
-#esc-aviso:empty { display: none; }
-#esc-aviso { padding: 10px 14px 0; }
 .esc-acciones { display: flex; justify-content: space-between; gap: 8px; }
 .esc-acciones a.link-btn { text-decoration: none; }
 .esc-pasos ol { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }

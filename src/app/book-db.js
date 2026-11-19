@@ -1,9 +1,11 @@
 // Cuadernillos PDF guardados en el celular (IndexedDB, una entrada por grupo = nombre de la hoja).
 // Aparte de la pantalla del cuadernillo para que la sincronización lo use sin cargar esa pantalla.
+import { sufijoDemo } from '../lib/demo.js';
+
 export const bookDB = (() => {
   let p;
   const open = () => (p = p || new Promise((res, rej) => {
-    const r = indexedDB.open('paseDeLista', 1);
+    const r = indexedDB.open(`paseDeLista${sufijoDemo}`, 1);
     r.onupgradeneeded = () => r.result.createObjectStore('cuadernillos');
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);

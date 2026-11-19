@@ -1,6 +1,7 @@
 import { ASIST_ID, DEFAULT_CODES, normalizeGroup } from './lib/excel-core.js';
 import { render } from './app/main-view.js';
 import { fixGrading, state, todayISO } from './app/state.js';
+import { DEMO } from './lib/demo.js';
 import './app/util.js';
 import './app/dialogs.js';
 import './app/upload.js';
@@ -29,13 +30,17 @@ if (state) {
   });
   delete state.grading;
 }
+// Demostración (otra pestaña): se nota en el título de la pestaña.
+if (DEMO) document.title = `Demostración · ${document.title}`;
+// Demostración nueva (pestaña recién abierta): sin cuadernillos de una demostración anterior.
+if (DEMO && !state) try { indexedDB.deleteDatabase(`paseDeLista.demo.${DEMO}`); } catch { /* sin IndexedDB */ }
 render();
 // Cambios que llegaron de otro dispositivo.
 window.addEventListener('nube-cambio', () => render());
 
 // Enlace de invitación (?invitacion=TOKEN): abre la pantalla para crear la cuenta.
 const invitacion = new URLSearchParams(location.search).get('invitacion');
-if (invitacion && /^[0-9a-f-]{36}$/i.test(invitacion)) import('./app/cuenta.js').then((m) => m.openInvitacion(invitacion));
+if (!DEMO && invitacion && /^[0-9a-f-]{36}$/i.test(invitacion)) import('./app/cuenta.js').then((m) => m.openInvitacion(invitacion));
 
 // En desarrollo (npm run dev) no hay service worker: la lista de archivos solo existe al construir.
 if (import.meta.env.PROD && 'serviceWorker' in navigator && location.protocol !== 'file:') {

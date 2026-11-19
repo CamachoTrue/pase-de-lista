@@ -2,17 +2,23 @@ import { STATUSES } from '../lib/excel-core.js';
 import { renderCard, renderStudents, startCard } from './card.js';
 import { renderCompact } from './compact.js';
 import { OPTIONS, dayData, dayRecords, fmtDate, glabel, group, save, secs, state, tab, typeOf, ui, vistaApp } from './state.js';
-import { rolGuardado } from '../lib/nube.js';
+import { haySesion, rolGuardado } from '../lib/nube.js';
+import { DEMO } from '../lib/demo.js';
 import { $, escapeHtml } from './util.js';
 
 // ---------- Render ----------
 // El director ve su escuela (no necesita grupos), salvo que elija "Mis grupos" porque también da clases.
-export const vistaEscuela = () => ui.escuela === 'ejemplo' || (rolGuardado() === 'director' && vistaApp() !== 'grupos');
+export const vistaEscuela = () => rolGuardado() === 'director' && vistaApp() !== 'grupos';
 
 export function render() {
   const escuela = vistaEscuela();
   $('#screen-escuela').hidden = !escuela;
   $('#upload-escuela').hidden = rolGuardado() !== 'director';
+  // Con la sesión ya iniciada no se dice "Ya tengo cuenta: entrar".
+  const dentro = haySesion() || !!DEMO;
+  $('#upload-cuenta').textContent = dentro ? 'Mi cuenta' : 'Ya tengo cuenta: entrar';
+  $('#upload-cuenta-hint').textContent = dentro ? 'Si ya usas la app en otro celular, en Mi cuenta puedes bajar tus grupos y calificaciones.'
+    : 'Si ya usas la app en otro celular, entra para bajar tus grupos y calificaciones.';
   if (escuela) {
     $('#screen-upload').hidden = true;
     $('#screen-main').hidden = true;

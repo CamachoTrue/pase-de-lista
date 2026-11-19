@@ -24,9 +24,11 @@
         <input type="file" id="file-input" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
       </label>
       <p class="hint">Formato .xlsx · La columna “NOMBRE” se detecta sola.</p>
+      <button class="btn big" id="upload-ejemplo">Probar con una lista de ejemplo</button>
+      <p class="hint">Para conocer la app sin tu Excel. No se guarda en tu cuenta; cuando quieras, sube tu archivo.</p>
       <button class="btn big upload-cuenta" id="upload-cuenta">Ya tengo cuenta: entrar</button>
       <button class="btn big" id="upload-escuela" hidden>‹ Volver a mi escuela</button>
-      <p class="hint">Si ya usas la app en otro celular, entra para bajar tus grupos y calificaciones.</p>
+      <p class="hint" id="upload-cuenta-hint">Si ya usas la app en otro celular, entra para bajar tus grupos y calificaciones.</p>
     </div>
   </section>
 
@@ -39,7 +41,6 @@
         <button class="btn" id="esc-cuenta">Mi cuenta</button>
       </div>
     </header>
-    <div id="esc-aviso"></div>
     <nav class="esc-tabs" id="esc-tabs" aria-label="Secciones de la escuela">
       <button class="esc-tab on" data-tab="resumen">Resumen</button>
       <button class="esc-tab" data-tab="maestros">Maestros</button>
