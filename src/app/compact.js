@@ -35,6 +35,7 @@ export function renderCompact() {
   }).join('');
   if (disc || exam) filterCompact();
   updateFillRest();
+  $('#azar-btn').hidden = t !== 'sino' || !lista().length;
 }
 
 // ---------- Botón "restantes" (lecturas: No · trabajos: 0) ----------
@@ -260,3 +261,63 @@ $('#work-del').addEventListener('click', async () => {
 
 $('#compact-preview').addEventListener('click', () => openPreview('todo'));
 $('#compact-export').addEventListener('click', () => openExportar());
+
+// ---------- Alumno al azar (secciones Sí/No): como cuando el maestro escoge a quién le toca participar ----------
+// No repite a nadie en el mismo día y sección hasta que ya pasaron todos; los que faltaron no salen.
+const salieron = new Map();
+let elegido = null;
+const claveAzar = () => `${group().sheet}|${state.ui.date}|${tab()}`;
+const quieto = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function pintarAzar() {
+  const s = elegido;
+  const v = s ? dayData(tab(), false)[s.row] : null;
+  $('#azar-info').textContent = s ? `No. ${s.no}${v ? ` · ya tiene “${v === 'S' ? 'Sí' : 'No'}” hoy` : ''}` : '';
+  $('#azar-marcar').hidden = !s;
+  document.querySelectorAll('#azar [data-azar="S"], #azar [data-azar="N"]').forEach((b) => b.classList.toggle('on', b.dataset.azar === v));
+}
+function elegirAlAzar() {
+  const att = dayData(ASIST_ID, false);
+  const presentes = lista().filter((s) => att[s.row] !== 'F');
+  if (!presentes.length) { toast('No hay alumnos presentes para elegir'); return; }
+  const k = claveAzar();
+  let ya = salieron.get(k) || new Set();
+  let opciones = presentes.filter((s) => !ya.has(s.row));
+  if (!opciones.length) { ya = new Set(); opciones = presentes; toast('Ya pasaron todos: empieza otra ronda'); }
+  const s = opciones[Math.floor(Math.random() * opciones.length)];
+  ya.add(s.row);
+  salieron.set(k, ya);
+  elegido = null;
+  const nombre = $('#azar-nombre');
+  const quedan = opciones.length - 1;
+  $('#azar-sec').textContent = `${secById(tab()).name} · ${quedan ? `faltan ${quedan} por pasar` : 'es el último de la ronda'}`;
+  pintarAzar();
+  if (!$('#azar').open) $('#azar').showModal();
+  const mostrar = () => {
+    elegido = s;
+    nombre.className = 'azar-nombre listo';
+    nombre.textContent = s.name;
+    if (navigator.vibrate) navigator.vibrate(20);
+    pintarAzar();
+  };
+  if (quieto() || presentes.length < 2) { mostrar(); return; }
+  // Unos nombres pasan rápido, como una ruleta, antes de detenerse en el elegido.
+  nombre.className = 'azar-nombre girando';
+  let n = 0;
+  const vuelta = setInterval(() => {
+    nombre.textContent = presentes[Math.floor(Math.random() * presentes.length)].name;
+    if (++n >= 10) { clearInterval(vuelta); mostrar(); }
+  }, 70);
+}
+$('#azar-btn').addEventListener('click', elegirAlAzar);
+$('#azar').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-azar]');
+  if (!b) return;
+  if (b.dataset.azar === 'otro') { elegirAlAzar(); return; }
+  if (!elegido) return;
+  const day = dayData(tab(), true);
+  day[elegido.row] = b.dataset.azar;
+  if (save() === false) { $('#azar').close(); return; } // sin acceso: no se guardó
+  refresh();
+  pintarAzar();
+  toast(`${elegido.name}: ${b.dataset.azar === 'S' ? 'Sí' : 'No'}`);
+});

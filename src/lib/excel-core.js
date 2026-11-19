@@ -31,7 +31,7 @@ const TYPES = {
 const ASIST_ID = 'records';
 const DEFAULT_SECTIONS = () => [
   { id: ASIST_ID, name: 'Asistencia', type: 'asist' },
-  { id: 'lect', name: 'Lecturas', type: 'sino', min: 4 },
+  { id: 'lect', name: 'Participaciones', type: 'sino', min: 4 },
   { id: 'trab', name: 'Trabajos', type: 'trab' },
   { id: 'disc', name: 'Disciplina', type: 'disc' },
   { id: 'exam', name: 'Examen', type: 'num' },
@@ -86,7 +86,7 @@ function parseHeader(v, sections = DEFAULT_SECTIONS()) {
   // Encabezados de versiones anteriores de la app.
   const first = (type) => sections.find((s) => s.type === type);
   if (/^ASIST/.test(R) && asist) return { date, sec: asist.id };
-  if (/^LECT/.test(R) && first('sino')) return { date, sec: first('sino').id };
+  if (/^(LECT|PARTICIP)/.test(R) && first('sino')) return { date, sec: first('sino').id };
   if (/^TRAB/.test(R) && first('trab')) return { date, sec: first('trab').id, title: titleOf() };
   if (/^EXAM/.test(R) && first('num')) return { date, sec: first('num').id };
   return null;

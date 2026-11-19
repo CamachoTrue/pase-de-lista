@@ -623,6 +623,22 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 #menu-btn[data-nube="mal"]::after, #esc-cuenta[data-nube="mal"]::after { background: var(--F); }
 @keyframes latido { 50% { opacity: .35; } }
 
+/* Alumno al azar (Sí/No) */
+.azar-btn { display: block; width: 100%; margin-top: 10px; font-weight: 700; }
+#azar { text-align: center; }
+#azar .btn { width: 100%; margin-top: 8px; }
+.azar-sec { margin: 0; }
+.azar-nombre { font-size: 1.5rem; font-weight: 800; line-height: 1.2; min-height: 3.6em; display: grid; place-items: center; padding: 8px 0; }
+.azar-nombre.girando { color: var(--muted); }
+.azar-nombre.listo { animation: azar-sale .35s ease-out; }
+@keyframes azar-sale { from { transform: scale(.85); opacity: .4; } }
+.azar-info { margin: 0 0 6px; min-height: 1.3em; }
+.azar-marcar { gap: 8px; }
+.azar-marcar .btn { margin-top: 0; }
+.azar-si.on { background: var(--A); border-color: var(--A); color: #fff; }
+.azar-no.on { background: var(--F); border-color: var(--F); color: #fff; }
+@media (prefers-reduced-motion: reduce) { .azar-nombre.listo { animation: none; } }
+
 /* Dar de baja (menú ⋮) */
 .bajas-lista { margin: 8px 0; }
 .bajas-lista li { align-items: center; justify-content: space-between; cursor: default; }

@@ -90,6 +90,8 @@
       <ul class="compact-list" id="compact-list"></ul>
       <!-- Al terminar de marcar a los que sí: los que quedan en blanco reciben No / 0 de una vez -->
       <div class="fill-rest-box" id="fill-rest" hidden></div>
+      <!-- Sí/No: elegir a un alumno al azar (para que participe) -->
+      <button class="btn azar-btn" id="azar-btn" hidden>🎲 Elegir un alumno al azar</button>
       <p class="hint compact-empty" id="compact-empty" hidden>Ningún alumno coincide.</p>
       <footer class="bottombar">
         <button class="btn" id="compact-preview">Vista previa</button>
@@ -189,6 +191,19 @@
       <button class="btn primary" id="exp-ok">Exportar</button>
     </div>
     <button class="btn" data-action="close">Cancelar</button>
+  </dialog>
+
+  <!-- Alumno al azar para participar (src/app/compact.js) -->
+  <dialog id="azar" aria-label="Alumno al azar">
+    <p class="hint azar-sec" id="azar-sec"></p>
+    <div class="azar-nombre" id="azar-nombre" aria-live="polite"></div>
+    <p class="hint azar-info" id="azar-info"></p>
+    <div class="row azar-marcar" id="azar-marcar">
+      <button class="btn azar-si" data-azar="S">Sí participó</button>
+      <button class="btn azar-no" data-azar="N">No</button>
+    </div>
+    <button class="btn primary" data-azar="otro">🎲 Otro alumno</button>
+    <button class="btn" data-action="close">Cerrar</button>
   </dialog>
 
   <!-- Dar de baja / reactivar alumnos (src/app/bajas.js) -->

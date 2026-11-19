@@ -24,7 +24,7 @@ if (state) {
   if (!state.ui.tab) state.ui.tab = ASIST_ID;
   state.codes = { ...DEFAULT_CODES, ...state.codes };
   // Versiones anteriores: porcentajes de todo el archivo y 5 secciones fijas. Cada grupo queda con su copia
-  // y con sus secciones (las de siempre: Asistencia, Lecturas, Trabajos, Disciplina y Examen).
+  // y con sus secciones (las de siempre: Asistencia, Participaciones, Trabajos, Disciplina y Examen).
   state.groups.forEach((g) => {
     g.grading = fixGrading(g.grading || state.grading);
     normalizeGroup(g, g.grading);
