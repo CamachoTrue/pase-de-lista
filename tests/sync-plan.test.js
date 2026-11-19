@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeGroup } from '../src/lib/excel-core.js';
-import { faltaImportar, planSecciones, planDias, diasDeTrabajos } from '../src/lib/sync-plan.js';
+import { claseBorrada, faltaImportar, hayQueBajar, planSecciones, planDias, diasDeTrabajos } from '../src/lib/sync-plan.js';
 
 function grupo() {
   const g = { sheet: 'V205', students: [{ row: 5, no: '1', name: 'ANA' }, { row: 6, no: '2', name: 'BETO' }], grading: { w: { records: 50, trab: 50 }, retardo: 100, escala: 10 } };
@@ -186,4 +186,16 @@ test('actualizar un grupo ya ligado conserva sus secciones, alumnos y cuadernill
   assert.equal(planSecciones(g), null);
   const p = planDias(g);
   assert.deepEqual([p.dias.length, p.trabajos.length, faltaImportar(g)], [0, 0, false]);
+});
+
+test('clase borrada en la nube: el grupo se vuelve a ligar; sin clase aún o sin consulta, no', () => {
+  const g = { nube: { clase_id: 'c1' } };
+  assert.equal(claseBorrada(g, { c1: {}, c2: {} }), false);
+  assert.equal(claseBorrada(g, { c2: {} }), true);
+  assert.equal(claseBorrada({ nube: {} }, { c2: {} }), false);
+  assert.equal(claseBorrada({}, {}), false);
+  assert.equal(claseBorrada(g, null), false);
+  // Ya ligado a la clase correcta, la baja completa aunque nadie más la haya cambiado.
+  assert.equal(hayQueBajar({ nube: { clase_id: 'c2', religar: true } }, {}, 'yo'), true);
+  assert.equal(hayQueBajar({ nube: { religar: true } }, {}, 'yo'), false);
 });

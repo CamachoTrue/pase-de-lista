@@ -88,9 +88,14 @@ export const ultimoCambio = (cambios, sinEste = null) =>
 // ¿Hay que bajar la clase? Sí, si otro dispositivo la cambió después de lo que ya tiene este.
 export function hayQueBajar(g, cambios, este) {
   if (!g.nube || !g.nube.clase_id) return false;
+  if (g.nube.religar) return true; // se volvió a ligar: baja su clase completa
   const otro = ultimoCambio(cambios, este);
   return !!otro && (!g.nube.visto || new Date(otro) > new Date(g.nube.visto));
 }
+
+// ¿La clase de este grupo ya no existe en la cuenta (se juntó con otra o se borró)? Entonces el grupo
+// se vuelve a ligar: se importa otra vez y el servidor lo pone en la clase que el maestro tiene en ese grupo.
+export const claseBorrada = (g, cambios) => !!(g.nube && g.nube.clase_id && cambios && !(g.nube.clase_id in cambios));
 
 // ---------- Bajar de la nube (dispositivo nuevo) ----------
 const normNombre = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();

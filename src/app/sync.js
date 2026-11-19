@@ -3,7 +3,7 @@
 // sube solo unos segundos después, al volver el internet y al abrir la app.
 import { alGuardar, fixGrading, save, state } from './state.js';
 import { dispositivo, errorLegible, guardarAcceso, guardarPaquete, guardarRol, haySesion, nube } from '../lib/nube.js';
-import { armarGrupo, diasDeTrabajos, faltaImportar, hayQueBajar, huella, planDias, planSecciones, resumenClase } from '../lib/sync-plan.js';
+import { armarGrupo, claseBorrada, diasDeTrabajos, faltaImportar, hayQueBajar, huella, planDias, planSecciones, resumenClase } from '../lib/sync-plan.js';
 import { ASIST_ID, DEFAULT_CODES, normalizeGroup } from '../lib/excel-core.js';
 import { guardarApariencia, leerApariencia } from '../lib/apariencia.js';
 import { b64ToBuf, toast } from './util.js';
@@ -54,6 +54,9 @@ export async function sincronizar() {
     state.nube_usuario = session.user.id;
     await bajarPeriodos(sb, perfil[0].escuela_id);
     await sincronizarAjustes(sb, session.user.id);
+    // Grupos cuya clase ya no está en la cuenta (se juntó con otra): se vuelven a ligar y bajan la clase correcta.
+    const enLaNube = await cambiosEnLaNube(sb, session.user.id);
+    state.groups.forEach((g) => { if (claseBorrada(g, enLaNube)) g.nube = { religar: true }; });
     for (const g of state.groups) await subirGrupo(sb, g);
     for (const g of state.groups) await subirSemestral(sb, g, perfil[0].escuela_id, session.user.id);
     const carpeta = `${perfil[0].escuela_id}/${session.user.id}`;
@@ -98,6 +101,9 @@ async function subirGrupo(sb, g) {
     g.students.forEach((s, i) => { s.alumno_id = r.alumnos[i]; });
     save(true);
   }
+  // Grupo que se volvió a ligar a otra clase: no se sube nada (su configuración vieja reemplazaría la
+  // de la nube); primero se baja la clase tal como está y después ya se sincroniza normal.
+  if (g.nube.religar) return;
   // 1b. Bajas: se guardan en la inscripción (su historial se conserva). Solo las que cambiaron.
   const subidas = g.nube.bajas || {};
   const cambios = g.students.filter((s) => s.alumno_id && (s.baja || null) !== (subidas[s.alumno_id] || null));
@@ -216,7 +222,7 @@ const criteriosNube = (g, cr) => {
 
 async function subirSemestral(sb, g, escuela, uid) {
   const clase = g.nube && g.nube.clase_id;
-  if (!clase) return;
+  if (!clase || g.nube.religar) return;
   // Cómo se saca la semestral (y los exámenes finales), en la clase.
   if (g.semestral) {
     const cfg = { ...g.semestral, final: porAlumno(g, g.semestral.final) };
@@ -252,7 +258,7 @@ async function subirSemestral(sb, g, escuela, uid) {
 // Resumen de la clase para el panel del director (solo si cambió).
 async function subirResumen(sb, g, escuela) {
   const clase = g.nube && g.nube.clase_id;
-  if (!clase) return;
+  if (!clase || g.nube.religar) return;
   const { datos, ultima } = resumenClase(g, state.periodos);
   const hs = huella(JSON.stringify([datos, ultima]));
   if (g.nube.h.__resumen === hs) return;
@@ -286,7 +292,7 @@ async function subirCuadernillos(sb, carpeta, escuela) {
   const st = sb.storage.from('archivos');
   for (const g of state.groups) {
     const clase = g.nube && g.nube.clase_id;
-    if (!clase) continue;
+    if (!clase || g.nube.religar) continue;
     let rec = null;
     try { rec = await bookDB.get(g.sheet); } catch { /* sin IndexedDB */ }
     const ruta = `${carpeta}/cuadernillos/${clase}.pdf`;
@@ -408,7 +414,7 @@ async function revisar() {
     ]);
     const este = dispositivo();
     const ajustes = yo && yo.ajustes_en && yo.ajustes_en !== state.nube_ajustes_en;
-    if (ajustes || state.groups.some((g) => hayQueBajar(g, cambios[g.nube && g.nube.clase_id], este))) sincronizar();
+    if (ajustes || state.groups.some((g) => claseBorrada(g, cambios) || hayQueBajar(g, cambios[g.nube && g.nube.clase_id], este))) sincronizar();
   } catch { /* sin conexión: se intenta en la siguiente vuelta */ }
 }
 setInterval(revisar, 15000);

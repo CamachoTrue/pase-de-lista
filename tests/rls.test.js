@@ -370,6 +370,29 @@ test('eliminar mi cuenta: el independiente borra todo; el de escuela solo su usu
   assert.equal((await as(U.maeB, 'select count(*)::int n from escuelas'))[0].n, 1); // otras escuelas intactas
 });
 
+test('una clase por grupo: con o sin materia, el maestro no parte lo capturado en dos clases', async () => {
+  const lista = JSON.stringify([{ numero: '1', nombre: 'Carla Ruiz' }]);
+  const imp = async (materia) => (await as(U.maeB, 'select importar_grupo($1, $2, $3::jsonb) r', ['M102', materia, lista]))[0].r;
+  const materia = async (c) => (await db.query('select materia from clases where id = $1', [c])).rows[0].materia;
+  const sinMateria = await imp('');
+  // Otro dispositivo ya con materia: adopta la clase que no tenía materia (no crea otra).
+  const conMateria = await imp('Taller');
+  assert.equal(conMateria.clase_id, sinMateria.clase_id);
+  assert.equal(await materia(sinMateria.clase_id), 'Taller');
+  // Un dispositivo sin materia se liga a la única clase del grupo, y no le borra la materia.
+  assert.equal((await imp('')).clase_id, sinMateria.clase_id);
+  const c = sinMateria.clase_id;
+  const sec = (id) => JSON.stringify([{ id, local: 'records', nombre: 'Asistencia', plantilla: 'asist', porcentaje: 100, orden: 0 }]);
+  const [{ guardar_secciones: s1 }] = await as(U.maeB, 'select guardar_secciones($1, $2, 100, 10, $3::jsonb)', [c, '', sec(null)]);
+  assert.equal(await materia(c), 'Taller');
+  // Sección con el id de otra clase (dispositivo que se volvió a ligar): se reconoce por nombre.
+  const [{ guardar_secciones: s2 }] = await as(U.maeB, 'select guardar_secciones($1, $2, 100, 10, $3::jsonb)', [c, 'Taller', sec(id(999))]);
+  assert.equal(s2.records, s1.records);
+  assert.equal((await db.query('select count(*)::int n from secciones where clase_id = $1', [c])).rows[0].n, 1);
+  // Otra materia distinta para el mismo grupo sí es otra clase.
+  assert.notEqual((await imp('Inglés')).clase_id, c);
+});
+
 test('todas las tablas tienen RLS activo', async () => {
   const r = await db.query(`select relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity`);
