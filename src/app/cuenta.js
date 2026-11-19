@@ -264,7 +264,7 @@ function renderDemo() {
     ${avisoSuscripcion(p)}
     <div class="nube-estado ${listas ? 'ok' : ''}"><span>${listas ? 'Todo guardado en tu cuenta ✓' : 'Aún no hay listas en este celular. Cuando subas tu Excel se guardarán también en tu cuenta.'}</span></div>
     ${p.rol === 'director' ? btnsDirector() : ''}
-    ${btnSalir()}${btnEliminar()}</div>`;
+    <button class="btn primary cuenta-salir" data-act="salir">‹ Salir de la demostración</button>${btnEliminar()}</div>`;
 }
 
 // ---------- Superadmin: escuelas ----------

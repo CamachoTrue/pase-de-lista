@@ -657,3 +657,4 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .vista-acc { display: flex; gap: 6px; }
 .exp-grupos { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 8px; font-size: .9rem; }
 .exp-grupos[hidden] { display: none; }
+.btn-cuenta { flex: none; padding: 10px 12px; font-size: .85rem; font-weight: 700; white-space: nowrap; }
