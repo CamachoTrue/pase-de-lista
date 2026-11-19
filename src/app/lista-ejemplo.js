@@ -48,7 +48,7 @@ export async function listaDeEjemplo(cargarLibro) {
   // Unos días ya capturados para que los resúmenes y el semáforo tengan qué mostrar.
   const dias = diasAnteriores(6);
   for (const g of state.groups) {
-    // Porcentajes de ejemplo (el maestro los cambia en Secciones y calificaciones).
+    // Porcentajes de ejemplo (el maestro los cambia en Criterios de evaluación).
     g.grading.w = { records: 20, lect: 20, trab: 40, disc: 10, exam: 10 };
     const nivel = Object.fromEntries(g.students.map((s) => [s.row, rnd() < 0.15 ? 0.55 : 0.92]));
     for (const d of dias) {

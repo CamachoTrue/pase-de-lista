@@ -25,7 +25,7 @@ function render() {
   const body = $('#sem-body');
   if (!periodosListos(per)) {
     body.innerHTML = `<div class="cuenta-card"><b>Faltan las fechas de los parciales</b>
-      <small>Defínelas en Secciones y calificaciones → Parciales del semestre.</small></div>
+      <small>Defínelas en Criterios de evaluación → Parciales del semestre.</small></div>
       <button class="btn" data-sem="ir-parciales">Definir parciales</button>`;
     $('#sem-cerrar').hidden = true;
     return;

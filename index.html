@@ -159,7 +159,7 @@
     <button class="menu-item cuenta-item" data-action="escuela" id="menu-escuela" hidden>Mi escuela (director)</button>
     <button class="menu-item cuenta-item" data-action="cuenta" id="menu-cuenta">Mi cuenta</button>
     <button class="menu-item" data-action="subject">Materia de este grupo</button>
-    <button class="menu-item" data-action="grades">Secciones y calificaciones</button>
+    <button class="menu-item" data-action="grades">Criterios de evaluación</button>
     <button class="menu-item" data-action="semestral">Calificación semestral</button>
     <button class="menu-item" data-action="group-report">Resumen del grupo (semáforo)</button>
     <button class="menu-item" data-action="student">Resumen por alumno</button>
@@ -248,11 +248,11 @@
     </div>
   </dialog>
 
-  <!-- Calificaciones: porcentaje de cada apartado y calificación de cada alumno -->
+  <!-- Criterios de evaluación: porcentaje de cada sección, parciales y su cierre -->
   <dialog id="grades" class="fullscreen">
     <div class="preview-head">
       <div>
-        <h2>Secciones y calificaciones</h2>
+        <h2>Criterios de evaluación</h2>
         <p class="hint" id="grades-sub"></p>
       </div>
       <button class="icon-btn" data-action="close" aria-label="Cerrar">✕</button>
@@ -280,7 +280,6 @@
       </details>
     </form>
     <div class="per-bar"><div class="per-tabs" id="per-tabs"></div><div class="per-cierre" id="per-cierre"></div></div>
-    <div class="preview-scroll"><table class="sheet grades-table" id="grades-table"></table></div>
     <div class="row">
       <button class="btn" data-action="close">Cerrar</button>
       <button class="btn primary" id="grades-save">Guardar</button>

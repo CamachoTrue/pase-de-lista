@@ -6,12 +6,12 @@ import { gname, group, save, secById, state } from './state.js';
 import { $, escapeHtml, normalize, toast } from './util.js';
 import { paqueteGuardado, rolGuardado } from '../lib/nube.js';
 
-// ---------- Secciones y calificaciones ----------
+// ---------- Criterios de evaluación ----------
 // Cada grupo tiene sus secciones (nombre + plantilla) y cuánto vale cada una. Todo se edita en un
-// borrador: la tabla se actualiza al instante, pero solo se guarda con "Guardar".
+// borrador: solo se guarda con "Guardar".
 export let gradeDraft = null; // { sections, grading }
 export const snapshot = (g) => JSON.parse(JSON.stringify({ sections: sectionsOf(g), grading: g.grading, periodos: state.periodos || null }));
-// Periodo que se ve en la tabla: 0 = todo; 1-3 = parcial.
+// Parcial elegido para cerrar o reabrir (0 = sin parciales).
 let periodoVista = 0;
 const periodosDeEscuela = () => !!(state.periodos && state.periodos.origen === 'escuela');
 // Maestro de una escuela (con director): las fechas las pone solo el director. El maestro
@@ -201,7 +201,6 @@ $('#grades').addEventListener('close', () => {
 });
 export function renderGrades() {
   const g = group();
-  const dg = draftGroup();
   const gr = gradeDraft.grading;
   const total = draftTotal();
   const saved = sameDraft();
@@ -220,38 +219,14 @@ export function renderGrades() {
   // Pestañas de periodo (si hay parciales definidos) y su cierre.
   const per = gradeDraft.periodos;
   const listos = periodosListos(per);
+  // Sin «Todo»: aquí solo se elige qué parcial cerrar (de inicio, el primero sin cerrar).
   if (!listos) periodoVista = 0;
+  else if (!per.parciales.some((x) => x.numero === periodoVista)) periodoVista = (per.parciales.find((x) => !cierreActivo(g, 'parcial', x.numero)) || per.parciales[0]).numero;
   $('#per-tabs').innerHTML = listos
-    ? [0, ...per.parciales.map((x) => x.numero)].map((n) => `<button type="button" class="per-tab ${n === periodoVista ? 'on' : ''}" data-p="${n}">${n ? `Parcial ${n}${cierreActivo(g, 'parcial', n) ? ' 🔒' : ''}` : 'Todo'}</button>`).join('')
+    ? per.parciales.map((x) => x.numero).map((n) => `<button type="button" class="per-tab ${n === periodoVista ? 'on' : ''}" data-p="${n}">${n ? `Parcial ${n}${cierreActivo(g, 'parcial', n) ? ' 🔒' : ''}` : 'Todo'}</button>`).join('')
     : '';
   const cierre = periodoVista ? cierreActivo(g, 'parcial', periodoVista) : null;
   $('#per-cierre').innerHTML = !periodoVista ? ''
     : cierre ? `<span>🔒 Cerrado el ${fechaCorta(cierre.cerrado_en)}: calificaciones definitivas.</span><button type="button" class="link-btn" data-cierre="reabrir">Reabrir</button>`
       : `<button type="button" class="btn per-cerrar" data-cierre="cerrar">Cerrar parcial ${periodoVista}</button>`;
-  const pv = periodoVista && listos ? per.parciales.find((x) => x.numero === periodoVista) : null;
-  const vista = pv ? enPeriodo(dg, pv.inicio, pv.fin) : dg;
-  const parts = dg.sections.filter((x) => weightOf(gr, x) > 0);
-  if (!parts.length) {
-    $('#grades-table').innerHTML = '<tbody><tr><td class="grades-empty">Escribe cuánto vale cada sección para ver las calificaciones.</td></tr></tbody>';
-    return;
-  }
-  const fmt = (v) => (v == null ? '—' : round1(v));
-  // La calificación final va junto al nombre para que se vea sin desplazar en el celular.
-  let html = '<thead><tr><th class="stick">No.</th><th class="stick name">Nombre</th><th class="final">Calif.</th>' +
-    parts.map((x) => `<th>${escapeHtml(x.name || 'Sin nombre')}<br><small>${weightOf(gr, x)}%${x.type === 'sino' ? ` · mín. ${secMin(x)}` : ''}</small></th>`).join('') +
-    '</tr></thead><tbody>';
-  for (const st of g.students) {
-    const r = cierre && cierre.calificaciones[st.row] ? { final: cierre.calificaciones[st.row].final, parts: cierre.calificaciones[st.row].partes || {} } : finalGrade(vista, st.row, gr);
-    html += `<tr><td class="stick">${escapeHtml(st.no)}</td><td class="stick name">${escapeHtml(st.name)}</td><td class="v final">${fmt(r.final)}</td>` +
-      parts.map((x) => `<td class="v">${fmt(r.parts[x.id])}</td>`).join('') +
-      '</tr>';
-  }
-  const t = $('#grades-table');
-  t.innerHTML = html + '</tbody>';
-  // No. y Nombre fijos al desplazar a la derecha.
-  const w = t.querySelector('thead th.stick').offsetWidth;
-  t.querySelectorAll('tr').forEach((tr) => {
-    tr.children[0].style.left = '0px';
-    tr.children[1].style.left = `${w}px`;
-  });
 }

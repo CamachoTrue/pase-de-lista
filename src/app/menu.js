@@ -43,7 +43,7 @@ menu.addEventListener('click', async (e) => {
   if (action === 'salir-demo') location.href = '/';
   if (action === 'semestral') abrir(() => import('./semestral.js'), 'openSemestral');
   if (action === 'new-file') {
-    if (await confirmBulk('¿Cargar otro archivo Excel?', 'Se reemplazan las listas de este celular por las del archivo nuevo. Si solo cambia de parcial, no hace falta: ciérralo en «Secciones y calificaciones». Exporta antes si necesitas un respaldo.', 'Sí, elegir archivo', true)) $('#file-input').click();
+    if (await confirmBulk('¿Cargar otro archivo Excel?', 'Se reemplazan las listas de este celular por las del archivo nuevo. Si solo cambia de parcial, no hace falta: ciérralo en «Criterios de evaluación». Exporta antes si necesitas un respaldo.', 'Sí, elegir archivo', true)) $('#file-input').click();
   }
 });
 

@@ -434,7 +434,7 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .sheet.gr-sheet td { white-space: normal; vertical-align: middle; }
 .sheet.gr-sheet td[colspan] { white-space: nowrap; }
 
-/* Editor de secciones (en Secciones y calificaciones) */
+/* Editor de secciones (en Criterios de evaluación) */
 .grades-form { max-height: 52dvh; overflow: auto; padding-right: 2px; }
 .sec-list { display: flex; flex-direction: column; gap: 6px; }
 .sec-row { border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--bg); }
