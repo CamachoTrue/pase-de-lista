@@ -167,7 +167,7 @@ test('actualizar un grupo ya ligado conserva sus secciones, alumnos y cuadernill
   const nube = {
     clase: { id: 'clase', grupo_id: 'g1', materia: '', retardo: 100, escala: 10, cambios: { compu: '2026-11-21T08:00:00+00:00' } },
     secciones: g.sections.map((s, i) => ({ id: s.nube_id, nombre: s.name, plantilla: s.type, porcentaje: (g.grading.w[s.id] || 0), minimo: s.type === 'sino' ? 4 : null, orden: i })),
-    inscripciones: [{ alumno_id: 'al-5', numero_lista: '1', nombre: 'ANA MARÍA' }, { alumno_id: 'al-6', numero_lista: '2', nombre: 'BETO' }],
+    inscripciones: [{ alumno_id: 'al-5', numero_lista: '1', nombre: 'ANA MARÍA' }, { alumno_id: 'al-6', numero_lista: '2', nombre: 'BETO', baja: '2026-11-22' }],
     trabajos: [],
     capturas: [
       { seccion_id: 'sec-records', alumno_id: 'al-5', fecha: '2026-11-20', trabajo_id: null, valor: 'A' },
@@ -180,6 +180,8 @@ test('actualizar un grupo ya ligado conserva sus secciones, alumnos y cuadernill
   assert.deepEqual(g.records, { '2026-11-20': { 5: 'A', 6: 'R' }, '2026-11-21': { 6: 'F' } });
   assert.deepEqual(g.students.map((s) => [s.row, s.alumno_id, !!s.added]), [[5, 'al-5', false], [6, 'al-6', false]]);
   assert.deepEqual([g.nube.pdf, g.nube.pdf_nube, g.nube.visto], ['marca-local', 'libro.pdf|100', '2026-11-21T08:00:00+00:00']);
+  assert.equal(g.students[1].baja, '2026-11-22');
+  assert.deepEqual(g.nube.bajas, { 'al-6': '2026-11-22' });
   assert.equal(planSecciones(g), null);
   const p = planDias(g);
   assert.deepEqual([p.dias.length, p.trabajos.length, faltaImportar(g)], [0, 0, false]);

@@ -1,7 +1,7 @@
 import { STATUSES } from '../lib/excel-core.js';
 import { renderCard, renderStudents, startCard } from './card.js';
 import { renderCompact } from './compact.js';
-import { OPTIONS, dayData, dayRecords, fmtDate, glabel, group, save, secs, state, tab, typeOf, ui, vistaApp } from './state.js';
+import { OPTIONS, dayData, dayRecords, fmtDate, glabel, group, lista, save, secs, state, tab, typeOf, ui, vistaApp } from './state.js';
 import { haySesion, rolGuardado } from '../lib/nube.js';
 import { DEMO } from '../lib/demo.js';
 import { tieneAcceso } from './acceso.js';
@@ -104,25 +104,25 @@ export function renderSummary() {
   const t = typeOf(cat);
   if (t === 'num') {
     const day = dayData(cat, false);
-    const vals = g.students.map((s) => day[s.row]).filter((v) => v != null);
+    const vals = lista().map((s) => day[s.row]).filter((v) => v != null);
     const avg = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
     $('#summary').innerHTML =
-      `<span>${fmtDate(state.ui.date)}</span><span>${vals.length}/${g.students.length} capturados</span>` +
+      `<span>${fmtDate(state.ui.date)}</span><span>${vals.length}/${lista().length} capturados</span>` +
       (avg != null ? `<span>Promedio: ${avg}</span>` : '');
     return;
   }
   if (t === 'disc') {
     const day = dayData(cat, false);
-    const zeros = g.students.filter((s) => day[s.row] === 0).length;
+    const zeros = lista().filter((s) => day[s.row] === 0).length;
     $('#summary').innerHTML =
       `<span>${fmtDate(state.ui.date)}</span><span class="F">Con 0: ${zeros}</span><span>Los demás: 10</span>`;
     return;
   }
   if (t !== 'asist') {
     const day = dayData(cat, false);
-    const vals = g.students.map((s) => day[s.row]).filter((v) => v != null);
+    const vals = lista().map((s) => day[s.row]).filter((v) => v != null);
     $('#summary').innerHTML =
-      `<span>${vals.length}/${g.students.length} capturados</span>` +
+      `<span>${vals.length}/${lista().length} capturados</span>` +
       OPTIONS[t].map((o) => `<span class="${o.color}">${o.btn}: ${vals.filter((v) => v === o.v).length}</span>`).join('');
     return;
   }
@@ -131,7 +131,7 @@ export function renderSummary() {
   Object.values(rec).forEach((s) => counts[s]++);
   const marked = Object.keys(rec).length;
   $('#summary').innerHTML =
-    `<span>${fmtDate(state.ui.date)}</span><span>${marked}/${g.students.length} marcados</span>` +
+    `<span>${fmtDate(state.ui.date)}</span><span>${marked}/${lista().length} marcados</span>` +
     STATUSES.map((k) => `<span class="${k}">${k}: ${counts[k]}</span>`).join('');
 }
 // Cambió el grupo o la fecha: vuelve a empezar desde el primer pendiente.

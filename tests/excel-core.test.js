@@ -177,3 +177,13 @@ test('el Excel lleva parciales y semestral, y se reconocen al volver a subirlo',
   const g2 = L.parseWorkbook(await load(out), L.DEFAULT_CODES, () => g.sections)[0];
   assert.equal(g2.dateCols.length, lay.length);
 });
+
+test('bajas: el alumno dado de baja sale de la lista desde su fecha y del resumen', async () => {
+  const { activos, groupReport, normalizeGroup } = await import('../src/lib/excel-core.js');
+  const g = { sheet: 'X', headerRow: 1, students: [{ row: 2, no: '1', name: 'UNO' }, { row: 3, no: '2', name: 'DOS', baja: '2026-11-25' }] };
+  normalizeGroup(g);
+  assert.deepEqual(activos(g, '2026-11-24').map((s) => s.name), ['UNO', 'DOS']);
+  assert.deepEqual(activos(g, '2026-11-25').map((s) => s.name), ['UNO']);
+  assert.deepEqual(activos(g).map((s) => s.name), ['UNO']);
+  assert.equal(groupReport(g, {}).rows.length, 1);
+});

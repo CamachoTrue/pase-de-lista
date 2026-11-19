@@ -95,6 +95,16 @@ async function subirGrupo(sb, g) {
     g.students.forEach((s, i) => { s.alumno_id = r.alumnos[i]; });
     save(true);
   }
+  // 1b. Bajas: se guardan en la inscripción (su historial se conserva). Solo las que cambiaron.
+  const subidas = g.nube.bajas || {};
+  const cambios = g.students.filter((s) => s.alumno_id && (s.baja || null) !== (subidas[s.alumno_id] || null));
+  for (const s of cambios) {
+    const { error } = await sb.from('inscripciones').update({ baja: s.baja || null }).eq('grupo_id', g.nube.grupo_id).eq('alumno_id', s.alumno_id);
+    if (error) throw error;
+    if (s.baja) subidas[s.alumno_id] = s.baja; else delete subidas[s.alumno_id];
+    g.nube.bajas = subidas;
+    save(true);
+  }
   // 2. Secciones y porcentajes.
   const ps = planSecciones(g);
   if (ps) {
@@ -332,7 +342,7 @@ async function bajarClase(sb, g) {
   if (!clase) return false;
   const secciones = await todas(() => sb.from('secciones').select('id, clase_id, nombre, plantilla, porcentaje, minimo, orden').eq('clase_id', id).order('id'));
   const secIds = secciones.map((s) => s.id);
-  const inscripciones = await todas(() => sb.from('inscripciones').select('grupo_id, alumno_id, numero_lista, alumnos(nombre)').eq('grupo_id', clase.grupo_id).is('baja', null).order('alumno_id'));
+  const inscripciones = await todas(() => sb.from('inscripciones').select('grupo_id, alumno_id, numero_lista, baja, alumnos(nombre)').eq('grupo_id', clase.grupo_id).order('alumno_id'));
   const trabajos = secIds.length ? await todas(() => sb.from('trabajos').select('id, seccion_id, fecha, titulo, orden').in('seccion_id', secIds).order('id')) : [];
   const capturas = await todas(() => sb.from('capturas').select('clase_id, seccion_id, alumno_id, fecha, trabajo_id, valor').eq('clase_id', id).order('id'));
   const cierres = await todas(() => sb.from('cierres').select('id, clase_id, tipo, parcial, calificaciones, cerrado_en, reabierto_en').eq('clase_id', id).order('id'));
@@ -341,7 +351,7 @@ async function bajarClase(sb, g) {
 
   armarGrupo(g, {
     clase, secciones, trabajos, capturas, cierres,
-    inscripciones: inscripciones.map((i) => ({ alumno_id: i.alumno_id, numero_lista: i.numero_lista, nombre: i.alumnos.nombre })),
+    inscripciones: inscripciones.map((i) => ({ alumno_id: i.alumno_id, numero_lista: i.numero_lista, nombre: i.alumnos.nombre, baja: i.baja })),
   });
   g.grading = fixGrading(g.grading);
   normalizeGroup(g, g.grading);

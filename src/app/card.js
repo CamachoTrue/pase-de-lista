@@ -1,25 +1,25 @@
 import { STATUSES } from '../lib/excel-core.js';
 import { confirmChange } from './dialogs.js';
 import { refresh, renderSummary } from './main-view.js';
-import { LABELS, dayRecords, group, save, tab, typeOf, ui } from './state.js';
+import { LABELS, dayRecords, group, lista, save, tab, typeOf, ui } from './state.js';
 import { $, escapeHtml, normalize, toast } from './util.js';
 
 export function firstPending() {
   const g = group();
   const rec = dayRecords(false);
-  return g.students.findIndex((s) => !rec[s.row]);
+  return lista().findIndex((s) => !rec[s.row]);
 }
 // Al abrir un grupo/fecha empieza en el primer alumno sin marcar.
 export function startCard() {
   const i = firstPending();
-  ui.cardIdx = i < 0 ? group().students.length : i;
+  ui.cardIdx = i < 0 ? lista().length : i;
 }
 
 export function renderCard(animate) {
   const g = group();
   const rec = dayRecords(false);
-  const n = g.students.length;
-  const marked = g.students.filter((s) => rec[s.row]).length;
+  const n = lista().length;
+  const marked = lista().filter((s) => rec[s.row]).length;
   const finished = ui.cardIdx >= n;
 
   $('#progress-fill').style.width = `${(marked / n) * 100}%`;
@@ -29,7 +29,7 @@ export function renderCard(animate) {
   if (finished) {
     $('#card-pos').textContent = `${marked} de ${n} marcados`;
     const c = { A: 0, F: 0, R: 0, J: 0 };
-    g.students.forEach((s) => rec[s.row] && c[rec[s.row]]++);
+    lista().forEach((s) => rec[s.row] && c[rec[s.row]]++);
     $('#done-summary').innerHTML = STATUSES.map((k) => `<span class="${k}">${LABELS[k]}: ${c[k]}</span>`).join('');
     const pending = n - marked;
     $('#done-pending').textContent = pending ? `Quedaron ${pending} alumno(s) sin marcar.` : 'Todos los alumnos tienen marca.';
@@ -37,7 +37,7 @@ export function renderCard(animate) {
     return;
   }
 
-  const s = g.students[ui.cardIdx];
+  const s = lista()[ui.cardIdx];
   const st = rec[s.row] || '';
   $('#card-pos').textContent = `Alumno ${ui.cardIdx + 1} de ${n}`;
   $('#card-no').textContent = s.no ? `No. ${s.no}` : '';
@@ -53,8 +53,8 @@ export function renderCard(animate) {
 
 export async function markCard(status) {
   const g = group();
-  if (ui.busy || ui.cardIdx >= g.students.length) return;
-  const s = g.students[ui.cardIdx];
+  if (ui.busy || ui.cardIdx >= lista().length) return;
+  const s = lista()[ui.cardIdx];
   const prev = dayRecords(false)[s.row];
   if (prev && prev !== status) {
     ui.busy = true;
@@ -107,7 +107,7 @@ export function renderStudents() {
   const rec = dayRecords(false);
   const q = normalize($('#search').value);
   const list = $('#students');
-  list.innerHTML = g.students
+  list.innerHTML = lista()
     .map((s, i) => [s, i])
     .filter(([s]) => !q || normalize(s.name).includes(q))
     .map(([s, i]) => {

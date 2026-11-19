@@ -131,6 +131,7 @@ export function armarGrupo(g, { clase, secciones, inscripciones, trabajos, captu
       g.students.push(s);
     } else libres.splice(libres.indexOf(s), 1);
     s.alumno_id = i.alumno_id;
+    if (i.baja) s.baja = i.baja; else delete s.baja;
     filaDe[i.alumno_id] = s.row;
   }
   // Trabajos por sección y fecha, en orden.
@@ -162,7 +163,8 @@ export function armarGrupo(g, { clase, secciones, inscripciones, trabajos, captu
     reabierto_en: c.reabierto_en || null, nube_id: c.id, nube_reabierto: !!c.reabierto_en,
   }));
   // Todo lo que llegó ya está en la nube: se marca como subido.
-  g.nube = { clase_id: clase.id, grupo_id: clase.grupo_id, h: {}, ...pdf, ...(clase.cambios ? { visto: ultimoCambio(clase.cambios) } : {}) };
+  const bajas = Object.fromEntries(inscripciones.filter((i) => i.baja).map((i) => [i.alumno_id, i.baja]));
+  g.nube = { clase_id: clase.id, grupo_id: clase.grupo_id, h: {}, bajas, ...pdf, ...(clase.cambios ? { visto: ultimoCambio(clase.cambios) } : {}) };
   if (cfg) g.nube.h.__semestral = huella(JSON.stringify(cfg));
   const ps = planSecciones(g);
   if (ps) g.nube.h.__secciones = ps.hash;

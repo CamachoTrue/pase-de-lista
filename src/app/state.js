@@ -1,4 +1,4 @@
-import { ASIST_ID, DEFAULT_GRADING, sectionsOf } from '../lib/excel-core.js';
+import { ASIST_ID, DEFAULT_GRADING, activos, sectionsOf } from '../lib/excel-core.js';
 import { toast } from './util.js';
 import { almacenApp, sufijoDemo } from '../lib/demo.js';
 
@@ -105,6 +105,8 @@ export const todayISO = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 export const group = () => state.groups[state.ui.group];
+// Alumnos que aparecen al capturar en la fecha elegida (los dados de baja salen desde su fecha de baja).
+export const lista = () => activos(group(), state.ui.date);
 export const dayRecords = (create) => {
   const g = group();
   if (!g.records[state.ui.date] && create) g.records[state.ui.date] = {};

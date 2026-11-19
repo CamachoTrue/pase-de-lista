@@ -36,6 +36,8 @@ const DEFAULT_SECTIONS = () => [
   { id: 'disc', name: 'Disciplina', type: 'disc' },
   { id: 'exam', name: 'Examen', type: 'num' },
 ];
+// Alumnos activos: sin baja, o (si se da una fecha) dados de baja después de ese día.
+const activos = (g, fecha = null) => g.students.filter((s) => !s.baja || (fecha != null && fecha < s.baja));
 const sectionsOf = (g) => (g.sections && g.sections.length ? g.sections : DEFAULT_SECTIONS());
 const newSectionId = () => `s_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const secMin = (s) => Math.max(1, Math.round(Number(s && s.min) || 4));
@@ -687,7 +689,7 @@ function groupReport(g, grading) {
   const graded = gradingOn(grading, g);
   let present = 0;
   let taken = 0;
-  const rows = g.students.map((s) => {
+  const rows = activos(g).map((s) => {
     const c = { A: 0, F: 0, R: 0, J: 0 };
     Object.values(g[ASIST_ID] || {}).forEach((day) => { const v = day[s.row]; if (v in c) c[v]++; });
     const total = c.A + c.F + c.R + c.J;
@@ -716,7 +718,7 @@ function groupReport(g, grading) {
   return {
     rows, graded, escala, grading,
     stats: {
-      alumnos: g.students.length,
+      alumnos: activos(g).length,
       asistencia: taken ? (100 * present) / taken : null,
       promedio: graded && finals.length ? round1(finals.reduce((a, b) => a + b, 0) / finals.length) : null,
       faltas: rows.reduce((n, r) => n + r.counts.F, 0),
@@ -878,7 +880,7 @@ function semestral(g, row, grading, periodos, config) {
 
 export {
     STATUSES, READ, WORK, DEFAULT_CODES, TYPES, ASIST_ID, DEFAULT_SECTIONS, sectionsOf, newSectionId, secMin,
-    parseWorkbook, exportWorkbook, groupDates, sheetLayout, worksOf, normalizeWorks, normalizeGroup, hasData, discDates, datesOf, shortDate,
+    activos, parseWorkbook, exportWorkbook, groupDates, sheetLayout, worksOf, normalizeWorks, normalizeGroup, hasData, discDates, datesOf, shortDate,
     DEFAULT_GRADING, gradeParts, finalGrade, gradingOn, weightOf, round1, parseHeader, parseDateHeader, cellText,
     studentReport, exportStudent, groupReport, exportGroupReport,
     enPeriodo, periodosListos, parcialDe, SEMESTRAL, semestral,

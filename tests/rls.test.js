@@ -335,6 +335,18 @@ test('ajustes de la cuenta: cada quien los suyos, con hora del cambio', async ()
   assert.equal((await as(U.maeA1, `update usuarios set ajustes = '{}' where id = $1 returning id`, [U.maeB.id])).length, 0);
 });
 
+test('bajas: el maestro da de baja en su escuela y la clase queda marcada como cambiada', async () => {
+  await db.query("select set_config('request.headers', $1, false)", [JSON.stringify({ 'x-dispositivo': 'cel-baja' })]);
+  const [i] = await as(U.maeA1, 'select grupo_id, alumno_id from inscripciones limit 1');
+  const r = await as(U.maeA1, `update inscripciones set baja = '2026-11-25' where grupo_id = $1 and alumno_id = $2 returning baja`, [i.grupo_id, i.alumno_id]);
+  assert.equal(r.length, 1);
+  const [c] = await as(U.maeA1, 'select cambios from clases where grupo_id = $1 limit 1', [i.grupo_id]);
+  assert.ok(c.cambios['cel-baja']);
+  assert.equal((await as(U.maeB, `update inscripciones set baja = null where alumno_id = $1 returning 1`, [i.alumno_id])).length, 0);
+  await as(U.maeA1, `update inscripciones set baja = null where grupo_id = $1 and alumno_id = $2`, [i.grupo_id, i.alumno_id]);
+  await db.query("select set_config('request.headers', '', false)");
+});
+
 test('eliminar mi cuenta: el independiente borra todo; el de escuela solo su usuario', async () => {
   await fails(U.super, 'select eliminar_mi_cuenta()', [], /administrador general/);
   await fails(null, 'select eliminar_mi_cuenta()', [], /permission denied/);

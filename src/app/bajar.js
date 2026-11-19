@@ -52,7 +52,7 @@ export async function bajarDeLaNube(avance = () => {}) {
   const ids = clases.map((c) => c.id);
   const secciones = ids.length ? await todas(() => sb.from('secciones').select('id, clase_id, nombre, plantilla, porcentaje, minimo, orden').in('clase_id', ids)) : [];
   const secIds = secciones.map((s) => s.id);
-  const inscripciones = ids.length ? await todas(() => sb.from('inscripciones').select('grupo_id, alumno_id, numero_lista, alumnos(nombre)').in('grupo_id', clases.map((c) => c.grupo_id)).is('baja', null)) : [];
+  const inscripciones = ids.length ? await todas(() => sb.from('inscripciones').select('grupo_id, alumno_id, numero_lista, baja, alumnos(nombre)').in('grupo_id', clases.map((c) => c.grupo_id))) : [];
   const trabajos = secIds.length ? await todas(() => sb.from('trabajos').select('id, seccion_id, fecha, titulo, orden').in('seccion_id', secIds)) : [];
   avance('Bajando calificaciones y asistencias…');
   const capturas = ids.length ? await todas(() => sb.from('capturas').select('clase_id, seccion_id, alumno_id, fecha, trabajo_id, valor').in('clase_id', ids).order('id')) : [];
@@ -72,7 +72,7 @@ export async function bajarDeLaNube(avance = () => {}) {
     armarGrupo(g, {
       clase: c,
       secciones: secciones.filter((s) => s.clase_id === c.id),
-      inscripciones: inscripciones.filter((i) => i.grupo_id === c.grupo_id).map((i) => ({ alumno_id: i.alumno_id, numero_lista: i.numero_lista, nombre: i.alumnos.nombre })),
+      inscripciones: inscripciones.filter((i) => i.grupo_id === c.grupo_id).map((i) => ({ alumno_id: i.alumno_id, numero_lista: i.numero_lista, nombre: i.alumnos.nombre, baja: i.baja })),
       trabajos: trabajos.filter((t) => secciones.some((s) => s.id === t.seccion_id && s.clase_id === c.id)),
       capturas: capturas.filter((x) => x.clase_id === c.id),
       cierres: cierres.filter((x) => x.clase_id === c.id),

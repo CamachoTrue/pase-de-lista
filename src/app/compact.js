@@ -2,7 +2,7 @@ import { ASIST_ID } from '../lib/excel-core.js';
 import { confirmBulk, confirmChange } from './dialogs.js';
 import { doExport, openPreview } from './export.js';
 import { refresh, renderSummary } from './main-view.js';
-import { DISC_DEFAULT, FILL_REST, LABELS, OPTIONS, curWork, dayData, group, optionOf, save, secById, state, tab, typeOf, workIdx, works } from './state.js';
+import { DISC_DEFAULT, FILL_REST, LABELS, OPTIONS, curWork, dayData, group, lista, optionOf, save, secById, state, tab, typeOf, workIdx, works } from './state.js';
 import { $, escapeHtml, normalize, toast } from './util.js';
 
 // ---------- Vista compacta (lecturas / trabajos) ----------
@@ -20,7 +20,7 @@ export function renderCompact() {
   $('#compact-hint').innerHTML = exam
     ? `Escribe la calificación de <b>${escapeHtml(sec.name)}</b> (0 a 100). Con <b>Enter</b> pasas al siguiente alumno.`
     : 'Todos tienen 10. Busca al alumno y toca <b>0</b> si se portó mal.';
-  $('#compact-list').innerHTML = g.students.map((s) => {
+  $('#compact-list').innerHTML = lista().map((s) => {
     const cur = optionOf(cat, disc ? (day[s.row] ?? DISC_DEFAULT) : day[s.row]);
     const a = att[s.row];
     const btns = exam
@@ -41,14 +41,14 @@ export function renderCompact() {
 // ---------- Botón "restantes" (lecturas: No · trabajos: 0) ----------
 export const pendingRows = () => {
   const day = dayData(tab(), false);
-  return group().students.filter((s) => day[s.row] == null);
+  return lista().filter((s) => day[s.row] == null);
 };
 // Sí/No: si todos tienen la misma marca, botón para cambiarlos todos a la otra.
 export const flipTarget = () => {
   if (typeOf(tab()) !== 'sino') return null;
   const day = dayData(tab(), false);
-  const vals = new Set(group().students.map((s) => day[s.row]));
-  if (vals.size !== 1 || !group().students.length) return null;
+  const vals = new Set(lista().map((s) => day[s.row]));
+  if (vals.size !== 1 || !lista().length) return null;
   const [only] = vals;
   return only === 'S' ? 'N' : only === 'N' ? 'S' : null;
 };
@@ -59,7 +59,7 @@ export function updateFillRest() {
   const flip = n ? null : flipTarget();
   box.hidden = !n && !flip;
   if (flip) {
-    const total = group().students.length;
+    const total = lista().length;
     box.innerHTML = `<button class="btn fill-rest ${flip === 'S' ? 'yes' : ''}" data-all="${flip}">Cambiar a los ${total} a “${flip === 'S' ? 'Sí' : 'No'}”</button>`;
     return;
   }
@@ -73,7 +73,7 @@ $('#fill-rest').addEventListener('click', async (e) => {
     const to = all.dataset.all;
     if (flipTarget() !== to) return;
     const label = to === 'S' ? 'Sí' : 'No';
-    const students = group().students;
+    const students = lista();
     if (!(await confirmBulk(`¿Cambiar a los ${students.length} alumnos a “${label}”?`,
       `Todos tienen “${to === 'S' ? 'No' : 'Sí'}” en este día y quedarán con “${label}”.`, 'Sí, cambiar'))) return;
     const day = dayData(tab(), true);

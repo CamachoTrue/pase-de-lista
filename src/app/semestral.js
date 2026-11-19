@@ -1,7 +1,7 @@
 // ---------- Calificación semestral ----------
 // Cada maestro elige cómo sale (por grupo): promedio de los parciales, o parciales + examen final
 // (con exentos opcionales). Al cerrar el semestre las calificaciones quedan definitivas.
-import { DEFAULT_GRADING, SEMESTRAL, periodosListos, round1, semestral } from '../lib/excel-core.js';
+import { DEFAULT_GRADING, SEMESTRAL, activos, periodosListos, round1, semestral } from '../lib/excel-core.js';
 import { confirmBulk } from './dialogs.js';
 import { cerrar, cierreActivo, fechaCorta, reabrir } from './cierres.js';
 import { gname, group, save, state } from './state.js';
@@ -58,7 +58,7 @@ function render() {
   let aprobados = 0;
   let reprobados = 0;
   let faltan = 0;
-  for (const s of g.students) {
+  for (const s of activos(g)) {
     const r = cierre && cierre.calificaciones[s.row] ? cierre.calificaciones[s.row] : semestral(g, s.row, gr, per, c);
     if (r.aprobado === true) aprobados++;
     if (r.aprobado === false) reprobados++;
@@ -134,7 +134,7 @@ $('#sem-cerrar').addEventListener('click', async () => {
   const g = group();
   const gr = Object.assign({}, DEFAULT_GRADING, g.grading);
   const c = cfgDe(g);
-  const filas = g.students.map((s) => [s, semestral(g, s.row, gr, state.periodos, c)]);
+  const filas = activos(g).map((s) => [s, semestral(g, s.row, gr, state.periodos, c)]);
   const faltan = filas.filter(([, r]) => r.faltaFinal).length;
   if (!(await confirmBulk('¿Cerrar el semestre?', `${faltan ? `${faltan} alumno(s) aún no tienen examen final. ` : ''}Las calificaciones semestrales de ${gname(g)} quedan definitivas. Se puede reabrir si hay que corregir.`, 'Sí, cerrar semestre'))) return;
   const cal = Object.fromEntries(filas.map(([s, r]) => [s.row, r]));
