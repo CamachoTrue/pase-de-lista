@@ -217,3 +217,15 @@ test('lista nueva del mismo grupo: conserva lo capturado, cierres y examen final
   // Diana no trae nada y sí aparece al pasar lista; Carla ya no.
   assert.deepEqual(L.activos(g).map((s) => s.name), ['BETO  RUIZ', 'ANA LOPEZ', 'DIANA VEGA']);
 });
+
+test('resumen del grupo de un parcial cerrado: usa la calificación del cierre para color y promedio', () => {
+  const g = { sheet: 'X', students: [{ row: 5, no: '1', name: 'ANA' }, { row: 6, no: '2', name: 'BETO' }], grading: { w: { records: 100 }, retardo: 100, escala: 10 } };
+  L.normalizeGroup(g);
+  g.records['2026-11-10'] = { 5: 'A', 6: 'A' };
+  const abierto = L.groupReport(g, g.grading);
+  assert.deepEqual(abierto.rows.map((x) => x.final), [10, 10]);
+  const r = L.groupReport(g, g.grading, { 5: 4, 6: 9 });
+  assert.deepEqual(r.rows.map((x) => [x.final, x.status]), [[4, 'rojo'], [9, 'verde']]);
+  assert.equal(r.stats.promedio, 6.5);
+  assert.match(r.rows[0].reasons[0], /Calificación 4 /);
+});

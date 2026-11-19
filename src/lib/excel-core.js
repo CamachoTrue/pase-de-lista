@@ -683,7 +683,8 @@ function exportStudent(ExcelJS, g, row, grading) {
 const RISK = { failPct: 60, warnPct: 80, attRed: 80, attYellow: 90 };
 const STATUS_TXT = { rojo: 'Rojo', amarillo: 'Amarillo', verde: 'Verde', none: 'Sin datos' };
 
-function groupReport(g, grading) {
+// cerradas: { fila: calificación } de un parcial cerrado (se usan en lugar de la calculada).
+function groupReport(g, grading, cerradas = null) {
   grading = Object.assign({}, DEFAULT_GRADING, grading);
   const escala = Number(grading.escala) || 10;
   const graded = gradingOn(grading, g);
@@ -696,7 +697,9 @@ function groupReport(g, grading) {
     present += total - c.F;
     taken += total;
     const att = total ? (100 * (total - c.F)) / total : null;
-    const { parts, final } = finalGrade(g, s.row, grading);
+    const calc = finalGrade(g, s.row, grading);
+    const parts = calc.parts;
+    const final = cerradas && s.row in cerradas ? cerradas[s.row] : calc.final;
     const fp = graded && final != null ? (100 * final) / escala : null;
     const reasons = [];
     let status = 'none';
@@ -732,8 +735,8 @@ function groupReport(g, grading) {
   };
 }
 
-function exportGroupReport(ExcelJS, g, grading) {
-  const r = groupReport(g, grading);
+function exportGroupReport(ExcelJS, g, grading, cerradas = null) {
+  const r = groupReport(g, grading, cerradas);
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Resumen del grupo', { views: [{ showGridLines: false }] });
   const parts = sectionsOf(g).filter((p) => weightOf(r.grading, p) > 0);

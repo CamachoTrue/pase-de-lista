@@ -2,6 +2,7 @@ import { exportGroupReport, groupReport, round1 } from '../lib/excel-core.js';
 import { gname, group, ui } from './state.js';
 import { openStudent, renderStudent } from './student-report.js';
 import { $, deliverFile, escapeHtml, loadExcel, toast } from './util.js';
+import { alElegirPeriodo, botonesPeriodo, cerradasDe, vistaPeriodo } from './periodo-vista.js';
 
 // ---------- Resumen del grupo (semáforo) ----------
 export let grFilter = 'all';
@@ -13,10 +14,13 @@ export function openGroupReport() {
   $('#gr-list').scrollTop = 0;
 }
 export function renderGroupReport() {
-  const g = group();
-  const r = groupReport(g, g.grading);
+  const g0 = group();
+  const v = vistaPeriodo(g0);
+  // Parcial cerrado: la calificación con que se cerró (también para el color y el promedio).
+  const r = groupReport(v.g, v.grading, cerradasDe(v));
   const st = r.stats;
-  $('#gr-sub').textContent = `${gname(g)}${r.graded ? ` · calificación sobre ${r.escala}` : ''}`;
+  $('#gr-periodos').innerHTML = botonesPeriodo(g0);
+  $('#gr-sub').textContent = `${gname(g0)}${v.etiqueta ? ` · ${v.etiqueta}` : ''}${r.graded ? ` · sobre ${r.escala}` : ''}`;
   const tile = (v, label, cls = '') => `<div class="gr-tile ${cls}"><b>${v}</b><span>${label}</span></div>`;
   $('#gr-tiles').innerHTML =
     tile(st.alumnos, 'Alumnos') +
@@ -41,6 +45,7 @@ export function renderGroupReport() {
         `<span class="gr-num"><b>${x.counts.F}</b><small>faltas</small></span></li>`).join('')
     : '<li class="empty">No hay alumnos en este color.</li>';
 }
+alElegirPeriodo($('#gr-periodos'), () => { grFilter = 'all'; renderGroupReport(); });
 $('#gr-chips').addEventListener('click', (e) => {
   const b = e.target.closest('[data-f]');
   if (!b) return;
@@ -59,14 +64,15 @@ $('#gr-list').addEventListener('click', (e) => {
 // Vista previa: genera el mismo Excel que se exporta y lo dibuja celda por celda (colores, negritas, celdas unidas).
 $('#gr-preview').addEventListener('click', async () => {
   const g = group();
+  const v = vistaPeriodo(g);
   const btn = $('#gr-preview');
   btn.disabled = true;
   try {
-    const buf = await exportGroupReport(await loadExcel(), g, g.grading);
+    const buf = await exportGroupReport(await loadExcel(), v.g, v.grading, cerradasDe(v));
     const wb = new (await loadExcel()).Workbook();
     await wb.xlsx.load(buf);
     $('#gr-sheet-table').innerHTML = sheetToHtml(wb.worksheets[0]);
-    $('#gr-sheet-sub').textContent = `Resumen ${gname(g)}.xlsx`;
+    $('#gr-sheet-sub').textContent = `Resumen ${gname(g)}${v.sufijo || ''}.xlsx`;
     $('#gr-sheet').showModal();
     $('#gr-sheet .preview-scroll').scrollTop = 0;
   } catch (err) {
@@ -127,13 +133,14 @@ export function sheetToHtml(ws) {
 }
 $('#gr-export').addEventListener('click', async () => {
   const g = group();
+  const v = vistaPeriodo(g);
   const btn = $('#gr-export');
   btn.disabled = true;
   btn.textContent = 'Generando…';
   try {
-    const out = await exportGroupReport(await loadExcel(), g, g.grading);
+    const out = await exportGroupReport(await loadExcel(), v.g, v.grading, cerradasDe(v));
     const safe = (t) => String(t).replace(/[\\/:*?"<>|]+/g, ' ').trim();
-    await deliverFile(out, `Resumen ${safe(gname(g))}.xlsx`);
+    await deliverFile(out, `Resumen ${safe(gname(g))}${v.sufijo || ''}.xlsx`);
     toast('Resumen del grupo generado');
   } catch (err) {
     console.error(err);

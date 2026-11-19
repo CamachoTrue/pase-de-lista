@@ -501,6 +501,8 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .per-tabs { display: flex; gap: 4px; overflow-x: auto; }
 .per-tab { flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 5px 12px; font-size: .82rem; font-weight: 600; cursor: pointer; }
 .per-tab.on { background: var(--text); color: var(--surface); border-color: var(--text); }
+.per-elige { flex: none; margin-bottom: 10px; padding-bottom: 2px; }
+.per-elige:empty { display: none; }
 .per-cierre { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: .85rem; }
 .per-cierre:empty { display: none; }
 .per-cerrar { padding: 6px 12px; }
