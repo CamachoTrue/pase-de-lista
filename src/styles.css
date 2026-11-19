@@ -653,3 +653,7 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .exp-op small { display: block; color: var(--muted); font-size: .8rem; }
 @media (min-width: 900px) { .vista { padding-left: 0; padding-right: 0; } .grupo-sec > .btn { align-self: flex-start; } }
 .calif-card .row, .grupo-acc { display: flex; flex-wrap: wrap; gap: 8px; } .calif-card .row .btn, .grupo-acc .btn { flex: 1 1 auto; width: auto; }
+.summary .btn-previa { margin-left: auto; padding: 4px 12px; font-size: .8rem; font-weight: 700; border-radius: 999px; }
+.vista-acc { display: flex; gap: 6px; }
+.exp-grupos { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 8px; font-size: .9rem; }
+.exp-grupos[hidden] { display: none; }

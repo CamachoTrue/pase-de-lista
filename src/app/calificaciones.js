@@ -9,7 +9,7 @@ import { gname, group, state, todayISO, ui } from './state.js';
 import { $, escapeHtml, toast } from './util.js';
 import { paqueteGuardado } from '../lib/nube.js';
 import { abrir, irA } from './menu.js';
-import { openExportar } from './export.js';
+import { openExportar, openPreview } from './export.js';
 
 const ST = { rojo: 'En riesgo', amarillo: 'Observación', verde: 'Bien', none: 'Sin datos' };
 let periodo = null; // 'todo' | número de parcial | 'sem'
@@ -34,7 +34,7 @@ export function renderCalif() {
       .map(([k, t]) => `<button class="per-tab ${periodo === k ? 'on' : ''}" data-periodo="${k}">${t}</button>`).join('')}</nav>` : '';
   root().innerHTML = `
     <div class="vista-head"><div><h2>Calificaciones</h2><p class="hint">${escapeHtml(gname(g))}</p></div>
-      <button class="btn primary" data-c="exportar">Exportar Excel</button></div>
+      <div class="vista-acc"><button class="btn" data-c="previa">Vista previa</button><button class="btn primary" data-c="exportar">Exportar</button></div></div>
     ${chips}
     ${tarjetaParcial(g)}
     <div data-cuerpo></div>`;
@@ -91,7 +91,7 @@ function pintarResumen(g) {
     ${r.graded ? '' : '<p class="hint">Para calcular calificaciones, pon cuánto vale cada sección en la pestaña <b>Grupo</b>. <button class="link-btn" data-c="criterios">Ponerlos ahora ›</button></p>'}
     <div class="gr-chips">${chip('all', st.alumnos, 'Todos')}${chip('rojo', st.rojo, 'Rojo')}${chip('amarillo', st.amarillo, 'Amarillo')}${chip('verde', st.verde, 'Verde')}${st.none ? chip('none', st.none, 'Sin datos') : ''}</div>
     <details class="gr-criteria"><summary>¿Cómo se decide el color?</summary><ul>${r.criteria.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul></details>
-    <p class="hint">Toca un alumno para ver todo su detalle.</p>
+    <p class="hint calif-tip">Toca un alumno para ver todo su detalle. <button class="link-btn" data-c="buscar">Buscar alumno ›</button></p>
     <ul class="gr-list calif-lista">${rows.length ? rows.map((x) => `<li data-row="${x.student.row}" class="${x.status}">
         <span class="gr-dot" title="${ST[x.status]}"></span>
         <span class="gr-name"><b>${escapeHtml(x.student.name)}</b><small>${x.reasons.length ? escapeHtml(x.reasons.join(' · ')) : ST[x.status]}</small></span>
@@ -161,6 +161,8 @@ root().addEventListener('click', async (e) => {
   if (!b) return;
   const c = b.dataset.c;
   if (c === 'exportar') openExportar();
+  if (c === 'previa') openPreview(typeof periodo === 'number' ? periodo : 'todo');
+  if (c === 'buscar') { const { openStudent } = await import('./student-report.js'); openStudent(); }
   if (c === 'cerrar') cerrarParcial(Number(b.dataset.n));
   if (c === 'reabrir') {
     const n = Number(b.dataset.n);

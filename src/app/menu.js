@@ -1,4 +1,4 @@
-import { openExportar } from './export.js';
+import { openExportar, openPreview } from './export.js';
 import { $, toast } from './util.js';
 import { rolGuardado } from '../lib/nube.js';
 import { DEMO } from '../lib/demo.js';
@@ -27,6 +27,7 @@ menu.addEventListener('click', (e) => {
   if (!action || action === 'close') return;
   menu.close();
   if (action === 'exportar') openExportar();
+  if (action === 'previa') openPreview('todo');
   if (action === 'cuenta') openCuenta();
   if (action === 'escuela') { setVistaApp('escuela'); render(); }
   if (action === 'salir-demo') location.href = '/';
@@ -45,6 +46,7 @@ $('#tabbar').addEventListener('click', (e) => {
 
 // Pantalla inicial (sin Excel): entrar con la cuenta para bajar los datos.
 $('#upload-cuenta').addEventListener('click', openCuenta);
+$('#upload-registro').addEventListener('click', () => abrir(() => import('./cuenta.js'), 'openRegistro'));
 $('#upload-escuela').addEventListener('click', () => { setVistaApp('escuela'); render(); });
 
 // Aviso de acceso / lista de ejemplo (arriba de la lista).

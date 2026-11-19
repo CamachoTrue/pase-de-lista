@@ -1,7 +1,7 @@
 import { STATUSES } from '../lib/excel-core.js';
 import { renderCard, renderStudents, startCard } from './card.js';
 import { renderCompact } from './compact.js';
-import { OPTIONS, dayData, dayRecords, fmtDate, glabel, group, lista, save, secs, state, tab, typeOf, ui, vistaApp } from './state.js';
+import { OPTIONS, dayData, dayRecords, glabel, group, lista, save, secs, state, tab, typeOf, ui, vistaApp } from './state.js';
 import { haySesion, rolGuardado } from '../lib/nube.js';
 import { DEMO } from '../lib/demo.js';
 import { tieneAcceso } from './acceso.js';
@@ -57,7 +57,8 @@ function pintarAcceso() {
   aviso.dataset.ir = ejemplo && acceso ? 'excel' : 'cuenta';
   aviso.classList.toggle('mal', !acceso && !ejemplo);
   // Pantalla inicial sin cuenta: primero entrar; subir el Excel pide la cuenta.
-  $('#upload-cuenta').classList.toggle('primary', !acceso);
+  $('#upload-registro').hidden = acceso;
+  $('#upload-registro').classList.toggle('primary', !acceso);
   $('#upload-subir').classList.toggle('primary', acceso);
 }
 
@@ -112,7 +113,15 @@ $('#tabs').addEventListener('click', (e) => {
   window.scrollTo(0, 0);
 });
 
+// Conteos del día (sin la fecha: ya está arriba) y el botón de vista previa del Excel, en cada pantalla.
 export function renderSummary() {
+  pintarConteos();
+  $('#summary').insertAdjacentHTML('beforeend', '<button class="btn btn-previa" data-previa>Vista previa</button>');
+}
+$('#summary').addEventListener('click', (e) => {
+  if (e.target.closest('[data-previa]')) import('./export.js').then((m) => m.openPreview('todo'));
+});
+function pintarConteos() {
   const cat = tab();
   const t = typeOf(cat);
   if (t === 'num') {
@@ -120,7 +129,7 @@ export function renderSummary() {
     const vals = lista().map((s) => day[s.row]).filter((v) => v != null);
     const avg = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null;
     $('#summary').innerHTML =
-      `<span>${fmtDate(state.ui.date)}</span><span>${vals.length}/${lista().length} capturados</span>` +
+      `<span>${vals.length}/${lista().length} capturados</span>` +
       (avg != null ? `<span>Promedio: ${avg}</span>` : '');
     return;
   }
@@ -128,7 +137,7 @@ export function renderSummary() {
     const day = dayData(cat, false);
     const zeros = lista().filter((s) => day[s.row] === 0).length;
     $('#summary').innerHTML =
-      `<span>${fmtDate(state.ui.date)}</span><span class="F">Con 0: ${zeros}</span><span>Los demás: 10</span>`;
+      `<span class="F">Con 0: ${zeros}</span><span>Los demás: 10</span>`;
     return;
   }
   if (t !== 'asist') {
@@ -144,7 +153,7 @@ export function renderSummary() {
   Object.values(rec).forEach((s) => counts[s]++);
   const marked = Object.keys(rec).length;
   $('#summary').innerHTML =
-    `<span>${fmtDate(state.ui.date)}</span><span>${marked}/${lista().length} marcados</span>` +
+    `<span>${marked}/${lista().length} marcados</span>` +
     STATUSES.map((k) => `<span class="${k}">${k}: ${counts[k]}</span>`).join('');
 }
 // Cambió el grupo o la fecha: vuelve a empezar desde el primer pendiente.

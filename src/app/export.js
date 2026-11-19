@@ -8,6 +8,7 @@ $('#preview-export').addEventListener('click', () => doExport($('#preview-export
 
 // ---------- Qué exportar: todo el semestre, un parcial o el resumen del grupo ----------
 let alcance = 'todo';
+let soloGrupo = true;
 const parciales = () => (periodosListos(state.periodos) ? state.periodos.parciales : []);
 // Grupos tal como se exportan: todo, o solo las fechas de un parcial (con los criterios con que se cerró).
 function preparar(groups, a) {
@@ -35,15 +36,22 @@ export function openExportar() {
   if (!opc.some(([k]) => k === alcance)) alcance = 'todo';
   $('#exp-opciones').innerHTML = opc.map(([k, t, sub]) => `<label class="exp-op"><input type="radio" name="exp" value="${k}" ${k === alcance ? 'checked' : ''}>
     <span><b>${escapeHtml(t)}</b><small>${escapeHtml(sub)}</small></span></label>`).join('');
-  $('#exp-previa').hidden = alcance === 'resumen';
+  $('#exp-este').textContent = `Solo ${gname(g)}`;
+  $('#exp-grupos').hidden = alcance === 'resumen' || state.groups.length < 2;
   $('#exportar').showModal();
 }
+$('#exp-grupos').addEventListener('change', (e) => { soloGrupo = e.target.value === 'uno'; });
 $('#exp-opciones').addEventListener('change', (e) => {
   const v = e.target.value;
   alcance = v === 'todo' || v === 'resumen' ? v : Number(v);
-  $('#exp-previa').hidden = alcance === 'resumen';
+  $('#exp-grupos').hidden = alcance === 'resumen' || state.groups.length < 2;
 });
-$('#exp-previa').addEventListener('click', () => { $('#exportar').close(); openPreview(alcance); });
+$('#exp-previa').addEventListener('click', async () => {
+  $('#exportar').close();
+  // El resumen del grupo tiene su propia vista previa (la misma que se exporta).
+  if (alcance === 'resumen') { await import('./group-report.js'); $('#gr-preview').click(); return; }
+  openPreview(alcance);
+});
 $('#exp-ok').addEventListener('click', async () => {
   const btn = $('#exp-ok');
   if (alcance === 'resumen') {
@@ -156,9 +164,18 @@ export async function doExport(btn, a = 'todo') {
   const txt = btn && btn.textContent;
   if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
   try {
-    const prep = preparar(state.groups, a);
-    const out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), prep.groups, state.codes, null, prep.periodos);
-    await deliverFile(out, state.fileName.replace(/\.xlsx$/i, '') + (typeof a === 'number' ? ` - parcial ${a}.xlsx` : ' - asistencia.xlsx'));
+    const uno = soloGrupo && state.groups.length > 1;
+    const prep = preparar(uno ? [group()] : state.groups, a);
+    let out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), prep.groups, state.codes, null, prep.periodos);
+    if (uno) {
+      // Solo la hoja de este grupo (las demás del archivo se quitan).
+      const wb = new (await loadExcel()).Workbook();
+      await wb.xlsx.load(out);
+      wb.worksheets.filter((w) => w.name !== group().sheet).forEach((w) => wb.removeWorksheet(w.id));
+      out = await wb.xlsx.writeBuffer();
+    }
+    const base = state.fileName.replace(/\.xlsx$/i, '') + (uno ? ` - ${gname(group())}` : '');
+    await deliverFile(out, base + (typeof a === 'number' ? ` - parcial ${a}.xlsx` : ' - asistencia.xlsx'));
     toast('Excel generado');
   } catch (err) {
     console.error(err);

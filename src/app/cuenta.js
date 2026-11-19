@@ -16,6 +16,13 @@ const body = () => $('#cuenta-body');
 let perfil = null; // el de la sesión, para "Eliminar mi cuenta"
 const enlace = (token) => `${location.origin}/?invitacion=${token}`;
 
+// Directo al registro (desde el aviso «Crear mi cuenta gratis»).
+export function openRegistro() {
+  $('#cuenta').showModal();
+  $('#cuenta-sub').textContent = '';
+  renderRegistro();
+}
+
 export async function openCuenta() {
   $('#cuenta').showModal();
   if (DEMO) { renderDemo(); return; }

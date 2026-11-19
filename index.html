@@ -26,6 +26,7 @@
       <p class="hint">Formato .xlsx · La columna “NOMBRE” se detecta sola.</p>
       <button class="btn big" id="upload-ejemplo">Probar con una lista de ejemplo</button>
       <p class="hint">Para conocer la app sin tu Excel. No se guarda en tu cuenta; cuando quieras, sube tu archivo.</p>
+      <button class="btn big" id="upload-registro">Crear mi cuenta gratis</button>
       <button class="btn big upload-cuenta" id="upload-cuenta">Ya tengo cuenta: entrar</button>
       <button class="btn big" id="upload-escuela" hidden>‹ Volver a mi escuela</button>
       <p class="hint" id="upload-cuenta-hint">Si ya usas la app en otro celular, entra para bajar tus grupos y calificaciones.</p>
@@ -160,6 +161,10 @@
     <h2>Exportar a Excel</h2>
     <p class="hint">Elige qué quieres entregar.</p>
     <div class="exp-opciones" id="exp-opciones"></div>
+    <div class="exp-grupos" id="exp-grupos">
+      <label><input type="radio" name="expg" value="uno" checked> <span id="exp-este">Solo este grupo</span></label>
+      <label><input type="radio" name="expg" value="todos"> <span>Todos mis grupos</span></label>
+    </div>
     <div class="row">
       <button class="btn" id="exp-previa">Vista previa</button>
       <button class="btn primary" id="exp-ok">Exportar</button>
@@ -173,6 +178,7 @@
     <button class="menu-item cuenta-item" data-action="salir-demo" id="menu-salir-demo" hidden>‹ Salir de la demostración</button>
     <button class="menu-item cuenta-item" data-action="escuela" id="menu-escuela" hidden>Mi escuela (director)</button>
     <button class="menu-item cuenta-item" data-action="cuenta" id="menu-cuenta">Mi cuenta</button>
+    <button class="menu-item" data-action="previa">Vista previa del Excel</button>
     <button class="menu-item" data-action="exportar">Exportar a Excel</button>
     <button class="btn" data-action="close">Cerrar</button>
   </dialog>
@@ -182,7 +188,8 @@
   <dialog id="bloqueo">
     <h2 id="bloqueo-titulo">Entra a tu cuenta para capturar</h2>
     <p class="hint" id="bloqueo-texto"></p>
-    <button class="btn primary big" id="bloqueo-cuenta">Entrar o crear mi cuenta</button>
+    <button class="btn primary big" id="bloqueo-registro">Crear mi cuenta gratis</button>
+    <button class="btn big" id="bloqueo-cuenta">Ya tengo cuenta: entrar</button>
     <button class="btn" id="bloqueo-exportar">Exportar mi Excel</button>
     <button class="btn" data-action="close">Ahora no</button>
   </dialog>

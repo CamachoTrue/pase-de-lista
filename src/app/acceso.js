@@ -4,7 +4,7 @@
 // hay acceso, el cambio no se guarda y la pantalla vuelve a lo que estaba guardado.
 import { DEMO } from '../lib/demo.js';
 import { accesoVencido, haySesion } from '../lib/nube.js';
-import { load, setGuardia, setState, state } from './state.js';
+import { recargar, setGuardia, state } from './state.js';
 import { $ } from './util.js';
 
 // Cuenta con la que se puede trabajar (o una demostración).
@@ -18,15 +18,16 @@ export function avisarBloqueo() {
   $('#bloqueo-titulo').textContent = vencida ? 'Tu acceso venció' : 'Entra a tu cuenta para capturar';
   $('#bloqueo-texto').textContent = vencida
     ? 'Puedes ver y exportar todo lo que tienes, pero para seguir capturando hay que renovar. Si eres de una escuela, avisa a tu director.'
-    : 'Para pasar lista y calificar necesitas tu cuenta. Lo que ya tienes en este celular no se pierde: al entrar se guarda en tu cuenta. Mientras, puedes verlo y exportarlo.';
-  $('#bloqueo-cuenta').textContent = vencida ? 'Ver mi cuenta' : 'Entrar o crear mi cuenta';
+    : 'Para pasar lista y calificar necesitas tu cuenta. Crearla toma un minuto y los primeros 30 días son gratis. Lo que ya tienes en este celular no se pierde: se guarda en tu cuenta al entrar.';
+  $('#bloqueo-cuenta').textContent = vencida ? 'Ver mi cuenta' : 'Ya tengo cuenta: entrar';
+  $('#bloqueo-registro').hidden = vencida;
   if (!d.open) d.showModal();
 }
 
 let vuelvaAPintar = () => {};
 export const alBloquear = (fn) => { vuelvaAPintar = fn; };
 setGuardia(() => puedeCapturar(), () => {
-  setState(load()); // se descarta el cambio: queda lo que estaba guardado
+  recargar(); // se descarta el cambio: queda lo que estaba guardado
   vuelvaAPintar();
   avisarBloqueo();
 });
@@ -36,5 +37,6 @@ $('#bloqueo').addEventListener('click', (e) => {
   if (!b) return;
   $('#bloqueo').close();
   if (b.id === 'bloqueo-cuenta') import('./menu.js').then((m) => m.openCuenta());
+  if (b.id === 'bloqueo-registro') import('./cuenta.js').then((m) => m.openRegistro());
   if (b.id === 'bloqueo-exportar') import('./export.js').then((m) => m.doExport(null));
 });

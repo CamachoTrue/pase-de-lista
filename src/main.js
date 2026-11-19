@@ -1,6 +1,6 @@
 import { ASIST_ID, DEFAULT_CODES, normalizeGroup } from './lib/excel-core.js';
 import { render } from './app/main-view.js';
-import { fixGrading, state, todayISO } from './app/state.js';
+import { fijarReferencia, fixGrading, state, todayISO } from './app/state.js';
 import { DEMO } from './lib/demo.js';
 import './app/util.js';
 import './app/dialogs.js';
@@ -31,6 +31,7 @@ if (state) {
   });
   delete state.grading;
 }
+fijarReferencia();
 // Sin cuenta: si se intenta capturar, el cambio se descarta y se vuelve a pintar lo guardado.
 alBloquear(() => render());
 // Demostración (otra pestaña): se nota en el título de la pestaña.

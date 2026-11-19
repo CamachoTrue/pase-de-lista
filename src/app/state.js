@@ -71,6 +71,10 @@ export const STORE_KEY = `paseDeLista.v1${sufijoDemo}`;
 export let state = load();
 // Reemplaza todo el estado (al subir otro archivo).
 export function setState(s) { state = s; }
+// Después de descartar un cambio (sin acceso), lo guardado vuelve a ser la referencia.
+// Al abrir la app (después de acomodar datos de versiones anteriores) esto es lo guardado.
+export function fijarReferencia() { ultimosDatos = datosDe(state); }
+export function recargar() { state = load(); ultimosDatos = datosDe(state); }
 // Estado de la pantalla que comparten varios módulos.
 export const ui = { view: 'card', cardIdx: 0, busy: false, studentRow: null, vista: 'lista' };
 // Director: ¿ve su escuela o sus grupos? (se recuerda en este dispositivo)
@@ -93,9 +97,12 @@ export const alGuardar = (fn) => oyentes.push(fn);
 let guardia = null;
 let alNegar = null;
 export const setGuardia = (fn, negar) => { guardia = fn; alNegar = negar; };
+// Datos sin la parte de pantalla (grupo, fecha y pestaña elegidos): moverse por la app no es capturar.
+const datosDe = (s) => JSON.stringify(s ? { ...s, ui: null } : null);
+let ultimosDatos = datosDe(state);
 export function save(silencioso = false) {
-  if (!silencioso && guardia && !guardia()) { alNegar(); return false; }
-  try { almacenApp().setItem(STORE_KEY, JSON.stringify(state)); }
+  if (!silencioso && guardia && !guardia() && datosDe(state) !== ultimosDatos) { alNegar(); return false; }
+  try { almacenApp().setItem(STORE_KEY, JSON.stringify(state)); ultimosDatos = datosDe(state); }
   catch (e) { toast('No se pudo guardar en el dispositivo'); }
   if (!silencioso) oyentes.forEach((fn) => fn());
 }
