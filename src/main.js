@@ -15,7 +15,6 @@ import './app/menu.js';
 import './app/settings.js';
 import './app/sync.js';
 import { alBloquear } from './app/acceso.js';
-import './app/movimiento.js';
 
 // ---------- Inicio ----------
 if (state) {

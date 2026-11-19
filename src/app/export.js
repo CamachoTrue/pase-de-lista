@@ -3,7 +3,9 @@ import { LABELS, gname, group, optionOf, secs, state } from './state.js';
 import { $, b64ToBuf, deliverFile, escapeHtml, loadExcel, toast } from './util.js';
 
 // ---------- Exportar ----------
+$('#export-btn').addEventListener('click', () => openExportar());
 $('#done-export').addEventListener('click', () => openExportar());
+$('#list-preview').addEventListener('click', () => openPreview('todo'));
 $('#preview-export').addEventListener('click', () => doExport($('#preview-export'), alcance));
 
 // ---------- Qué exportar: todo el semestre, un parcial o el resumen del grupo ----------
@@ -64,7 +66,7 @@ $('#exp-ok').addEventListener('click', async () => {
   } else await doExport(btn, alcance);
   $('#exportar').close();
 });
-$('#done-preview').addEventListener('click', openPreview);
+$('#done-preview').addEventListener('click', () => openPreview('todo'));
 // ---------- Vista previa ----------
 // Se genera el mismo Excel que al exportar y se vuelve a leer, así lo que se ve es exactamente lo que se descarga.
 export async function openPreview(a = alcance) {

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Clase al Día</title>
   <meta name="apple-mobile-web-app-title" content="Clase al Día">
-  <meta name="theme-color" content="#1d5a45">
+  <meta name="theme-color" content="#1f7a4d">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -38,9 +38,7 @@
     <header class="esc-top">
       <div class="esc-tit"><span class="esc-cap">Mi escuela</span><h1 id="esc-nombre">Mi escuela</h1><small id="esc-sub"></small></div>
       <div class="esc-top-acc">
-        <button class="icon-btn btn-cuenta" id="esc-cuenta" aria-label="Mi cuenta" title="Mi cuenta">
-          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-        </button>
+        <button class="btn" id="esc-cuenta">Mi cuenta</button>
       </div>
     </header>
     <nav class="esc-tabs" id="esc-tabs" aria-label="Secciones de la escuela">
@@ -61,19 +59,15 @@
           <select id="group-select" aria-label="Grupo"></select>
           <span class="gp-chev" aria-hidden="true">▾</span>
         </label>
-        <button class="icon-btn btn-cuenta" id="menu-btn" aria-label="Mi cuenta" title="Mi cuenta">
-          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-        </button>
+        <button class="icon-btn" id="menu-btn" aria-label="Menú">⋮</button>
       </div>
-      <div id="lista-controles">
-        <div class="topbar-row">
-          <button class="icon-btn" id="prev-day" aria-label="Día anterior">‹</button>
-          <button class="fecha-btn" id="date-input" aria-label="Elegir fecha"></button>
-          <button class="icon-btn" id="next-day" aria-label="Día siguiente">›</button>
-        </div>
-        <div class="tabs" role="tablist" id="tabs"></div>
-        <div class="summary" id="summary"></div>
+      <div class="topbar-row">
+        <button class="icon-btn" id="prev-day" aria-label="Día anterior">‹</button>
+        <button class="fecha-btn" id="date-input" aria-label="Elegir fecha"></button>
+        <button class="icon-btn" id="next-day" aria-label="Día siguiente">›</button>
       </div>
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div class="summary" id="summary"></div>
     </header>
 
     <!-- Vista compacta: lecturas (Sí/No), trabajos (0/50/100) y disciplina (10/0), muchos alumnos por pantalla -->
@@ -97,6 +91,10 @@
       <!-- Al terminar de marcar a los que sí: los que quedan en blanco reciben No / 0 de una vez -->
       <div class="fill-rest-box" id="fill-rest" hidden></div>
       <p class="hint compact-empty" id="compact-empty" hidden>Ningún alumno coincide.</p>
+      <footer class="bottombar">
+        <button class="btn" id="compact-preview">Vista previa</button>
+        <button class="btn primary" id="compact-export">Exportar Excel</button>
+      </footer>
     </div>
 
     <!-- Vista de un alumno a la vez -->
@@ -146,19 +144,34 @@
       </div>
       <p class="hint list-hint">Toca un nombre para pasar lista desde ese alumno.</p>
       <ol class="students" id="students"></ol>
+
+      <footer class="bottombar">
+        <button class="btn" id="list-preview">Vista previa</button>
+        <button class="btn primary" id="export-btn">Exportar Excel</button>
+      </footer>
     </div>
-
-    <!-- Pestañas Calificaciones y Grupo (src/app/calificaciones.js y grupo.js, se cargan al abrirlas) -->
-    <div id="vista-calif" class="vista" hidden></div>
-    <div id="vista-grupo" class="vista" hidden></div>
-
-    <!-- Barra de abajo: las tres partes de la app -->
-    <nav class="tabbar" id="tabbar" aria-label="Secciones">
-      <button data-vista="lista" class="on"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9"/></svg>Pasar lista</button>
-      <button data-vista="calif"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Calificaciones</button>
-      <button data-vista="grupo"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.2 2.7-5.5 6-5.5s6 2.3 6 5.5"/><path d="M16 5.2a3 3 0 010 5.6M21 19c0-2.6-1.6-4.6-4-5.3"/></svg>Grupo</button>
-    </nav>
   </section>
+
+  <!-- Menú -->
+  <dialog id="menu">
+    <h2>Opciones</h2>
+    <button class="menu-item cuenta-item" data-action="salir-demo" id="menu-salir-demo" hidden>‹ Salir de la demostración</button>
+    <button class="menu-item cuenta-item" data-action="escuela" id="menu-escuela" hidden>Mi escuela (director)</button>
+    <button class="menu-item cuenta-item" data-action="cuenta" id="menu-cuenta">Mi cuenta</button>
+    <button class="menu-item" data-action="subject">Materia de este grupo</button>
+    <button class="menu-item" data-action="grades">Secciones y calificaciones</button>
+    <button class="menu-item" data-action="semestral">Calificación semestral</button>
+    <button class="menu-item" data-action="group-report">Resumen del grupo (semáforo)</button>
+    <button class="menu-item" data-action="student">Resumen por alumno</button>
+    <button class="menu-item" data-action="book">Cuadernillo del grupo (PDF)</button>
+    <button class="menu-item" data-action="add-student">Agregar alumno al grupo</button>
+    <button class="menu-item" data-action="remove-student">Quitar alumno agregado</button>
+    <button class="menu-item" data-action="bajas">Dar de baja a un alumno</button>
+    <button class="menu-item" data-action="settings">Valores de cada estado</button>
+    <button class="menu-item danger" data-action="new-file">Cargar otro archivo</button>
+    <button class="btn" data-action="close">Cerrar</button>
+  </dialog>
+
 
   <!-- Calendario: días con actividad marcados (src/app/calendario.js) -->
   <dialog id="calendario" aria-label="Calendario"></dialog>
@@ -179,7 +192,14 @@
     <button class="btn" data-action="close">Cancelar</button>
   </dialog>
 
-
+  <!-- Dar de baja / reactivar alumnos (src/app/bajas.js) -->
+  <dialog id="bajas">
+    <h2>Dar de baja a un alumno</h2>
+    <p class="hint">Desde hoy ya no aparece al pasar lista ni en los resúmenes. Lo capturado antes se conserva y lo puedes reactivar.</p>
+    <input type="search" class="dialog-search" id="bajas-busca" placeholder="Buscar alumno…">
+    <ul class="pick-list bajas-lista" id="bajas-lista"></ul>
+    <button class="btn" data-action="close">Cerrar</button>
+  </dialog>
 
   <!-- Sin cuenta (o vencida): ver y exportar sí, capturar no (src/app/acceso.js) -->
   <dialog id="bloqueo">

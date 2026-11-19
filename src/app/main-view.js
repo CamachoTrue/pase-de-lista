@@ -65,20 +65,6 @@ function pintarAcceso() {
 export function refresh() {
   const opt = $('#group-select').options[state.ui.group];
   if (opt) opt.textContent = glabel(group());
-  // Pestañas de abajo: Pasar lista, Calificaciones o Grupo.
-  const vista = ui.vista || 'lista';
-  document.querySelectorAll('#tabbar [data-vista]').forEach((b) => b.classList.toggle('on', b.dataset.vista === vista));
-  $('#lista-controles').hidden = vista !== 'lista';
-  $('#vista-calif').hidden = vista !== 'calif';
-  $('#vista-grupo').hidden = vista !== 'grupo';
-  if (vista !== 'lista') {
-    $('#card-view').hidden = true;
-    $('#list-view').hidden = true;
-    $('#compact-view').hidden = true;
-    const carga = vista === 'calif' ? import('./calificaciones.js').then((m) => m.renderCalif()) : import('./grupo.js').then((m) => m.renderGrupo());
-    carga.catch((e) => { console.error(e); $(`#vista-${vista}`).innerHTML = '<p class="hint">No se pudo abrir. Revisa tu conexión e inténtalo otra vez.</p>'; });
-    return;
-  }
   const t = tab();
   renderTabs();
   const att = typeOf(t) === 'asist';
@@ -113,15 +99,8 @@ $('#tabs').addEventListener('click', (e) => {
   window.scrollTo(0, 0);
 });
 
-// Conteos del día (sin la fecha: ya está arriba) y el botón de vista previa del Excel, en cada pantalla.
+// Conteos del día (sin la fecha: ya está arriba).
 export function renderSummary() {
-  pintarConteos();
-  $('#summary').insertAdjacentHTML('beforeend', '<button class="btn btn-previa" data-previa>Vista previa</button>');
-}
-$('#summary').addEventListener('click', (e) => {
-  if (e.target.closest('[data-previa]')) import('./export.js').then((m) => m.openPreview('todo'));
-});
-function pintarConteos() {
   const cat = tab();
   const t = typeOf(cat);
   if (t === 'num') {

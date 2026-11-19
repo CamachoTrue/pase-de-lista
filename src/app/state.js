@@ -76,7 +76,7 @@ export function setState(s) { state = s; }
 export function fijarReferencia() { ultimosDatos = datosDe(state); }
 export function recargar() { state = load(); ultimosDatos = datosDe(state); }
 // Estado de la pantalla que comparten varios módulos.
-export const ui = { view: 'card', cardIdx: 0, busy: false, studentRow: null, vista: 'lista' };
+export const ui = { view: 'card', cardIdx: 0, busy: false, studentRow: null };
 // Director: ¿ve su escuela o sus grupos? (se recuerda en este dispositivo)
 const VISTA = `app.vista${sufijoDemo}`;
 export const vistaApp = () => { try { return almacenApp().getItem(VISTA); } catch { return null; } };

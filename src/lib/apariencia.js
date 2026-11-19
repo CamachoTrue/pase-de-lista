@@ -5,7 +5,7 @@ import { almacenApp, sufijoDemo } from './demo.js';
 
 // Cada color con su versión para fondo claro y para fondo oscuro: [principal, al pasar el mouse, suave, texto encima].
 export const COLORES = {
-  verde: { nombre: 'Verde pizarrón', claro: ['#1d5a45', '#174a39', '#e6efe9', '#ffffff'], oscuro: ['#4fae84', '#5fbe93', '#1d3329', '#0d1511'] },
+  verde: { nombre: 'Verde', claro: ['#1f7a4d', '#1a6640', '#e3f4ea', '#ffffff'], oscuro: ['#2f9e66', '#38b073', '#183a27', '#ffffff'] },
   azul: { nombre: 'Azul marino', claro: ['#1f4e8c', '#193f72', '#e4ecf7', '#ffffff'], oscuro: ['#6b9fe6', '#82b0ee', '#1b2a42', '#0b1424'] },
   vino: { nombre: 'Vino', claro: ['#8a2343', '#721c37', '#f6e3e9', '#ffffff'], oscuro: ['#e07a98', '#ea93ab', '#3a1c26', '#1e0a11'] },
   morado: { nombre: 'Morado', claro: ['#5b3a9e', '#4a2f83', '#ece6f7', '#ffffff'], oscuro: ['#a48be0', '#b39ce8', '#2a2140', '#140d24'] },
@@ -39,7 +39,7 @@ export function aplicarApariencia() {
   raiz.style.setProperty('--primary-soft', suave);
   raiz.style.setProperty('--primary-text', texto);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = oscuro ? '#111513' : COLORES[a.color].claro[0];
+  if (meta) meta.content = oscuro ? '#101412' : COLORES[a.color].claro[0];
 }
 sistemaOscuro.addEventListener('change', aplicarApariencia);
 aplicarApariencia();

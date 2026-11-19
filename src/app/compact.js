@@ -1,5 +1,6 @@
 import { ASIST_ID } from '../lib/excel-core.js';
 import { confirmBulk, confirmChange } from './dialogs.js';
+import { openExportar, openPreview } from './export.js';
 import { refresh, renderSummary } from './main-view.js';
 import { DISC_DEFAULT, FILL_REST, LABELS, OPTIONS, curWork, dayData, group, lista, optionOf, save, secById, state, tab, typeOf, workIdx, works } from './state.js';
 import { $, escapeHtml, normalize, toast } from './util.js';
@@ -257,3 +258,5 @@ $('#work-del').addEventListener('click', async () => {
   toast(`${name} eliminado`);
 });
 
+$('#compact-preview').addEventListener('click', () => openPreview('todo'));
+$('#compact-export').addEventListener('click', () => openExportar());
