@@ -171,6 +171,8 @@ function desvincular() {
   limpiar(state.groups);
   delete state.nube_usuario;
   delete state.nube_excel;
+  delete state.nube_ajustes;
+  delete state.nube_ajustes_en;
   // Los parciales que puso la escuela pasan a ser del maestro (ya puede editarlos).
   if (state.periodos && state.periodos.origen === 'escuela') { state.periodos.origen = 'maestro'; delete state.periodos.id; }
   save(true);
@@ -585,6 +587,7 @@ $('#cuenta-body').addEventListener('click', async (e) => {
       $('#cuenta').close();
       render();
       toast(`Listo: ${n} ${n === 1 ? 'clase bajada' : 'clases bajadas'} a este celular`);
+      programar(500); // trae también los ajustes de la cuenta (valores de cada estado, parciales)
     } catch (ex) {
       console.error(ex);
       if (av) av.textContent = errorLegible(ex);

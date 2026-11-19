@@ -29,7 +29,9 @@ $('#file-input').addEventListener('change', async (e) => {
       // La clase en la nube también: se vuelve a subir todo (la base de datos no duplica nada).
       if (prev && prev.nube && prev.nube.clase_id) g.nube = { clase_id: prev.nube.clase_id, grupo_id: prev.nube.grupo_id, h: {} };
     });
-    setState({ fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, ui: { group: 0, date: todayISO(), tab: ASIST_ID }, nube_usuario: state && state.nube_usuario });
+    setState({ fileName: file.name, fileB64: bufToB64(buf), groups, codes: { ...DEFAULT_CODES, ...codes }, ui: { group: 0, date: todayISO(), tab: ASIST_ID }, nube_usuario: state && state.nube_usuario,
+      // Parciales y marcas de la cuenta no dependen del Excel: se conservan.
+      periodos: state && state.periodos, nube_ajustes: state && state.nube_ajustes, nube_ajustes_en: state && state.nube_ajustes_en });
     save();
     const total = groups.reduce((n, g) => n + g.students.length, 0);
     toast(`${groups.length} grupo(s), ${total} alumnos cargados`);

@@ -4,7 +4,7 @@
 import { alGuardar, fixGrading, save, state } from './state.js';
 import { dispositivo, errorLegible, haySesion, nube } from '../lib/nube.js';
 import { armarGrupo, diasDeTrabajos, faltaImportar, hayQueBajar, huella, planDias, planSecciones, resumenClase } from '../lib/sync-plan.js';
-import { ASIST_ID, normalizeGroup } from '../lib/excel-core.js';
+import { ASIST_ID, DEFAULT_CODES, normalizeGroup } from '../lib/excel-core.js';
 import { b64ToBuf, toast } from './util.js';
 import { bookDB } from './book-db.js';
 
@@ -45,6 +45,7 @@ export async function sincronizar() {
     if (!p0.activa || (p0.vence_el && p0.vence_el < new Date().toISOString().slice(0, 10))) { estado.fase = 'vencida'; return; }
     state.nube_usuario = session.user.id;
     await bajarPeriodos(sb, perfil[0].escuela_id);
+    await sincronizarAjustes(sb, session.user.id);
     for (const g of state.groups) await subirGrupo(sb, g);
     for (const g of state.groups) await subirSemestral(sb, g, perfil[0].escuela_id, session.user.id);
     const carpeta = `${perfil[0].escuela_id}/${session.user.id}`;
@@ -139,6 +140,38 @@ async function bajarPeriodos(sb, escuela) {
   const periodos = { semestre: s.nombre, id: s.id, origen: 'escuela',
     parciales: [...s.parciales].sort((a, b) => a.numero - b.numero).map((p) => ({ numero: p.numero, inicio: p.inicio, fin: p.fin })) };
   if (JSON.stringify(periodos) !== JSON.stringify(state.periodos)) { state.periodos = periodos; save(true); }
+}
+
+// ---------- Ajustes de la cuenta: valores de cada estado y parciales propios del maestro ----------
+// Lo que este dispositivo manda a la cuenta. Si los parciales los puso la escuela, se conservan los
+// propios que ya estaban en la cuenta.
+const ajustesLocales = (remoto) => ({
+  codes: state.codes,
+  periodos: state.periodos && state.periodos.origen === 'escuela' ? (remoto.periodos ?? null) : (state.periodos || null),
+});
+async function sincronizarAjustes(sb, uid) {
+  const { data, error } = await sb.from('usuarios').select('ajustes, ajustes_en').eq('id', uid).single();
+  if (error) throw error;
+  const remoto = data.ajustes || {};
+  const hayRemoto = !!data.ajustes_en;
+  const h = huella(JSON.stringify(ajustesLocales(remoto)));
+  // Primera vez en este dispositivo: si la cuenta ya tiene ajustes, mandan los de la cuenta.
+  const cambioAqui = state.nube_ajustes ? h !== state.nube_ajustes : !hayRemoto;
+  if (cambioAqui) {
+    const { data: r, error: e } = await sb.from('usuarios').update({ ajustes: ajustesLocales(remoto) }).eq('id', uid).select('ajustes_en').single();
+    if (e) throw e;
+    state.nube_ajustes = h;
+    state.nube_ajustes_en = r.ajustes_en;
+    save(true);
+  } else if (hayRemoto && data.ajustes_en !== state.nube_ajustes_en) {
+    // Otro dispositivo los cambió: se usan aquí.
+    if (remoto.codes) state.codes = { ...DEFAULT_CODES, ...remoto.codes };
+    if (!(state.periodos && state.periodos.origen === 'escuela')) state.periodos = remoto.periodos || null;
+    state.nube_ajustes = huella(JSON.stringify(ajustesLocales(remoto)));
+    state.nube_ajustes_en = data.ajustes_en;
+    save(true);
+    window.dispatchEvent(new Event('nube-cambio'));
+  }
 }
 
 // { fila: x } → { alumno_id: x }
@@ -336,14 +369,18 @@ async function bajarClase(sb, g) {
 // dispositivo cambió algo, se sincroniza completo (sube lo de aquí y baja lo de allá).
 async function revisar() {
   if (!state || !state.groups || !haySesion() || !navigator.onLine || corriendo || document.hidden) return;
-  if (!state.groups.some((g) => g.nube && g.nube.clase_id)) return;
+  if (!state.nube_usuario) return; // este dispositivo aún no se ha ligado a la cuenta
   try {
     const sb = await nube();
     const { data: { session } } = await sb.auth.getSession();
-    if (!session || (state.nube_usuario && state.nube_usuario !== session.user.id)) return;
-    const cambios = await cambiosEnLaNube(sb, session.user.id);
+    if (!session || state.nube_usuario !== session.user.id) return;
+    const [cambios, { data: yo }] = await Promise.all([
+      cambiosEnLaNube(sb, session.user.id),
+      sb.from('usuarios').select('ajustes_en').eq('id', session.user.id).maybeSingle(),
+    ]);
     const este = dispositivo();
-    if (state.groups.some((g) => hayQueBajar(g, cambios[g.nube && g.nube.clase_id], este))) sincronizar();
+    const ajustes = yo && yo.ajustes_en && yo.ajustes_en !== state.nube_ajustes_en;
+    if (ajustes || state.groups.some((g) => hayQueBajar(g, cambios[g.nube && g.nube.clase_id], este))) sincronizar();
   } catch { /* sin conexión: se intenta en la siguiente vuelta */ }
 }
 setInterval(revisar, 30000);

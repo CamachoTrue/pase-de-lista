@@ -322,6 +322,19 @@ test('cambios por dispositivo: cada clase sabe qué dispositivo la cambió', asy
   await db.query("select set_config('request.headers', '', false)");
 });
 
+test('ajustes de la cuenta: cada quien los suyos, con hora del cambio', async () => {
+  const [r] = await as(U.maeB, `update usuarios set ajustes = '{"codes":{"A":"P"}}' where id = $1 returning ajustes, ajustes_en`, [U.maeB.id]);
+  assert.equal(r.ajustes.codes.A, 'P');
+  assert.ok(r.ajustes_en);
+  // El director puede ver la fila de su maestro, pero no cambiarle los ajustes.
+  await fails(U.dirB, `update usuarios set ajustes = '{}' where id = $1`, [U.maeB.id], /propios ajustes/);
+  // Cambiar el nombre no mueve la hora de los ajustes; y nadie la pone a mano.
+  const [n] = await as(U.maeB, `update usuarios set nombre = 'Mae B bis' where id = $1 returning ajustes_en`, [U.maeB.id]);
+  assert.deepEqual(n.ajustes_en, r.ajustes_en);
+  await fails(U.maeB, `update usuarios set ajustes_en = now() where id = $1`, [U.maeB.id], /permission denied/);
+  assert.equal((await as(U.maeA1, `update usuarios set ajustes = '{}' where id = $1 returning id`, [U.maeB.id])).length, 0);
+});
+
 test('eliminar mi cuenta: el independiente borra todo; el de escuela solo su usuario', async () => {
   await fails(U.super, 'select eliminar_mi_cuenta()', [], /administrador general/);
   await fails(null, 'select eliminar_mi_cuenta()', [], /permission denied/);
