@@ -187,3 +187,33 @@ test('bajas: el alumno dado de baja sale de la lista desde su fecha y del resume
   assert.deepEqual(activos(g).map((s) => s.name), ['UNO']);
   assert.equal(groupReport(g, {}).rows.length, 1);
 });
+
+test('lista nueva del mismo grupo: conserva lo capturado, cierres y examen final; los que se van quedan de baja', () => {
+  const st = (row, no, name, extra = {}) => ({ row, no, name, ...extra });
+  const prev = {
+    sheet: '1A', headerRow: 4,
+    students: [st(5, '1', 'ANA LÓPEZ', { alumno_id: 'a1' }), st(6, '2', 'BETO RUIZ', { alumno_id: 'a2' }), st(7, '3', 'CARLA SOTO', { alumno_id: 'a3' })],
+    records: { '2026-11-10': { 5: 'A', 6: 'F', 7: 'R' } },
+    lect: { '2026-11-11': { 5: 'S', 7: 'N' } },
+    trab: { '2026-11-12': [{ title: 'Ensayo', vals: { 5: 100, 6: 50 }, nube_id: 't1' }] },
+    cierres: [{ tipo: 'parcial', parcial: 1, calificaciones: { 5: { final: 9 }, 6: { final: 6 }, 7: { final: 8 } } }],
+    semestral: { modo: 'final', final: { 6: 70 } },
+  };
+  // Lista nueva: cambia el orden, se va Carla y llega Diana (y Beto viene sin acento distinto).
+  const g = { sheet: '1A', headerRow: 4, students: [st(5, '1', 'BETO  RUIZ'), st(6, '2', 'ANA LOPEZ'), st(7, '3', 'DIANA VEGA')], sections: L.DEFAULT_SECTIONS() };
+  L.normalizeGroup(g);
+  const r = L.actualizarGrupo(prev, g, '2026-11-20');
+  assert.deepEqual(r, { llegan: ['DIANA VEGA'], seVan: ['CARLA SOTO'], siguen: ['ANA LOPEZ', 'BETO  RUIZ'] });
+  const fila = (n) => g.students.find((s) => s.name.startsWith(n)).row;
+  assert.equal(g.students.find((s) => s.name === 'ANA LOPEZ').alumno_id, 'a1');
+  const carla = g.students.find((s) => s.name === 'CARLA SOTO');
+  assert.deepEqual([carla.baja, carla.added, carla.alumno_id], ['2026-11-20', true, 'a3']);
+  assert.deepEqual(g.records['2026-11-10'], { [fila('ANA')]: 'A', [fila('BETO')]: 'F', [fila('CARLA')]: 'R' });
+  assert.deepEqual(g.lect['2026-11-11'], { [fila('ANA')]: 'S', [fila('CARLA')]: 'N' });
+  assert.deepEqual(g.trab['2026-11-12'][0].vals, { [fila('ANA')]: 100, [fila('BETO')]: 50 });
+  assert.equal(g.trab['2026-11-12'][0].nube_id, 't1');
+  assert.equal(g.cierres[0].calificaciones[fila('BETO')].final, 6);
+  assert.deepEqual(g.semestral.final, { [fila('BETO')]: 70 });
+  // Diana no trae nada y sí aparece al pasar lista; Carla ya no.
+  assert.deepEqual(L.activos(g).map((s) => s.name), ['BETO  RUIZ', 'ANA LOPEZ', 'DIANA VEGA']);
+});

@@ -1,4 +1,5 @@
-import { ASIST_ID, DEFAULT_CODES, normalizeGroup, parseWorkbook } from '../lib/excel-core.js';
+import { ASIST_ID, DEFAULT_CODES, actualizarGrupo, normalizeGroup, parseWorkbook } from '../lib/excel-core.js';
+import { confirmBulk } from './dialogs.js';
 import { render } from './main-view.js';
 import { fixGrading, save, setState, state, todayISO } from './state.js';
 import { $, bufToB64, loadExcel, toast } from './util.js';
@@ -29,6 +30,7 @@ export async function cargarLibro(buf, fileName, { ejemplo = false } = {}) {
   const old = (state && state.groups) || [];
   const prevOf = (sheet) => old.find((o) => o.sheet === sheet);
   const groups = parseWorkbook(wb, codes, (sheet) => (prevOf(sheet) || {}).sections);
+  const cambios = [];
   if (!groups.length) {
     toast('No encontré una columna “NOMBRE” en ninguna hoja');
     return false;
@@ -40,15 +42,31 @@ export async function cargarLibro(buf, fileName, { ejemplo = false } = {}) {
     if (prev && prev.subject) g.subject = prev.subject; // la materia también se conserva
     // La clase en la nube también: se vuelve a subir todo (la base de datos no duplica nada).
     if (prev && prev.nube && prev.nube.clase_id) g.nube = { clase_id: prev.nube.clase_id, grupo_id: prev.nube.grupo_id, h: {} };
+    // Lista nueva del mismo grupo: se actualiza (no se pierde lo capturado ni los parciales cerrados).
+    if (prev && !(state && state.ejemplo) && !ejemplo) cambios.push([g, actualizarGrupo(prev, g, todayISO())]);
   });
+  if (cambios.length && !(await confirmarLista(cambios, old.filter((o) => !groups.some((g) => g.sheet === o.sheet))))) return false;
   setState({ fileName, fileB64: bufToB64(buf), ...(ejemplo ? { ejemplo: true } : {}), groups, codes: { ...DEFAULT_CODES, ...codes }, ui: { group: 0, date: todayISO(), tab: ASIST_ID }, nube_usuario: state && state.nube_usuario,
     // Parciales y marcas de la cuenta no dependen del Excel: se conservan.
     periodos: state && state.periodos, nube_ajustes: state && state.nube_ajustes, nube_ajustes_en: state && state.nube_ajustes_en });
   save();
-  const total = groups.reduce((n, g) => n + g.students.length, 0);
-  toast(`${groups.length} grupo(s), ${total} alumnos cargados`);
+  const total = groups.reduce((n, g) => n + g.students.filter((x) => !x.baja).length, 0);
+  toast(cambios.length ? 'Lista actualizada: se conservó todo lo capturado' : `${groups.length} grupo(s), ${total} alumnos cargados`);
   render();
   return true;
+}
+
+// Antes de cambiar la lista: qué alumnos llegan y cuáles se van, grupo por grupo.
+function confirmarLista(cambios, quitados) {
+  const nombres = (a) => (a.length > 3 ? `${a.slice(0, 3).join(', ')} y ${a.length - 3} más` : a.join(', '));
+  const lineas = cambios.map(([g, r]) => {
+    const partes = [];
+    if (r.llegan.length) partes.push(`llegan ${r.llegan.length} (${nombres(r.llegan)})`);
+    if (r.seVan.length) partes.push(`se van ${r.seVan.length} (${nombres(r.seVan)}), quedan de baja`);
+    return `${g.sheet}: ${partes.length ? partes.join('; ') : 'sin cambios en los alumnos'}.`;
+  });
+  if (quitados.length) lineas.push(`Ya no vienen en el archivo: ${quitados.map((g) => g.sheet).join(', ')} (se quitan de este celular).`);
+  return confirmBulk('¿Actualizar la lista?', `${lineas.join(' ')} Todo lo capturado y los parciales cerrados se conservan.`, 'Sí, actualizar');
 }
 
 // Lista de ejemplo (para conocer la app sin el Excel propio). Se carga al tocar el botón.

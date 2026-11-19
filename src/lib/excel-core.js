@@ -878,10 +878,55 @@ function semestral(g, row, grading, periodos, config) {
   };
 }
 
+// ---------- Lista nueva del mismo grupo (p. ej. al empezar otro parcial) ----------
+// Actualiza el grupo en vez de reemplazarlo: reconoce a cada alumno por su nombre y le conserva todo lo
+// capturado, los parciales cerrados y su examen final; los nuevos se agregan; los que ya no vienen quedan
+// de baja desde «hoy» (con su historial) al final de la lista. g es el grupo leído del archivo nuevo y
+// queda actualizado; prev es el grupo que ya estaba. Regresa { llegan, seVan, siguen } (nombres).
+function actualizarGrupo(prev, g, hoy) {
+  const clave = (n) => norm(n).replace(/[^A-Z0-9 ]/g, '');
+  const delArchivo = [...g.students];
+  const nuevos = new Map(g.students.map((s) => [clave(s.name), s]));
+  const fila = {}; // fila anterior → fila nueva
+  const siguen = [];
+  const seVan = [];
+  let ultima = Math.max(g.headerRow || 0, ...g.students.map((s) => s.row));
+  for (const p of prev.students) {
+    const s = nuevos.get(clave(p.name));
+    if (s && !s.__ya) {
+      s.__ya = true;
+      fila[p.row] = s.row;
+      if (p.alumno_id) s.alumno_id = p.alumno_id;
+      siguen.push(s.name);
+    } else {
+      // Ya no viene en la lista: se queda (de baja) para no perder su historial.
+      const q = { ...p, row: ++ultima, added: true, baja: p.baja || hoy };
+      g.students.push(q);
+      fila[p.row] = q.row;
+      if (!p.baja) seVan.push(p.name);
+    }
+  }
+  const llegan = delArchivo.filter((s) => !s.__ya).map((s) => s.name);
+  delArchivo.forEach((s) => delete s.__ya);
+  const mover = (vals) => { const o = {}; for (const [r, v] of Object.entries(vals || {})) if (r in fila) o[fila[r]] = v; return o; };
+  // Lo capturado en la app manda; lo que traiga el archivo (si es uno exportado) llena lo que falte.
+  for (const sec of sectionsOf(g)) {
+    const del = prev[sec.id] || {};
+    const dest = (g[sec.id] = g[sec.id] || {});
+    for (const [fecha, dia] of Object.entries(del)) {
+      if (sec.type === 'trab') dest[fecha] = (Array.isArray(dia) ? dia : [{ title: '', vals: dia }]).map((w) => ({ ...w, vals: mover(w.vals) }));
+      else dest[fecha] = { ...(dest[fecha] || {}), ...mover(dia) };
+    }
+  }
+  g.cierres = (prev.cierres || []).map((c) => ({ ...c, calificaciones: mover(c.calificaciones) }));
+  if (prev.semestral) g.semestral = { ...prev.semestral, final: mover(prev.semestral.final) };
+  return { llegan, seVan, siguen };
+}
+
 export {
     STATUSES, READ, WORK, DEFAULT_CODES, TYPES, ASIST_ID, DEFAULT_SECTIONS, sectionsOf, newSectionId, secMin,
     activos, parseWorkbook, exportWorkbook, groupDates, sheetLayout, worksOf, normalizeWorks, normalizeGroup, hasData, discDates, datesOf, shortDate,
     DEFAULT_GRADING, gradeParts, finalGrade, gradingOn, weightOf, round1, parseHeader, parseDateHeader, cellText,
     studentReport, exportStudent, groupReport, exportGroupReport,
-    enPeriodo, periodosListos, parcialDe, cierreVigente, SEMESTRAL, semestral,
+    enPeriodo, periodosListos, parcialDe, cierreVigente, SEMESTRAL, semestral, actualizarGrupo,
 };

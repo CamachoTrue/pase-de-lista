@@ -59,8 +59,12 @@ function pintarPeriodos() {
     ? 'Las fechas de los parciales las puso tu director para toda la escuela. Si alguna está mal, pídele que la cambie.'
     : bloqueado ? 'En tu escuela, las fechas de los parciales las pone el director. Aún no las ha puesto; en cuanto lo haga aparecerán aquí solas.'
     : 'Las capturas se acomodan solas en su parcial según la fecha. Valen para todos tus grupos.';
-  $('#per-resumen').textContent = periodosListos(p) ? `· ${p.semestre || 'definidos'}` : '· sin definir';
+  pintarResumenPeriodos();
 }
+const pintarResumenPeriodos = () => {
+  const p = gradeDraft.periodos || {};
+  $('#per-resumen').textContent = periodosListos(p) ? `· ${p.semestre || 'definidos'}` : '· sin definir';
+};
 function leerPeriodos() {
   const f = $('#grades-form');
   const parciales = [1, 2, 3].map((n) => ({ numero: n, inicio: f.elements[`p${n}i`].value, fin: f.elements[`p${n}f`].value }))
@@ -71,6 +75,7 @@ function leerPeriodos() {
 $('#grades-form').addEventListener('input', (e) => {
   if (!/^(semestre|p\d[if])$/.test(e.target.name || '')) return;
   leerPeriodos();
+  pintarResumenPeriodos();
   renderGrades();
 });
 $('#per-tabs').addEventListener('click', (e) => {

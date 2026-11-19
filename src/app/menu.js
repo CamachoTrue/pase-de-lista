@@ -42,7 +42,7 @@ menu.addEventListener('click', async (e) => {
   if (action === 'salir-demo') location.href = '/';
   if (action === 'semestral') abrir(() => import('./semestral.js'), 'openSemestral');
   if (action === 'new-file') {
-    if (await confirmBulk('¿Cargar otro archivo Excel?', 'Se reemplazan las listas de este celular por las del archivo nuevo. Si solo cambia de parcial, no hace falta: ciérralo en «Criterios de evaluación». Exporta antes si necesitas un respaldo.', 'Sí, elegir archivo', true)) $('#file-input').click();
+    if (await confirmBulk('¿Cargar la lista nueva?', 'Elige el Excel con la lista actualizada (por ejemplo, la del nuevo parcial). Cada alumno conserva lo capturado y los parciales cerrados; los nuevos se agregan y los que ya no vengan quedan de baja. Antes de aplicar te digo quién llega y quién se va.', 'Elegir archivo')) $('#file-input').click();
   }
 });
 
