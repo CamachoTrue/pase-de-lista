@@ -1,3 +1,4 @@
+import './lib/apariencia.js';
 import { ASIST_ID, DEFAULT_CODES, normalizeGroup } from './lib/excel-core.js';
 import { render } from './app/main-view.js';
 import { fijarReferencia, fixGrading, state, todayISO } from './app/state.js';

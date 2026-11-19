@@ -1,7 +1,7 @@
 import { STATUSES } from '../lib/excel-core.js';
 import { renderCard, renderStudents, startCard } from './card.js';
 import { renderCompact } from './compact.js';
-import { OPTIONS, dayData, dayRecords, glabel, group, lista, save, secs, state, tab, typeOf, ui, vistaApp } from './state.js';
+import { OPTIONS, dayData, dayRecords, glabel, group, lista, save, secs, state, tab, todayISO, typeOf, ui, vistaApp } from './state.js';
 import { haySesion, rolGuardado } from '../lib/nube.js';
 import { DEMO } from '../lib/demo.js';
 import { tieneAcceso } from './acceso.js';
@@ -38,7 +38,7 @@ export function render() {
     .map((g, i) => `<option value="${i}">${escapeHtml(glabel(g))}</option>`)
     .join('');
   sel.value = state.ui.group;
-  $('#date-input').value = state.ui.date;
+  pintarFecha();
   startCard();
   refresh();
 }
@@ -168,16 +168,25 @@ $('#group-select').addEventListener('change', (e) => {
   $('#search').value = '';
   changed();
 });
-$('#date-input').addEventListener('change', (e) => {
-  if (!e.target.value) return;
-  state.ui.date = e.target.value;
+// Fecha arriba: botón que abre el calendario (con los días que tuvieron actividad marcados).
+const fechaLarga = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); };
+export function pintarFecha() {
+  const b = $('#date-input');
+  b.value = state.ui.date;
+  b.textContent = fechaLarga(state.ui.date);
+  b.classList.toggle('hoy', state.ui.date === todayISO());
+}
+export function irAFecha(iso) {
+  state.ui.date = iso;
+  pintarFecha();
   changed();
-});
+}
+$('#date-input').addEventListener('click', () => import('./calendario.js').then((m) => m.abrirCalendario()));
 export function shiftDay(n) {
   const [y, m, d] = state.ui.date.split('-').map(Number);
   const dt = new Date(y, m - 1, d + n);
   state.ui.date = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-  $('#date-input').value = state.ui.date;
+  pintarFecha();
   changed();
 }
 $('#prev-day').addEventListener('click', () => shiftDay(-1));

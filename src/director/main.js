@@ -1,5 +1,6 @@
 // ---------- Panel del director (/director): pensado para computadora ----------
 // Entrar, elegir escuela (administrador) y mostrar el panel (src/director/panel.js).
+import '../lib/apariencia.js';
 import { errorLegible, nube } from '../lib/nube.js';
 import { crearPanel, escuelaDeEjemplo, exportarEscuela, leerEscuela } from './panel.js';
 

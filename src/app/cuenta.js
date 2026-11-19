@@ -8,6 +8,7 @@ import { errorLegible, guardarAcceso, guardarPaquete, guardarRol, nube, recordar
 import { alCambiarEstado, estado, programar, sincronizar } from './sync.js';
 import { save, setVistaApp, state } from './state.js';
 import { DEMO, PERFIL_DEMO } from '../lib/demo.js';
+import { COLORES, guardarApariencia, leerApariencia } from '../lib/apariencia.js';
 import { bajarDeLaNube, clasesEnLaNube } from './bajar.js';
 import { render, vistaEscuela } from './main-view.js';
 
@@ -66,7 +67,7 @@ async function renderCuenta() {
   if (p.rol === 'director') html += btnsDirector();
   if (p.rol === 'superadmin') html += '<a class="btn primary dir-link" href="/director" target="_blank" rel="noopener">Abrir panel de escuelas ↗</a>';
   if (p.rol === 'superadmin') html += seccionVerComo() + seccionEscuelas();
-  body().innerHTML = html + btnSalir() + (p.rol === 'superadmin' ? '' : btnEliminar());
+  body().innerHTML = html + seccionApariencia() + btnSalir() + (p.rol === 'superadmin' ? '' : btnEliminar());
   pintarNube();
   programar(200);
   ofrecerBajar();
@@ -137,6 +138,26 @@ const btnsDirector = () => (vistaEscuela()
       <button class="btn" data-act="ir-grupos">Ir a mis grupos</button></section>`
   : `<button class="btn primary big" data-act="ir-escuela">‹ Volver a mi escuela</button>
     <p class="hint">Resumen de la escuela, maestros (invitar y dar o quitar acceso) y parciales.</p>`);
+
+// Apariencia: tema y color principal (se guardan también en la cuenta).
+function seccionApariencia() {
+  const a = leerApariencia();
+  const tema = (v, t) => `<button class="apa-tema ${a.tema === v ? 'on' : ''}" data-act="tema" data-v="${v}">${t}</button>`;
+  return `<section class="cuenta-sec apariencia" data-apariencia>
+      <h3>Apariencia</h3>
+      <div class="apa-temas">${tema('auto', 'Automático')}${tema('claro', 'Claro')}${tema('oscuro', 'Oscuro')}</div>
+      <p class="hint">Automático sigue el modo claro u oscuro de tu celular.</p>
+      <div class="apa-colores">${Object.entries(COLORES).map(([k, c]) => `<button class="apa-color ${a.color === k ? 'on' : ''}" data-act="color" data-v="${k}"
+        style="--c:${c.claro[0]};--c2:${c.oscuro[0]}" aria-label="${c.nombre}" title="${c.nombre}"></button>`).join('')}</div>
+      <p class="hint">Color de la app: <b>${COLORES[a.color].nombre}</b>. Los colores de asistencia (A, F, R, J) no cambian.</p>
+    </section>`;
+}
+function cambiarApariencia(cambio) {
+  guardarApariencia(cambio);
+  const s = body().querySelector('[data-apariencia]');
+  if (s) s.outerHTML = seccionApariencia();
+  if (!DEMO) programar(800); // se guarda también en la cuenta
+}
 
 // Rol guardado en el dispositivo: si cambia (entrar, salir, otra cuenta), la app cambia de pantalla.
 function cambiarRol(r) {
@@ -265,6 +286,7 @@ function renderDemo() {
     ${avisoSuscripcion(p)}
     <div class="nube-estado ${listas ? 'ok' : ''}"><span>${listas ? 'Todo guardado en tu cuenta ✓' : 'Aún no hay listas en este celular. Cuando subas tu Excel se guardarán también en tu cuenta.'}</span></div>
     ${p.rol === 'director' ? btnsDirector() : ''}
+    ${seccionApariencia()}
     <button class="btn primary cuenta-salir" data-act="salir">‹ Salir de la demostración</button>${btnEliminar()}</div>`;
 }
 
@@ -460,6 +482,7 @@ $('#cuenta-body').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const act = b.dataset.act;
+  if (act === 'tema' || act === 'color') { cambiarApariencia({ [act]: b.dataset.v }); return; }
   if (act === 'ir-escuela') { setVistaApp('escuela'); $('#cuenta').close(); render(); return; }
   if (act === 'ir-grupos') { setVistaApp('grupos'); $('#cuenta').close(); render(); return; }
   if (DEMO) {

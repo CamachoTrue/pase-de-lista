@@ -53,6 +53,6 @@ tr.dir-click:hover td.dir-chev { text-decoration: underline; }
 .dir-tabla th { background: var(--surface-2); color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .dir-tabla tr:last-child td { border-bottom: none; }
 .dir-tabla td small { color: var(--muted); }
-@media (prefers-color-scheme: dark) {
-  .dir-sem .rojo { background: var(--F-soft); color: var(--F); } .dir-sem .amarillo { background: var(--R-soft); color: var(--R); } .dir-sem .verde { background: var(--A-soft); color: var(--A); }
-}
+:root[data-tema="oscuro"] .dir-sem .rojo { background: var(--F-soft); color: var(--F); }
+:root[data-tema="oscuro"] .dir-sem .amarillo { background: var(--R-soft); color: var(--R); }
+:root[data-tema="oscuro"] .dir-sem .verde { background: var(--A-soft); color: var(--A); }

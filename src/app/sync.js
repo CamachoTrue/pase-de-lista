@@ -5,6 +5,7 @@ import { alGuardar, fixGrading, save, state } from './state.js';
 import { dispositivo, errorLegible, guardarAcceso, guardarPaquete, guardarRol, haySesion, nube } from '../lib/nube.js';
 import { armarGrupo, diasDeTrabajos, faltaImportar, hayQueBajar, huella, planDias, planSecciones, resumenClase } from '../lib/sync-plan.js';
 import { ASIST_ID, DEFAULT_CODES, normalizeGroup } from '../lib/excel-core.js';
+import { guardarApariencia, leerApariencia } from '../lib/apariencia.js';
 import { b64ToBuf, toast } from './util.js';
 import { bookDB } from './book-db.js';
 
@@ -164,6 +165,7 @@ async function bajarPeriodos(sb, escuela) {
 // propios que ya estaban en la cuenta.
 const ajustesLocales = (remoto) => ({
   codes: state.codes,
+  apariencia: leerApariencia(),
   periodos: state.periodos && state.periodos.origen === 'escuela' ? (remoto.periodos ?? null) : (state.periodos || null),
 });
 async function sincronizarAjustes(sb, uid) {
@@ -183,6 +185,7 @@ async function sincronizarAjustes(sb, uid) {
   } else if (hayRemoto && data.ajustes_en !== state.nube_ajustes_en) {
     // Otro dispositivo los cambió: se usan aquí.
     if (remoto.codes) state.codes = { ...DEFAULT_CODES, ...remoto.codes };
+    if (remoto.apariencia) guardarApariencia(remoto.apariencia);
     if (!(state.periodos && state.periodos.origen === 'escuela')) state.periodos = remoto.periodos || null;
     state.nube_ajustes = huella(JSON.stringify(ajustesLocales(remoto)));
     state.nube_ajustes_en = data.ajustes_en;
