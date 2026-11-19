@@ -1,7 +1,7 @@
 // ---------- Panel del director (/director): pensado para computadora ----------
 // Entrar, elegir escuela (administrador) y mostrar el panel (src/director/panel.js).
 import { errorLegible, nube } from '../lib/nube.js';
-import { crearPanel, escuelaDeEjemplo, leerEscuela } from './panel.js';
+import { crearPanel, escuelaDeEjemplo, exportarEscuela, leerEscuela } from './panel.js';
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -15,6 +15,7 @@ async function iniciarEjemplo() {
   document.body.insertAdjacentHTML('afterbegin', '<div class="dir-ejemplo">Escuela de ejemplo · datos inventados para conocer el panel</div>');
   $('#dir-sub').textContent = 'Preparatoria de Ejemplo · EJEMPLO';
   panel.mostrar(await escuelaDeEjemplo());
+  $('#dir-exportar').hidden = false;
 }
 
 async function iniciar() {
@@ -67,6 +68,7 @@ async function cargar(escuela, nombre) {
   try {
     panel.mostrar(await leerEscuela(sb, escuela));
     $('#dir-recargar').hidden = false;
+    $('#dir-exportar').hidden = false;
   } catch (e) {
     console.error(e);
     $('#dir-main').innerHTML = `<p class="hint">No se pudo cargar: ${esc(errorLegible(e))}</p>`;
@@ -74,5 +76,11 @@ async function cargar(escuela, nombre) {
 }
 
 $('#dir-recargar').addEventListener('click', () => actual && cargar(...actual));
+$('#dir-exportar').addEventListener('click', async (e) => {
+  e.currentTarget.disabled = true;
+  try { await exportarEscuela(panel.datos(), $('#dir-sub').textContent.split(' · ')[0]); } catch (ex) { console.error(ex); alertar('No se pudo exportar. Revisa tu conexión.'); }
+  $('#dir-exportar').disabled = false;
+});
+const alertar = (t) => { $('#dir-main').insertAdjacentHTML('afterbegin', `<p class="form-error">${esc(t)}</p>`); };
 
 iniciar();

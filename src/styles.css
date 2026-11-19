@@ -63,11 +63,11 @@ button, input, select { font: inherit; color: inherit; }
 .group-picker:focus-within { box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent); }
 #date-input { flex: 1; min-width: 0; text-align: center; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--bg); }
 .summary { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; font-size: .85rem; }
-.summary span { padding: 3px 8px; border-radius: 999px; background: var(--bg); }
-.summary .A { background: var(--A-soft); color: var(--A); }
-.summary .F { background: var(--F-soft); color: var(--F); }
-.summary .R { background: var(--R-soft); color: var(--R); }
-.summary .J { background: var(--J-soft); color: var(--J); }
+/* Conteos del día: solo información (no son botones), por eso van como texto, sin fondo de botón. */
+.summary { gap: 4px 12px; align-items: baseline; color: var(--muted); }
+.summary span { padding: 0; background: none; }
+.summary .A, .summary .F, .summary .R, .summary .J { font-weight: 700; }
+.summary .A { color: var(--A); } .summary .F { color: var(--F); } .summary .R { color: var(--R); } .summary .J { color: var(--J); }
 
 .toolbar { display: flex; gap: 8px; padding: 10px 12px; }
 #search { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 10px; padding: 10px; background: var(--surface); }
@@ -396,10 +396,12 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 /* Resumen del grupo (semáforo) */
 .gr-body { flex: 1; min-height: 0; overflow: auto; }
 .gr-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.gr-tile { background: var(--bg); border-radius: 12px; padding: 10px 12px; }
+/* Indicadores (solo información): sin caja de botón; el panel de la escuela los vuelve botones (.dir-tile). */
+.gr-tile { background: none; border-left: 3px solid var(--border); border-radius: 0; padding: 4px 10px; }
+.gr-tile.dir-tile { background: var(--surface); border-left-width: 1px; border-radius: 12px; padding: 10px 12px; }
 .gr-tile b { display: block; font-size: 1.5rem; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .gr-tile span { font-size: .8rem; color: var(--muted); }
-.gr-tile.rojo { background: var(--F-soft); } .gr-tile.rojo b { color: var(--F); }
+.gr-tile.rojo { border-left-color: var(--F); } .gr-tile.rojo b { color: var(--F); }
 .gr-tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
 .gr-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 6px; }
 .gr-chip { border: 1.5px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 6px 12px; font-size: .85rem; cursor: pointer; }

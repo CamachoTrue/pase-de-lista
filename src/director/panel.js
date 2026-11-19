@@ -81,14 +81,16 @@ export function crearPanel(root) {
     const asis = avg(todos.map((x) => x.a).filter((v) => v != null));
     const atrasadas = d.clases.filter((c) => c.ultima == null || dias(c.ultima) > 7).length;
     const tabs = [['resumen', 'Clases'], ['maestros', 'Por maestro'], ['riesgo', `En riesgo (${riesgo.size})`], ['alumno', 'Buscar alumno']];
+    // Cada indicador es un botón que lleva a su detalle.
+    const tile = (v, txt, ir, cls = '') => `<button class="gr-tile dir-tile ${cls}" data-vista="${ir}"><b>${v}</b><span>${txt}</span><i>Ver ›</i></button>`;
     let html = `<section class="dir-tiles">
-        <div class="gr-tile"><b>${unicos.size}</b><span>Alumnos</span></div>
-        <div class="gr-tile"><b>${d.maestros.filter((m) => m.activo).length}</b><span>Maestros</span></div>
-        <div class="gr-tile"><b>${d.clases.length}</b><span>Clases</span></div>
-        <div class="gr-tile"><b>${asis == null ? '—' : `${r1(asis)} %`}</b><span>Asistencia promedio</span></div>
-        <div class="gr-tile"><b>${prom == null ? '—' : r1(prom)}</b><span>Promedio general (sobre 10)</span></div>
-        <div class="gr-tile ${riesgo.size ? 'rojo' : ''}"><b>${riesgo.size}</b><span>Alumnos en riesgo</span></div>
-        <div class="gr-tile ${atrasadas ? 'amar' : ''}"><b>${atrasadas}</b><span>Clases sin captura en 7 días</span></div>
+        ${tile(unicos.size, 'Alumnos', 'alumno')}
+        ${tile(d.maestros.filter((m) => m.activo).length, 'Maestros', 'maestros')}
+        ${tile(d.clases.length, 'Clases', 'resumen')}
+        ${tile(asis == null ? '—' : `${r1(asis)} %`, 'Asistencia promedio', 'resumen')}
+        ${tile(prom == null ? '—' : r1(prom), 'Promedio general (sobre 10)', 'resumen')}
+        ${tile(riesgo.size, 'Alumnos en riesgo', 'riesgo', riesgo.size ? 'rojo' : '')}
+        ${tile(atrasadas, 'Clases sin captura en 7 días', 'maestros', atrasadas ? 'amar' : '')}
       </section>
       <nav class="dir-tabs">${tabs.map(([k, t]) => `<button class="per-tab ${vista === k ? 'on' : ''}" data-vista="${k}">${t}</button>`).join('')}</nav>
       <section class="dir-vista">`;
@@ -103,14 +105,14 @@ export function crearPanel(root) {
 
   function vistaClases(d) {
     if (!d.clases.length) return '<p class="hint">Aún no hay clases. Aparecen cuando los maestros entran con su cuenta y sincronizan.</p>';
-    return `<p class="hint">Toca una clase para ver a sus alumnos. Los datos los suben los celulares de los maestros al sincronizar.</p>
+    return `<p class="hint">Toca una clase para ver a sus alumnos, y el nombre de un alumno para ver todas sus materias. Los datos los suben los celulares de los maestros al sincronizar.</p>
       <div class="preview-scroll"><table class="sheet dir-tabla"><thead><tr><th>Grupo</th><th>Materia</th><th>Maestro</th><th>Alumnos</th>
-      <th>Promedio</th><th>Asistencia</th><th>Semáforo</th><th>Última captura</th></tr></thead><tbody>
+      <th>Promedio</th><th>Asistencia</th><th>Semáforo</th><th>Última captura</th><th></th></tr></thead><tbody>
       ${d.clases.map((c) => `<tr class="dir-click" data-clase="${c.id}"><td><b>${esc(c.grupo)}</b></td><td>${esc(c.materia || '—')}</td><td>${esc(c.maestro)}</td>
         <td class="v">${c.n}</td><td class="v">${c.promedio == null ? '—' : `${calif(c.promedio)}<small> /${c.escala}</small>`}</td>
         <td class="v">${c.asistencia == null ? '—' : `${r1(c.asistencia)} %`}</td>
         <td class="dir-sem"><span class="rojo">${c.rojo}</span><span class="amarillo">${c.amarillo}</span><span class="verde">${c.verde}</span></td>
-        <td class="${c.ultima == null || dias(c.ultima) > 7 ? 'dir-atraso' : ''}">${c.ultima ? `${fecha(c.ultima)}${hace(c.ultima)}` : 'sin datos'}</td></tr>`).join('')}
+        <td class="${c.ultima == null || dias(c.ultima) > 7 ? 'dir-atraso' : ''}">${c.ultima ? `${fecha(c.ultima)}${hace(c.ultima)}` : 'sin datos'}</td><td class="dir-chev">Ver ›</td></tr>`).join('')}
       </tbody></table></div>`;
   }
 
@@ -198,5 +200,24 @@ export function crearPanel(root) {
     pintar();
   });
 
-  return { mostrar: (d) => { datos = d; pintar(); } };
+  return { mostrar: (d) => { datos = d; pintar(); }, datos: () => datos };
 }
+
+// Excel de la escuela (para el director): se arma solo al pedirlo.
+export async function exportarEscuela(datos, nombre) {
+  if (!datos) return;
+  const { excelEscuela, entregar } = await import('./excel-escuela.js');
+  const ExcelJS = await cargarExcelJS();
+  const buf = await excelEscuela(ExcelJS, datos, nombre);
+  const limpio = String(nombre || 'escuela').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').slice(0, 40);
+  await entregar(buf, `Resumen_${limpio}_${hoy()}.xlsx`);
+}
+let excelListo = null;
+const cargarExcelJS = () => (excelListo = excelListo || new Promise((res, rej) => {
+  if (window.ExcelJS) { res(window.ExcelJS); return; }
+  const sc = document.createElement('script');
+  sc.src = '/vendor/exceljs.min.js';
+  sc.onload = () => res(window.ExcelJS);
+  sc.onerror = () => { excelListo = null; rej(new Error('No se pudo cargar Excel')); };
+  document.head.appendChild(sc);
+}));

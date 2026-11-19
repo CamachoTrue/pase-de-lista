@@ -5,12 +5,10 @@
 //   Parciales → fechas de los parciales del semestre para toda la escuela.
 // En la demostración de director (/?demo=director) la escuela es de ejemplo y no se guarda nada.
 import '../director/director.css';
-import { crearPanel, escuelaDeEjemplo, leerEscuela } from '../director/panel.js';
+import { crearPanel, escuelaDeEjemplo, exportarEscuela, leerEscuela } from '../director/panel.js';
 import { errorLegible, nube } from '../lib/nube.js';
-import { setVistaApp } from './state.js';
 import { DEMO } from '../lib/demo.js';
 import { $, escapeHtml, toast } from './util.js';
-import { render } from './main-view.js';
 import { openCuenta } from './menu.js';
 
 const ROL = { director: 'Director', maestro: 'Maestro' };
@@ -36,8 +34,8 @@ function armar() {
   main().dataset.listo = '1';
   main().innerHTML = `
     <div data-pane="resumen">
-      <div class="esc-acciones"><button class="link-btn" data-esc="actualizar">↻ Actualizar</button>
-        <a class="link-btn" href="/director" target="_blank" rel="noopener" data-grande>Abrir en pantalla grande ↗</a></div>
+      <div class="esc-acciones"><button class="btn" data-esc="actualizar">↻ Actualizar</button>
+        <button class="btn primary" data-esc="exportar" hidden>Exportar Excel</button></div>
       <div data-inicio></div>
       <div class="dir-vista-app" data-panel><p class="hint">Cargando…</p></div>
     </div>
@@ -84,10 +82,10 @@ async function mostrarPestaña(p) {
 async function cargarResumen(yo) {
   const box = main().querySelector('[data-panel]');
   box.innerHTML = '<p class="hint">Cargando datos de la escuela…</p>';
-  main().querySelector('[data-grande]').href = ejemplo() ? '/director?ejemplo=1' : '/director';
   const sb = ejemplo() ? null : await nube();
   const datos = ejemplo() ? await escuelaDeEjemplo() : await leerEscuela(sb, yo.escuela_id);
   const inicio = main().querySelector('[data-inicio]');
+  main().querySelector('[data-esc="exportar"]').hidden = !datos.clases.length;
   if (datos.clases.length) {
     inicio.innerHTML = '';
     box.hidden = false;
@@ -245,10 +243,6 @@ $('#esc-tabs').addEventListener('click', (e) => {
   if (b) mostrarPestaña(b.dataset.tab);
 });
 $('#esc-cuenta').addEventListener('click', openCuenta);
-$('#esc-grupos').addEventListener('click', () => {
-  setVistaApp('grupos');
-  render();
-});
 
 main().addEventListener('click', async (e) => {
   const ir = e.target.closest('[data-ir]');
@@ -257,6 +251,12 @@ main().addEventListener('click', async (e) => {
   if (!b) return;
   const act = b.dataset.esc;
   if (act === 'actualizar') { cargado[pestaña] = false; await mostrarPestaña(pestaña); return; }
+  if (act === 'exportar') {
+    b.disabled = true;
+    try { await exportarEscuela(panel.datos(), $('#esc-nombre').textContent); } catch (ex) { console.error(ex); toast('No se pudo exportar. Revisa tu conexión.'); }
+    b.disabled = false;
+    return;
+  }
   if (ejemplo()) { toast('Demostración: aquí no se guarda nada'); return; }
   const token = (b.closest('[data-token]') || {}).dataset?.token;
   if (act === 'copiar') copiar(enlace(token));

@@ -38,3 +38,12 @@ td.dir-click { color: #1f7a4d; font-weight: 600; text-decoration: underline; tex
 @media (max-width: 560px) { .dir-main { padding: 12px; } .dir-top { padding: 12px; } }
 .dir-top-acc a.btn { color: var(--text); }
 .dir-ejemplo { background: #fbf0dc; color: #7a4f0e; text-align: center; font-weight: 600; font-size: 13px; padding: 6px 12px; }
+/* Indicadores: son botones (llevan a su detalle) y se ven como tales */
+.dir-tile { position: relative; text-align: left; font: inherit; color: var(--text); cursor: pointer; border: 1px solid var(--border); border-radius: 12px; transition: border-color .15s, transform .05s; }
+.dir-tile:hover { border-color: var(--primary); }
+.dir-tile:active { transform: scale(.98); }
+.dir-tile i { position: absolute; right: 10px; top: 10px; font-style: normal; font-size: .72rem; font-weight: 700; color: var(--primary); }
+.dir-chev { color: var(--primary); font-weight: 700; white-space: nowrap; text-align: right; }
+tr.dir-click:hover td.dir-chev { text-decoration: underline; }
+@media (min-width: 700px) { .dir-tiles .gr-tile:last-child:nth-child(odd) { grid-column: auto; } }
+@media (min-width: 1000px) { .dir-tiles { grid-template-columns: repeat(7, minmax(0, 1fr)); } }

@@ -55,9 +55,7 @@ async function renderCuenta() {
     ${avisoSuscripcion(p)}
     ${p.escuela_id ? '<div class="nube-estado" data-nube></div>' : ''}
     ${p.escuela_id && !(state && state.groups && state.groups.length) ? '<div class="cuenta-bajar" data-bajar hidden></div>' : ''}`;
-  if (p.rol === 'director') html += `<button class="btn primary big" data-act="ir-escuela">Ir a mi escuela</button>
-    <p class="hint">Ahí ves el resumen de la escuela, invitas maestros, les das o quitas acceso y pones los parciales.</p>
-    <a class="btn dir-link" href="/director" target="_blank" rel="noopener">Abrir panel en pantalla grande ↗</a>`;
+  if (p.rol === 'director') html += btnsDirector();
   if (p.rol === 'superadmin') html += '<a class="btn primary dir-link" href="/director" target="_blank" rel="noopener">Abrir panel de escuelas ↗</a>';
   if (p.rol === 'superadmin') html += seccionVerComo() + seccionEscuelas();
   body().innerHTML = html + btnSalir() + (p.rol === 'superadmin' ? '' : btnEliminar());
@@ -123,6 +121,13 @@ function avisoSuscripcion(p) {
   }
   return '';
 }
+
+// Director: su escuela y, solo si también da clases, sus grupos.
+const btnsDirector = () => `<button class="btn primary big" data-act="ir-escuela">Ir a mi escuela</button>
+    <p class="hint">Resumen de la escuela, maestros (invitar y dar o quitar acceso) y parciales.</p>
+    <section class="cuenta-sec"><h3>¿También das clases?</h3>
+      <p class="hint">Si pasas lista a algún grupo, aquí tienes tus grupos como cualquier maestro.</p>
+      <button class="btn" data-act="ir-grupos">Ir a mis grupos</button></section>`;
 
 // Rol guardado en el dispositivo: si cambia (entrar, salir, otra cuenta), la app cambia de pantalla.
 function cambiarRol(r) {
@@ -250,8 +255,7 @@ function renderDemo() {
     </div>
     ${avisoSuscripcion(p)}
     <div class="nube-estado ${listas ? 'ok' : ''}"><span>${listas ? 'Todo guardado en tu cuenta ✓' : 'Aún no hay listas en este celular. Cuando subas tu Excel se guardarán también en tu cuenta.'}</span></div>
-    ${p.rol === 'director' ? `<button class="btn primary big" data-act="ir-escuela">Ir a mi escuela</button>
-      <p class="hint">Ahí ves el resumen de la escuela, invitas maestros, les das o quitas acceso y pones los parciales.</p>` : ''}
+    ${p.rol === 'director' ? btnsDirector() : ''}
     ${btnSalir()}${btnEliminar()}</div>`;
 }
 
@@ -448,6 +452,7 @@ $('#cuenta-body').addEventListener('click', async (e) => {
   if (!b) return;
   const act = b.dataset.act;
   if (act === 'ir-escuela') { setVistaApp('escuela'); $('#cuenta').close(); render(); return; }
+  if (act === 'ir-grupos') { setVistaApp('grupos'); $('#cuenta').close(); render(); return; }
   if (DEMO) {
     // Cerrar sesión en la demostración = volver a tu propia app (con tu cuenta y tus datos).
     if (act === 'salir') { location.href = '/'; return; }
