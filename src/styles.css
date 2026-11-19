@@ -963,5 +963,7 @@ dialog[open]::backdrop { animation: velo .25s ease-out; }
 /* Scroll: lo que está detrás no se mueve. Al llegar al final de una lista o ventana, el scroll se queda ahí
    (no pasa a la página de fondo), y con una ventana abierta el fondo queda quieto. Sin rebote de página web. */
 html, body { overscroll-behavior: none; }
-dialog, .preview-scroll, .cuenta-body, .grupo-alumnos, .gr-list, .gr-body, .tabs, .calif-periodos, #student-list, .pick-list { overscroll-behavior: contain; }
+/* Solo las ventanas y las tiras horizontales detienen el scroll; las listas de adentro lo pasan a su ventana. */
+dialog, .tabs, .calif-periodos { overscroll-behavior: contain; }
+.cuenta-lista { overflow: visible; }
 html:has(dialog[open]), html:has(dialog[open]) body { overflow: hidden; }
