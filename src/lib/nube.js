@@ -21,6 +21,11 @@ const almacen = {
 // ¿Hay una sesión guardada? (sin cargar la librería)
 export const haySesion = () => !!almacen.getItem(SESION);
 
+// Rol de la cuenta (para abrir la pantalla correcta sin esperar a internet).
+const ROL = 'cuenta.rol';
+export const rolGuardado = () => (haySesion() ? seguro(() => localStorage.getItem(ROL)) : null);
+export const guardarRol = (r) => seguro(() => (r ? localStorage.setItem(ROL, r) : localStorage.removeItem(ROL)));
+
 // Identificador de este dispositivo (no es personal): la nube anota qué dispositivo cambió cada clase
 // para que los demás sepan que hay algo nuevo que bajar, sin volver a bajar sus propios cambios.
 const DISP = 'cuenta.dispositivo';

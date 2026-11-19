@@ -25,8 +25,27 @@
       </label>
       <p class="hint">Formato .xlsx · La columna “NOMBRE” se detecta sola.</p>
       <button class="btn big upload-cuenta" id="upload-cuenta">Ya tengo cuenta: entrar</button>
+      <button class="btn big" id="upload-escuela" hidden>‹ Volver a mi escuela</button>
       <p class="hint">Si ya usas la app en otro celular, entra para bajar tus grupos y calificaciones.</p>
     </div>
+  </section>
+
+  <!-- Pantalla del director: su escuela (src/app/escuela.js) -->
+  <section id="screen-escuela" class="screen" hidden>
+    <header class="esc-top">
+      <div class="esc-tit"><span class="esc-cap">Mi escuela</span><h1 id="esc-nombre">Mi escuela</h1><small id="esc-sub"></small></div>
+      <div class="esc-top-acc">
+        <button class="btn" id="esc-grupos">Mis grupos</button>
+        <button class="btn" id="esc-cuenta">Mi cuenta</button>
+      </div>
+    </header>
+    <div id="esc-aviso"></div>
+    <nav class="esc-tabs" id="esc-tabs" aria-label="Secciones de la escuela">
+      <button class="esc-tab on" data-tab="resumen">Resumen</button>
+      <button class="esc-tab" data-tab="maestros">Maestros</button>
+      <button class="esc-tab" data-tab="parciales">Parciales</button>
+    </nav>
+    <main id="esc-main"></main>
   </section>
 
   <!-- Pantalla principal: pasar lista -->
@@ -134,6 +153,7 @@
   <!-- Menú -->
   <dialog id="menu">
     <h2>Opciones</h2>
+    <button class="menu-item cuenta-item" data-action="escuela" id="menu-escuela" hidden>Mi escuela (director)</button>
     <button class="menu-item cuenta-item" data-action="cuenta" id="menu-cuenta">Mi cuenta</button>
     <button class="menu-item" data-action="subject">Materia de este grupo</button>
     <button class="menu-item" data-action="grades">Secciones y calificaciones</button>

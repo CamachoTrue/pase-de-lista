@@ -1,11 +1,24 @@
 import { STATUSES } from '../lib/excel-core.js';
 import { renderCard, renderStudents, startCard } from './card.js';
 import { renderCompact } from './compact.js';
-import { OPTIONS, dayData, dayRecords, fmtDate, glabel, group, save, secs, state, tab, typeOf, ui } from './state.js';
+import { OPTIONS, dayData, dayRecords, fmtDate, glabel, group, save, secs, state, tab, typeOf, ui, vistaApp } from './state.js';
+import { rolGuardado } from '../lib/nube.js';
 import { $, escapeHtml } from './util.js';
 
 // ---------- Render ----------
+// El director ve su escuela (no necesita grupos), salvo que elija "Mis grupos" porque también da clases.
+export const vistaEscuela = () => ui.escuela === 'ejemplo' || (rolGuardado() === 'director' && vistaApp() !== 'grupos');
+
 export function render() {
+  const escuela = vistaEscuela();
+  $('#screen-escuela').hidden = !escuela;
+  $('#upload-escuela').hidden = rolGuardado() !== 'director';
+  if (escuela) {
+    $('#screen-upload').hidden = true;
+    $('#screen-main').hidden = true;
+    import('./escuela.js').then((m) => m.openEscuela()).catch((e) => console.error(e));
+    return;
+  }
   const has = !!(state && state.groups && state.groups.length);
   $('#screen-upload').hidden = has;
   $('#screen-main').hidden = !has;

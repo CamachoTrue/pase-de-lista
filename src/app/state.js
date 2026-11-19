@@ -71,7 +71,11 @@ export let state = load();
 // Reemplaza todo el estado (al subir otro archivo).
 export function setState(s) { state = s; }
 // Estado de la pantalla que comparten varios módulos.
-export const ui = { view: 'card', cardIdx: 0, busy: false, studentRow: null };
+export const ui = { view: 'card', cardIdx: 0, busy: false, studentRow: null, escuela: null };
+// Director: ¿ve su escuela o sus grupos? (se recuerda en este dispositivo)
+const VISTA = 'app.vista';
+export const vistaApp = () => { try { return localStorage.getItem(VISTA); } catch { return null; } };
+export const setVistaApp = (v) => { try { localStorage.setItem(VISTA, v); } catch { /* sin almacenamiento */ } };
 
 export function load() {
   try {

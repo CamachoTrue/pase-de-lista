@@ -4,16 +4,15 @@
 // la sincronización con la cuenta llega en la etapa 4.
 import { $, escapeHtml, toast } from './util.js';
 import { confirmBulk } from './dialogs.js';
-import { errorLegible, nube, recordar, setRecordar } from '../lib/nube.js';
+import { errorLegible, guardarRol, nube, recordar, rolGuardado, setRecordar } from '../lib/nube.js';
 import { alCambiarEstado, estado, programar, sincronizar } from './sync.js';
-import { save, state } from './state.js';
+import { save, setVistaApp, state, ui } from './state.js';
 import { bajarDeLaNube, clasesEnLaNube } from './bajar.js';
 import { render } from './main-view.js';
 
 const ROL = { superadmin: 'Administrador general', director: 'Director', maestro: 'Maestro' };
 const body = () => $('#cuenta-body');
 let perfil = null; // el de la sesión, para "Eliminar mi cuenta"
-const fecha = (iso) => new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
 const enlace = (token) => `${location.origin}/?invitacion=${token}`;
 
 export async function openCuenta() {
@@ -28,7 +27,7 @@ async function renderCuenta() {
   try { sb = await nube(); } catch { return sinConexion(); }
   const { data: { session } } = await sb.auth.getSession();
   perfil = null;
-  if (!session) return renderEntrar();
+  if (!session) { cambiarRol(null); return renderEntrar(); }
   const { data, error } = await sb.rpc('mi_perfil');
   if (error) {
     if (/fetch|network/i.test(error.message || '')) return sinConexion(session.user.email);
@@ -36,6 +35,7 @@ async function renderCuenta() {
     return;
   }
   const p = data && data[0];
+  cambiarRol(p ? p.rol : null);
   if (!p) {
     $('#cuenta-sub').textContent = session.user.email;
     body().innerHTML = `<div class="cuenta-card"><b>Tu cuenta aún no pertenece a una escuela</b>
@@ -52,14 +52,15 @@ async function renderCuenta() {
     ${avisoSuscripcion(p)}
     ${p.escuela_id ? '<div class="nube-estado" data-nube></div>' : ''}
     ${p.escuela_id && !(state && state.groups && state.groups.length) ? '<div class="cuenta-bajar" data-bajar hidden></div>' : ''}`;
-  if (p.rol === 'director' || p.rol === 'superadmin') html += '<a class="btn primary dir-link" href="/director" target="_blank" rel="noopener">Abrir panel de la escuela ↗</a>';
-  if (p.rol === 'director') html += seccionPeriodos() + seccionMaestros();
+  if (p.rol === 'director') html += `<button class="btn primary big" data-act="ir-escuela">Ir a mi escuela</button>
+    <p class="hint">Ahí ves el resumen de la escuela, invitas maestros, les das o quitas acceso y pones los parciales.</p>
+    <a class="btn dir-link" href="/director" target="_blank" rel="noopener">Abrir panel en pantalla grande ↗</a>`;
+  if (p.rol === 'superadmin') html += '<a class="btn primary dir-link" href="/director" target="_blank" rel="noopener">Abrir panel de escuelas ↗</a>';
   if (p.rol === 'superadmin') html += seccionVerComo() + seccionEscuelas();
   body().innerHTML = html + btnSalir() + (p.rol === 'superadmin' ? '' : btnEliminar());
   pintarNube();
   programar(200);
   ofrecerBajar();
-  if (p.rol === 'director') { await cargarPeriodos(sb, p.escuela_id); await cargarMaestros(sb, p.escuela_id); }
   if (p.rol === 'superadmin') await cargarEscuelas(sb);
 }
 
@@ -117,6 +118,13 @@ function avisoSuscripcion(p) {
     if (dias <= 31) return `<div class="nube-estado espera"><span>Tu cuenta está activa hasta el ${p.vence_el} (${dias} día${dias === 1 ? '' : 's'}).</span></div>`;
   }
   return '';
+}
+
+// Rol guardado en el dispositivo: si cambia (entrar, salir, otra cuenta), la app cambia de pantalla.
+function cambiarRol(r) {
+  if (rolGuardado() === r) return;
+  guardarRol(r);
+  render();
 }
 
 const btnSalir = () => '<button class="btn cuenta-salir" data-act="salir">Cerrar sesión</button>';
@@ -214,84 +222,6 @@ function renderRegistro() {
 }
 
 // ---------- Director: maestros e invitaciones ----------
-function seccionMaestros() {
-  return `<section class="cuenta-sec">
-      <h3>Maestros de tu escuela</h3>
-      <p class="hint" data-cupo></p>
-      <form class="cuenta-form invitar" data-form="invitar">
-        <label class="field">Correo del maestro<input name="correo" type="email" autocomplete="off" required placeholder="maestro@correo.com"></label>
-        <button class="btn primary" type="submit">Crear invitación</button>
-        <p class="form-error" data-error></p>
-      </form>
-      <div data-nuevo></div>
-      <ul class="pick-list cuenta-lista" data-invitaciones></ul>
-      <ul class="pick-list cuenta-lista" data-usuarios></ul>
-    </section>`;
-}
-
-async function cargarMaestros(sb, escuela) {
-  const [cobro, inv, us] = await Promise.all([
-    sb.rpc('datos_cobro'),
-    sb.from('invitaciones').select('id, correo, token, vence_en, usada_en, rol').eq('escuela_id', escuela).is('usada_en', null).order('creada_en', { ascending: false }),
-    sb.from('usuarios').select('id, nombre, correo, rol, activo').eq('escuela_id', escuela).order('nombre'),
-  ]);
-  const c = cobro.data && cobro.data[0];
-  const pend = (inv.data || []).filter((i) => new Date(i.vence_en) > new Date());
-  const cupo = body().querySelector('[data-cupo]');
-  if (cupo && c) cupo.textContent = `${c.cuentas_usadas + pend.length} de ${c.cuentas_contratadas} cuentas en uso (incluye invitaciones pendientes).`;
-  body().querySelector('[data-invitaciones]').innerHTML = pend.length
-    ? '<li class="titulo">Invitaciones pendientes</li>' + pend.map((i) => `<li data-token="${i.token}">
-        <span class="nm">${escapeHtml(i.correo)}<small>vence ${fecha(i.vence_en)}</small></span>
-        <button class="link-btn" data-act="compartir">Enviar</button>
-        <button class="link-btn danger-text" data-act="borrar-inv" data-id="${i.id}">Quitar</button></li>`).join('')
-    : '';
-  body().querySelector('[data-usuarios]').innerHTML = '<li class="titulo">Cuentas</li>' + (us.data || []).map((u) => `<li>
-      <span class="nm">${escapeHtml(u.nombre)}<small>${escapeHtml(u.correo)} · ${ROL[u.rol]}${u.activo ? '' : ' · desactivada'}</small></span></li>`).join('');
-}
-
-// ---------- Director: parciales del semestre (para toda la escuela) ----------
-function seccionPeriodos() {
-  const filas = [1, 2, 3].map((n) => `<div class="per-row"><b>Parcial ${n}</b><input type="date" name="p${n}i" aria-label="Inicio del parcial ${n}"><span>a</span><input type="date" name="p${n}f" aria-label="Fin del parcial ${n}"></div>`).join('');
-  return `<section class="cuenta-sec">
-      <h3>Parciales del semestre</h3>
-      <p class="hint">Las fechas valen para todos los maestros de tu escuela: cada captura cae sola en su parcial.</p>
-      <form class="cuenta-form" data-form="periodos">
-        <label class="per-sem">Semestre <input name="semestre" required placeholder="Ago–Dic 2026" maxlength="40"></label>
-        ${filas}
-        <button class="btn primary" type="submit">Guardar parciales</button>
-        <p class="form-error" data-error></p>
-      </form>
-    </section>`;
-}
-async function cargarPeriodos(sb, escuela) {
-  const f = body().querySelector('[data-form="periodos"]');
-  const { data } = await sb.from('semestres').select('id, nombre, parciales(numero, inicio, fin)').eq('escuela_id', escuela).order('inicio', { ascending: false }).limit(1);
-  const s = data && data[0];
-  if (!s || !f) return;
-  f.elements.semestre.value = s.nombre;
-  for (const p of s.parciales) {
-    if (!f.elements[`p${p.numero}i`]) continue;
-    f.elements[`p${p.numero}i`].value = p.inicio;
-    f.elements[`p${p.numero}f`].value = p.fin;
-  }
-}
-async function guardarPeriodos(sb, f) {
-  const { data: perfil } = await sb.rpc('mi_perfil');
-  const escuela = perfil[0].escuela_id;
-  const pars = [1, 2, 3].map((n) => ({ numero: n, inicio: f.elements[`p${n}i`].value, fin: f.elements[`p${n}f`].value })).filter((p) => p.inicio && p.fin);
-  if (!pars.length) throw new Error('Escribe las fechas de al menos un parcial.');
-  if (pars.some((p) => p.fin < p.inicio)) throw new Error('Cada parcial debe terminar después de empezar.');
-  const nombre = f.elements.semestre.value.trim();
-  const inicio = pars.map((p) => p.inicio).sort()[0];
-  const fin = pars.map((p) => p.fin).sort().at(-1);
-  const { data: sem, error } = await sb.from('semestres').upsert({ escuela_id: escuela, nombre, inicio, fin }, { onConflict: 'escuela_id,nombre' }).select('id').single();
-  if (error) throw error;
-  const r = await sb.from('parciales').upsert(pars.map((p) => ({ ...p, escuela_id: escuela, semestre_id: sem.id })), { onConflict: 'semestre_id,numero' });
-  if (r.error) throw r.error;
-  const quitar = [1, 2, 3, 4, 5, 6].filter((n) => !pars.some((p) => p.numero === n));
-  await sb.from('parciales').delete().eq('semestre_id', sem.id).in('numero', quitar);
-}
-
 // ---------- Superadmin: ver la app como cada rol (vista previa con datos de ejemplo) ----------
 function seccionVerComo() {
   return `<section class="cuenta-sec">
@@ -348,23 +278,8 @@ function renderVistaPrevia(tipo) {
     </div>
     ${avisoSuscripcion(p)}
     <div class="nube-estado ok"><span>Todo guardado en tu cuenta ✓ · 8:15 a.m.</span><button class="link-btn" data-act="subir">Guardar ahora</button></div>`;
-  if (tipo === 'director') html += '<a class="btn primary dir-link" href="/director?ejemplo=1" target="_blank" rel="noopener">Abrir panel de la escuela ↗</a>' + seccionPeriodos() + seccionMaestros();
   html += `<section class="cuenta-sec"><h3>Lo que puede hacer</h3><ul class="vista-puede">${PUEDE[tipo].map((t) => `<li>${t}</li>`).join('')}</ul></section>`;
   body().innerHTML = html + btnSalir() + btnEliminar() + '</div>';
-  if (tipo !== 'director') return;
-  const f = body().querySelector('[data-form="periodos"]');
-  const y = new Date().getFullYear();
-  const per = [['p1', `${y}-08-25`, `${y}-09-26`], ['p2', `${y}-09-29`, `${y}-10-31`], ['p3', `${y}-11-03`, `${y}-12-12`]];
-  f.elements.semestre.value = `Ago–Dic ${y}`;
-  per.forEach(([k, i, fin]) => { f.elements[`${k}i`].value = i; f.elements[`${k}f`].value = fin; });
-  body().querySelector('[data-cupo]').textContent = '5 de 8 cuentas en uso (incluye invitaciones pendientes).';
-  body().querySelector('[data-invitaciones]').innerHTML = `<li class="titulo">Invitaciones pendientes</li>
-    <li><span class="nm">rosa.leyva@prepaejemplo.mx<small>vence ${fecha(new Date(Date.now() + 5 * 864e5).toISOString())}</small></span>
-    <button class="link-btn" data-act="compartir">Enviar</button><button class="link-btn danger-text" data-act="borrar-inv">Quitar</button></li>`;
-  const us = [['Mtra. Laura Gómez', 'direccion@prepaejemplo.mx', 'director'], ['Prof. Jorge Méndez', 'jorge.mendez@prepaejemplo.mx', 'maestro'],
-    ['Mtra. Sofía Navarro', 'sofia.navarro@prepaejemplo.mx', 'maestro'], ['Prof. Ricardo Soto', 'ricardo.soto@prepaejemplo.mx', 'maestro']];
-  body().querySelector('[data-usuarios]').innerHTML = '<li class="titulo">Cuentas</li>' + us.map(([n, c, r]) => `<li>
-      <span class="nm">${escapeHtml(n)}<small>${escapeHtml(c)} · ${ROL[r]}</small></span></li>`).join('');
 }
 
 // ---------- Superadmin: escuelas ----------
@@ -532,17 +447,6 @@ $('#cuenta-body').addEventListener('submit', async (e) => {
       if (error) throw error;
       toast('Precio de lista guardado');
       await cargarEscuelas(sb);
-    } else if (f.dataset.form === 'periodos') {
-      await guardarPeriodos(sb, f);
-      toast('Parciales guardados para toda la escuela');
-    } else if (f.dataset.form === 'invitar') {
-      const { data: perfil } = await sb.rpc('mi_perfil');
-      const correo = v('correo').toLowerCase();
-      const { data, error } = await sb.from('invitaciones').insert({ escuela_id: perfil[0].escuela_id, correo, rol: 'maestro' }).select('token').single();
-      if (error) throw error;
-      f.reset();
-      await cargarMaestros(sb, perfil[0].escuela_id);
-      mostrarEnlace(data.token, correo);
     } else if (f.dataset.form === 'escuela') {
       const correo = v('correo').toLowerCase();
       const clave = v('clave').toUpperCase();
@@ -572,7 +476,11 @@ $('#cuenta-body').addEventListener('click', async (e) => {
   if (!b) return;
   const act = b.dataset.act;
   if (act === 'volver-panel') { renderCuenta(); return; }
-  if (act === 'ver-como') { renderVistaPrevia(b.dataset.rol); body().scrollTop = 0; return; }
+  if (act === 'ver-como') {
+    if (b.dataset.rol === 'director') { $('#cuenta').close(); ui.escuela = 'ejemplo'; render(); return; }
+    renderVistaPrevia(b.dataset.rol); body().scrollTop = 0; return;
+  }
+  if (act === 'ir-escuela') { setVistaApp('escuela'); $('#cuenta').close(); render(); return; }
   if (b.closest('.vista-previa')) { toast('Vista previa: aquí no se hace nada'); return; }
   const token = (b.closest('[data-token]') || {}).dataset?.token;
   if (act === 'subir') sincronizar();
@@ -667,7 +575,9 @@ $('#inv-form').addEventListener('submit', async (e) => {
     history.replaceState(null, '', location.pathname);
     $('#invitacion').close();
     toast('¡Listo! Tu cuenta quedó creada');
-    openCuenta();
+    // El director va directo a su escuela; el maestro ve su cuenta (para subir su Excel o bajar sus listas).
+    const rol = acepta.data && (acepta.data.rol || (acepta.data[0] && acepta.data[0].rol));
+    if (rol === 'director') { guardarRol('director'); setVistaApp('escuela'); render(); } else openCuenta();
     programar(300);
   } catch (ex) {
     console.error(ex);
