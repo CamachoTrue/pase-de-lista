@@ -1,5 +1,5 @@
 import { openSettings } from './settings.js';
-import { openAddStudent, openRemoveStudent } from './students.js';
+import { openAddStudent } from './students.js';
 import { openSubject } from './subject.js';
 import { confirmBulk } from './dialogs.js';
 import { $, toast } from './util.js';
@@ -30,7 +30,6 @@ menu.addEventListener('click', async (e) => {
   if (!action || action === 'close') return;
   menu.close();
   if (action === 'add-student') openAddStudent();
-  if (action === 'remove-student') openRemoveStudent();
   if (action === 'bajas') abrir(() => import('./bajas.js'), 'openBajas');
   if (action === 'grades') abrir(() => import('./grades.js'), 'openGrades');
   if (action === 'student') abrir(() => import('./student-report.js'), 'openStudent');
