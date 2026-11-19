@@ -2,12 +2,16 @@ import { ASIST_ID, DEFAULT_CODES, normalizeGroup, parseWorkbook } from '../lib/e
 import { render } from './main-view.js';
 import { fixGrading, save, setState, state, todayISO } from './state.js';
 import { $, bufToB64, loadExcel, toast } from './util.js';
+import { avisarBloqueo, tieneAcceso } from './acceso.js';
 
 // ---------- Subir archivo ----------
+// Subir el Excel propio necesita la cuenta (la lista de ejemplo no).
+$('#upload-subir').addEventListener('click', (e) => { if (!tieneAcceso()) { e.preventDefault(); avisarBloqueo(); } });
 $('#file-input').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
+  if (!tieneAcceso()) { avisarBloqueo(); return; }
   try {
     await cargarLibro(await file.arrayBuffer(), file.name);
   } catch (err) {

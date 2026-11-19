@@ -89,7 +89,12 @@ export function load() {
 const oyentes = [];
 export const alGuardar = (fn) => oyentes.push(fn);
 // silencioso: guardar sin avisar (la propia sincronización guarda sus marcas así, para no repetirse).
+// Guardia de acceso (src/app/acceso.js): si no hay cuenta activa, los cambios no se guardan.
+let guardia = null;
+let alNegar = null;
+export const setGuardia = (fn, negar) => { guardia = fn; alNegar = negar; };
 export function save(silencioso = false) {
+  if (!silencioso && guardia && !guardia()) { alNegar(); return false; }
   try { almacenApp().setItem(STORE_KEY, JSON.stringify(state)); }
   catch (e) { toast('No se pudo guardar en el dispositivo'); }
   if (!silencioso) oyentes.forEach((fn) => fn());

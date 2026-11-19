@@ -19,7 +19,7 @@
       <div class="logo">✓</div>
       <h1>Clase al Día</h1>
       <p>Sube el Excel con la lista de alumnos. Cada hoja del archivo se toma como un grupo.</p>
-      <label class="btn primary big">
+      <label class="btn primary big" id="upload-subir">
         Subir archivo Excel
         <input type="file" id="file-input" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
       </label>
@@ -51,6 +51,7 @@
   <!-- Pantalla principal: pasar lista -->
   <section id="screen-main" class="screen" hidden>
     <header class="topbar">
+      <button class="aviso-acceso" id="aviso-acceso" hidden></button>
       <div class="topbar-row">
         <label class="group-picker">
           <span class="gp-cap">Grupo · toca para cambiar</span>
@@ -169,6 +170,15 @@
     <button class="btn" data-action="close">Cerrar</button>
   </dialog>
 
+
+  <!-- Sin cuenta (o vencida): ver y exportar sí, capturar no (src/app/acceso.js) -->
+  <dialog id="bloqueo">
+    <h2 id="bloqueo-titulo">Entra a tu cuenta para capturar</h2>
+    <p class="hint" id="bloqueo-texto"></p>
+    <button class="btn primary big" id="bloqueo-cuenta">Entrar o crear mi cuenta</button>
+    <button class="btn" id="bloqueo-exportar">Exportar mi Excel</button>
+    <button class="btn" data-action="close">Ahora no</button>
+  </dialog>
 
   <dialog id="settings">
     <h2>Valor en el Excel</h2>

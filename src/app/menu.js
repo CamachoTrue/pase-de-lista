@@ -52,3 +52,9 @@ menu.addEventListener('click', (e) => {
 // Pantalla inicial (sin Excel): entrar con la cuenta para bajar los datos.
 $('#upload-cuenta').addEventListener('click', openCuenta);
 $('#upload-escuela').addEventListener('click', () => { setVistaApp('escuela'); render(); });
+
+// Aviso de acceso / lista de ejemplo (arriba de la lista).
+$('#aviso-acceso').addEventListener('click', (e) => {
+  if (e.currentTarget.dataset.ir === 'excel') $('#file-input').click();
+  else openCuenta();
+});

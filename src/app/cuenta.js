@@ -4,7 +4,7 @@
 // la sincronización con la cuenta llega en la etapa 4.
 import { $, escapeHtml, toast } from './util.js';
 import { confirmBulk } from './dialogs.js';
-import { errorLegible, guardarPaquete, guardarRol, nube, recordar, rolGuardado, setRecordar } from '../lib/nube.js';
+import { errorLegible, guardarAcceso, guardarPaquete, guardarRol, nube, recordar, rolGuardado, setRecordar } from '../lib/nube.js';
 import { alCambiarEstado, estado, programar, sincronizar } from './sync.js';
 import { save, setVistaApp, state } from './state.js';
 import { DEMO, PERFIL_DEMO } from '../lib/demo.js';
@@ -29,7 +29,7 @@ async function renderCuenta() {
   try { sb = await nube(); } catch { return sinConexion(); }
   const { data: { session } } = await sb.auth.getSession();
   perfil = null;
-  if (!session) { cambiarRol(null); guardarPaquete(null); return renderEntrar(); }
+  if (!session) { guardarAcceso(null); guardarPaquete(null); cambiarRol(null); return renderEntrar(); }
   const { data, error } = await sb.rpc('mi_perfil');
   if (error) {
     if (/fetch|network/i.test(error.message || '')) return sinConexion(session.user.email);
@@ -37,8 +37,9 @@ async function renderCuenta() {
     return;
   }
   const p = data && data[0];
-  cambiarRol(p ? p.rol : null);
+  guardarAcceso(p);
   guardarPaquete(p ? p.paquete : null);
+  cambiarRol(p ? p.rol : null);
   if (!p) {
     $('#cuenta-sub').textContent = session.user.email;
     body().innerHTML = `<div class="cuenta-card"><b>Tu cuenta aún no pertenece a una escuela</b>

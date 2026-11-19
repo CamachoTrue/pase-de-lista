@@ -13,6 +13,7 @@ import './app/subject.js';
 import './app/menu.js';
 import './app/settings.js';
 import './app/sync.js';
+import { alBloquear } from './app/acceso.js';
 
 // ---------- Inicio ----------
 if (state) {
@@ -30,6 +31,8 @@ if (state) {
   });
   delete state.grading;
 }
+// Sin cuenta: si se intenta capturar, el cambio se descarta y se vuelve a pintar lo guardado.
+alBloquear(() => render());
 // Demostración (otra pestaña): se nota en el título de la pestaña.
 if (DEMO) document.title = `Demostración · ${document.title}`;
 // Demostración nueva (pestaña recién abierta): sin cuadernillos de una demostración anterior.

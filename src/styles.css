@@ -600,3 +600,8 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .esc-usuarios li.inactivo .nm { opacity: .6; }
 .dir-vista-app { display: flex; flex-direction: column; gap: 12px; }
 @media (min-width: 900px) { .esc-tabs { max-width: 520px; } }
+
+/* Aviso de acceso (sin cuenta, vencida o lista de ejemplo): es un botón, se ve como tal */
+.aviso-acceso { display: block; width: 100%; margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--R); border-radius: 10px; background: var(--R-soft); color: var(--text); font: inherit; font-size: .85rem; text-align: left; cursor: pointer; }
+.aviso-acceso.mal { border-color: var(--F); background: var(--F-soft); }
+.aviso-acceso b { color: var(--primary); white-space: nowrap; }

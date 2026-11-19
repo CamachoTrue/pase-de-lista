@@ -32,6 +32,17 @@ const PAQUETE = 'cuenta.paquete';
 export const paqueteGuardado = () => (DEMO ? (DEMO === 'independiente' ? 'individual' : 'empresarial') : haySesion() ? seguro(() => localStorage.getItem(PAQUETE)) : null);
 export const guardarPaquete = (p) => !DEMO && seguro(() => (p ? localStorage.setItem(PAQUETE, p) : localStorage.removeItem(PAQUETE)));
 
+// Acceso de la cuenta (escuela activa y fecha de vencimiento), para saber sin internet si se puede capturar.
+const ACCESO = 'cuenta.acceso';
+export const guardarAcceso = (p) => !DEMO && seguro(() => (p ? localStorage.setItem(ACCESO, JSON.stringify({ activa: p.activa !== false, vence_el: p.vence_el || null, escuela: !!p.escuela_id, rol: p.rol }))
+  : localStorage.removeItem(ACCESO)));
+export function accesoVencido() {
+  if (DEMO) return false;
+  const a = seguro(() => JSON.parse(localStorage.getItem(ACCESO) || 'null'));
+  if (!a || a.rol === 'superadmin' || !a.escuela) return false;
+  return !a.activa || (!!a.vence_el && a.vence_el < new Date().toISOString().slice(0, 10));
+}
+
 // Identificador de este dispositivo (no es personal): la nube anota qué dispositivo cambió cada clase
 // para que los demás sepan que hay algo nuevo que bajar, sin volver a bajar sus propios cambios.
 const DISP = 'cuenta.dispositivo';

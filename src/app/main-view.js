@@ -4,6 +4,8 @@ import { renderCompact } from './compact.js';
 import { OPTIONS, dayData, dayRecords, fmtDate, glabel, group, save, secs, state, tab, typeOf, ui, vistaApp } from './state.js';
 import { haySesion, rolGuardado } from '../lib/nube.js';
 import { DEMO } from '../lib/demo.js';
+import { tieneAcceso } from './acceso.js';
+import { accesoVencido } from '../lib/nube.js';
 import { $, escapeHtml } from './util.js';
 
 // ---------- Render ----------
@@ -26,6 +28,7 @@ export function render() {
     return;
   }
   const has = !!(state && state.groups && state.groups.length);
+  pintarAcceso();
   $('#screen-upload').hidden = has;
   $('#screen-main').hidden = !has;
   if (!has) return;
@@ -40,6 +43,23 @@ export function render() {
   refresh();
 }
 
+
+// Aviso arriba de la lista cuando no se puede capturar (sin cuenta o vencida) o es la lista de ejemplo.
+function pintarAcceso() {
+  const acceso = tieneAcceso();
+  const ejemplo = !!(state && state.ejemplo);
+  const aviso = $('#aviso-acceso');
+  const txt = !acceso && haySesion() && accesoVencido() ? 'Tu acceso venció: puedes ver y exportar, pero no capturar. <b>Ver mi cuenta ›</b>'
+    : ejemplo ? (acceso ? 'Estás usando la lista de ejemplo. <b>Subir mi Excel ›</b>' : 'Estás usando la lista de ejemplo. <b>Crear mi cuenta ›</b>')
+    : !acceso ? 'Solo lectura: entra a tu cuenta para capturar. <b>Entrar ›</b>' : '';
+  aviso.hidden = !txt;
+  aviso.innerHTML = txt;
+  aviso.dataset.ir = ejemplo && acceso ? 'excel' : 'cuenta';
+  aviso.classList.toggle('mal', !acceso && !ejemplo);
+  // Pantalla inicial sin cuenta: primero entrar; subir el Excel pide la cuenta.
+  $('#upload-cuenta').classList.toggle('primary', !acceso);
+  $('#upload-subir').classList.toggle('primary', acceso);
+}
 
 export function refresh() {
   const opt = $('#group-select').options[state.ui.group];
