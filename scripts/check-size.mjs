@@ -6,7 +6,9 @@ import { gzipSync } from 'node:zlib';
 
 const KB = 1024;
 // Lo que se descarga al abrir la app (sin librerías que se cargan solo al usarlas).
-const BUDGET = { js: 40 * KB, css: 10 * KB, html: 8 * KB, total: 55 * KB }; // comprimido (gzip)
+// CSS 12 KB (antes 10): el diseño «Cuaderno de clase» (2026-11-19) usa fuentes del sistema en vez de
+// descargar tipografías, así que su costo es solo CSS. El total al abrir sigue en 55 KB.
+const BUDGET = { js: 40 * KB, css: 12 * KB, html: 8 * KB, total: 55 * KB }; // comprimido (gzip)
 const dist = 'dist';
 const gz = (f) => gzipSync(readFileSync(f), { level: 9 }).length;
 const html = readFileSync(join(dist, 'index.html'), 'utf8');

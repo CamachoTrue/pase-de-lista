@@ -22,8 +22,8 @@
 .dir-tabla td small { display: block; color: #6b7570; font-size: 11px; }
 .dir-tabla td.v small { display: inline; }
 .dir-click { cursor: pointer; }
-tr.dir-click:hover td, td.dir-click:hover, li.dir-click:hover { background: #eef6f1; }
-td.dir-click { color: #1f7a4d; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+tr.dir-click:hover td, td.dir-click:hover, li.dir-click:hover { background: var(--primary-soft); }
+td.dir-click { color: var(--primary); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .dir-sem span { display: inline-block; min-width: 24px; text-align: center; border-radius: 6px; padding: 1px 4px; margin-right: 3px; font-weight: 700; font-size: 12px; }
 .dir-sem .rojo { background: #fbe5e5; color: #c62f2f; }
 .dir-sem .amarillo { background: #fbf0dc; color: #9a6413; }
