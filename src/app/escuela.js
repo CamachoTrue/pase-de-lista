@@ -37,7 +37,7 @@ function armar() {
       <div class="esc-acciones"><button class="btn" data-esc="actualizar">↻ Actualizar</button>
         <button class="btn primary" data-esc="exportar" hidden>Exportar Excel</button></div>
       <div data-inicio></div>
-      <div class="dir-vista-app" data-panel><p class="hint">Cargando…</p></div>
+      <div class="dir-vista-app" data-panel><div class="esqueleto"><i></i><i></i><i></i><i></i><b></b><b></b><b></b></div></div>
     </div>
     <div data-pane="maestros" hidden></div>
     <div data-pane="parciales" hidden></div>`;
@@ -81,7 +81,7 @@ async function mostrarPestaña(p) {
 // ---------- Resumen ----------
 async function cargarResumen(yo) {
   const box = main().querySelector('[data-panel]');
-  box.innerHTML = '<p class="hint">Cargando datos de la escuela…</p>';
+  box.innerHTML = '<div class="esqueleto"><i></i><i></i><i></i><i></i><b></b><b></b><b></b></div>';
   const sb = ejemplo() ? null : await nube();
   const datos = ejemplo() ? await escuelaDeEjemplo() : await leerEscuela(sb, yo.escuela_id);
   const inicio = main().querySelector('[data-inicio]');

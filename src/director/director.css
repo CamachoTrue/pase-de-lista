@@ -47,3 +47,12 @@ td.dir-click { color: var(--primary); font-weight: 600; text-decoration: underli
 tr.dir-click:hover td.dir-chev { text-decoration: underline; }
 @media (min-width: 700px) { .dir-tiles .gr-tile:last-child:nth-child(odd) { grid-column: auto; } }
 @media (min-width: 1000px) { .dir-tiles { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+/* Tablas del panel con el estilo de la app (no de hoja de Excel), también en modo oscuro */
+.dir-tabla { border-collapse: separate; border-spacing: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.dir-tabla th, .dir-tabla td { background: var(--surface); color: var(--text); border: none; border-bottom: 1px solid var(--border); padding: 10px 12px; }
+.dir-tabla th { background: var(--surface-2); color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.dir-tabla tr:last-child td { border-bottom: none; }
+.dir-tabla td small { color: var(--muted); }
+@media (prefers-color-scheme: dark) {
+  .dir-sem .rojo { background: var(--F-soft); color: var(--F); } .dir-sem .amarillo { background: var(--R-soft); color: var(--R); } .dir-sem .verde { background: var(--A-soft); color: var(--A); }
+}
