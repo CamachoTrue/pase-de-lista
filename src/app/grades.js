@@ -90,7 +90,7 @@ $('#per-cierre').addEventListener('click', async (e) => {
     const vista = enPeriodo(g, p.inicio, p.fin);
     const cal = {};
     g.students.forEach((s) => { const r = finalGrade(vista, s.row, g.grading); cal[s.row] = { final: r.final, partes: r.parts }; });
-    cerrar(g, 'parcial', periodoVista, cal);
+    cerrar(g, 'parcial', periodoVista, cal, g.grading);
     toast(`Parcial ${periodoVista} cerrado`);
   } else {
     const c = cierreActivo(g, 'parcial', periodoVista);

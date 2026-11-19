@@ -202,6 +202,13 @@ const conPartesNube = (g, cal) => {
     ? { ...v, partes: Object.fromEntries(Object.entries(v.partes).map(([k, x]) => [nubeDe[k] || k, x])) } : v]));
 };
 
+// Criterios del cierre con el id de cada sección en la nube (igual en todos los dispositivos).
+const criteriosNube = (g, cr) => {
+  if (!cr) return null;
+  const nubeDe = Object.fromEntries((g.sections || []).map((s) => [s.id, s.nube_id || s.id]));
+  return { ...cr, w: Object.fromEntries(Object.entries(cr.w || {}).map(([k, v]) => [nubeDe[k] || k, v])) };
+};
+
 async function subirSemestral(sb, g, escuela, uid) {
   const clase = g.nube && g.nube.clase_id;
   if (!clase) return;
@@ -222,6 +229,7 @@ async function subirSemestral(sb, g, escuela, uid) {
       const { data, error } = await sb.from('cierres').insert({
         escuela_id: escuela, clase_id: clase, tipo: c.tipo, parcial: c.parcial || null, semestre: (state.periodos && state.periodos.semestre) || '',
         calificaciones: porAlumno(g, conPartesNube(g, c.calificaciones)), cerrado_por: uid, cerrado_en: c.cerrado_en,
+        criterios: criteriosNube(g, c.criterios),
       }).select('id').single();
       if (error) throw error;
       c.nube_id = data.id;
@@ -345,7 +353,7 @@ async function bajarClase(sb, g) {
   const inscripciones = await todas(() => sb.from('inscripciones').select('grupo_id, alumno_id, numero_lista, baja, alumnos(nombre)').eq('grupo_id', clase.grupo_id).order('alumno_id'));
   const trabajos = secIds.length ? await todas(() => sb.from('trabajos').select('id, seccion_id, fecha, titulo, orden').in('seccion_id', secIds).order('id')) : [];
   const capturas = await todas(() => sb.from('capturas').select('clase_id, seccion_id, alumno_id, fecha, trabajo_id, valor').eq('clase_id', id).order('id'));
-  const cierres = await todas(() => sb.from('cierres').select('id, clase_id, tipo, parcial, calificaciones, cerrado_en, reabierto_en').eq('clase_id', id).order('id'));
+  const cierres = await todas(() => sb.from('cierres').select('id, clase_id, tipo, parcial, calificaciones, criterios, cerrado_en, reabierto_en').eq('clase_id', id).order('id'));
   const { data: cuad } = await sb.from('cuadernillos').select('nombre, ruta, tamano, pagina').eq('clase_id', id).maybeSingle();
   if (ediciones !== antes || ocupado()) return false;
 

@@ -60,13 +60,15 @@
         </label>
         <button class="icon-btn" id="menu-btn" aria-label="Menú">⋮</button>
       </div>
-      <div class="topbar-row">
-        <button class="icon-btn" id="prev-day" aria-label="Día anterior">‹</button>
-        <input type="date" id="date-input" aria-label="Fecha">
-        <button class="icon-btn" id="next-day" aria-label="Día siguiente">›</button>
+      <div id="lista-controles">
+        <div class="topbar-row">
+          <button class="icon-btn" id="prev-day" aria-label="Día anterior">‹</button>
+          <input type="date" id="date-input" aria-label="Fecha">
+          <button class="icon-btn" id="next-day" aria-label="Día siguiente">›</button>
+        </div>
+        <div class="tabs" role="tablist" id="tabs"></div>
+        <div class="summary" id="summary"></div>
       </div>
-      <div class="tabs" role="tablist" id="tabs"></div>
-      <div class="summary" id="summary"></div>
     </header>
 
     <!-- Vista compacta: lecturas (Sí/No), trabajos (0/50/100) y disciplina (10/0), muchos alumnos por pantalla -->
@@ -90,10 +92,6 @@
       <!-- Al terminar de marcar a los que sí: los que quedan en blanco reciben No / 0 de una vez -->
       <div class="fill-rest-box" id="fill-rest" hidden></div>
       <p class="hint compact-empty" id="compact-empty" hidden>Ningún alumno coincide.</p>
-      <footer class="bottombar">
-        <button class="btn" id="compact-preview">Vista previa</button>
-        <button class="btn primary" id="compact-export">Exportar Excel</button>
-      </footer>
     </div>
 
     <!-- Vista de un alumno a la vez -->
@@ -143,13 +141,31 @@
       </div>
       <p class="hint list-hint">Toca un nombre para pasar lista desde ese alumno.</p>
       <ol class="students" id="students"></ol>
-
-      <footer class="bottombar">
-        <button class="btn" id="list-preview">Vista previa</button>
-        <button class="btn primary" id="export-btn">Exportar Excel</button>
-      </footer>
     </div>
+
+    <!-- Pestañas Calificaciones y Grupo (src/app/calificaciones.js y grupo.js, se cargan al abrirlas) -->
+    <div id="vista-calif" class="vista" hidden></div>
+    <div id="vista-grupo" class="vista" hidden></div>
+
+    <!-- Barra de abajo: las tres partes de la app -->
+    <nav class="tabbar" id="tabbar" aria-label="Secciones">
+      <button data-vista="lista" class="on"><span aria-hidden="true">✓</span>Pasar lista</button>
+      <button data-vista="calif"><span aria-hidden="true">★</span>Calificaciones</button>
+      <button data-vista="grupo"><span aria-hidden="true">☰</span>Grupo</button>
+    </nav>
   </section>
+
+  <!-- Exportar: elegir qué (semestre, un parcial o el resumen del grupo) -->
+  <dialog id="exportar">
+    <h2>Exportar a Excel</h2>
+    <p class="hint">Elige qué quieres entregar.</p>
+    <div class="exp-opciones" id="exp-opciones"></div>
+    <div class="row">
+      <button class="btn" id="exp-previa">Vista previa</button>
+      <button class="btn primary" id="exp-ok">Exportar</button>
+    </div>
+    <button class="btn" data-action="close">Cancelar</button>
+  </dialog>
 
   <!-- Menú -->
   <dialog id="menu">
@@ -157,16 +173,7 @@
     <button class="menu-item cuenta-item" data-action="salir-demo" id="menu-salir-demo" hidden>‹ Salir de la demostración</button>
     <button class="menu-item cuenta-item" data-action="escuela" id="menu-escuela" hidden>Mi escuela (director)</button>
     <button class="menu-item cuenta-item" data-action="cuenta" id="menu-cuenta">Mi cuenta</button>
-    <button class="menu-item" data-action="subject">Materia de este grupo</button>
-    <button class="menu-item" data-action="grades">Secciones y calificaciones</button>
-    <button class="menu-item" data-action="semestral">Calificación semestral</button>
-    <button class="menu-item" data-action="group-report">Resumen del grupo (semáforo)</button>
-    <button class="menu-item" data-action="student">Resumen por alumno</button>
-    <button class="menu-item" data-action="book">Cuadernillo del grupo (PDF)</button>
-    <button class="menu-item" data-action="add-student">Agregar alumno al grupo</button>
-    <button class="menu-item" data-action="remove-student">Quitar alumno agregado</button>
-    <button class="menu-item" data-action="settings">Valores de cada estado</button>
-    <button class="menu-item danger" data-action="new-file">Cargar otro archivo</button>
+    <button class="menu-item" data-action="exportar">Exportar a Excel</button>
     <button class="btn" data-action="close">Cerrar</button>
   </dialog>
 

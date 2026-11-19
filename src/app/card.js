@@ -5,7 +5,6 @@ import { LABELS, dayRecords, group, lista, save, tab, typeOf, ui } from './state
 import { $, escapeHtml, normalize, toast } from './util.js';
 
 export function firstPending() {
-  const g = group();
   const rec = dayRecords(false);
   return lista().findIndex((s) => !rec[s.row]);
 }
@@ -16,7 +15,6 @@ export function startCard() {
 }
 
 export function renderCard(animate) {
-  const g = group();
   const rec = dayRecords(false);
   const n = lista().length;
   const marked = lista().filter((s) => rec[s.row]).length;
@@ -52,7 +50,6 @@ export function renderCard(animate) {
 
 
 export async function markCard(status) {
-  const g = group();
   if (ui.busy || ui.cardIdx >= lista().length) return;
   const s = lista()[ui.cardIdx];
   const prev = dayRecords(false)[s.row];
@@ -103,7 +100,6 @@ document.addEventListener('keydown', (e) => {
 });
 
 export function renderStudents() {
-  const g = group();
   const rec = dayRecords(false);
   const q = normalize($('#search').value);
   const list = $('#students');

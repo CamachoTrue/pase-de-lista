@@ -57,7 +57,7 @@ export async function bajarDeLaNube(avance = () => {}) {
   avance('Bajando calificaciones y asistencias…');
   const capturas = ids.length ? await todas(() => sb.from('capturas').select('clase_id, seccion_id, alumno_id, fecha, trabajo_id, valor').in('clase_id', ids).order('id')) : [];
 
-  const cierres = ids.length ? await todas(() => sb.from('cierres').select('id, clase_id, tipo, parcial, calificaciones, cerrado_en, reabierto_en').in('clase_id', ids)) : [];
+  const cierres = ids.length ? await todas(() => sb.from('cierres').select('id, clase_id, tipo, parcial, calificaciones, criterios, cerrado_en, reabierto_en').in('clase_id', ids)) : [];
   avance('Armando tus grupos…');
   const ExcelJS = await loadExcel();
   const wb = new ExcelJS.Workbook();

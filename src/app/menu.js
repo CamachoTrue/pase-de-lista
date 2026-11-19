@@ -1,16 +1,14 @@
-import { doExport, openPreview } from './export.js';
-import { openSettings } from './settings.js';
-import { openAddStudent, openRemoveStudent } from './students.js';
-import { openSubject } from './subject.js';
+import { openExportar } from './export.js';
 import { $, toast } from './util.js';
 import { rolGuardado } from '../lib/nube.js';
 import { DEMO } from '../lib/demo.js';
-import { setVistaApp } from './state.js';
-import { render } from './main-view.js';
+import { setVistaApp, ui } from './state.js';
+import { refresh, render } from './main-view.js';
 
-// ---------- Menú y diálogos ----------
-// Pantallas que se usan poco se cargan al abrirlas (la app abre más rápido).
-const abrir = (carga, fn) => carga().then((m) => m[fn]()).catch((e) => { console.error(e); toast('No se pudo abrir. Revisa tu conexión e inténtalo otra vez.'); });
+// ---------- Menú (⋮), barra de pestañas y diálogos ----------
+// La app tiene tres pestañas abajo: Pasar lista, Calificaciones y Grupo. El ⋮ solo guarda lo de la
+// cuenta y exportar. Las pantallas que se usan poco se cargan al abrirlas (la app abre más rápido).
+export const abrir = (carga, fn, ...args) => carga().then((m) => m[fn](...args)).catch((e) => { console.error(e); toast('No se pudo abrir. Revisa tu conexión e inténtalo otra vez.'); });
 export const openCuenta = () => abrir(() => import('./cuenta.js'), 'openCuenta');
 export const menu = $('#menu');
 $('#menu-btn').addEventListener('click', () => {
@@ -28,25 +26,21 @@ menu.addEventListener('click', (e) => {
   const action = e.target.dataset.action;
   if (!action || action === 'close') return;
   menu.close();
-  if (action === 'export') doExport(null);
-  if (action === 'preview') openPreview();
-  if (action === 'add-student') openAddStudent();
-  if (action === 'remove-student') openRemoveStudent();
-  if (action === 'grades') abrir(() => import('./grades.js'), 'openGrades');
-  if (action === 'student') abrir(() => import('./student-report.js'), 'openStudent');
-  if (action === 'group-report') abrir(() => import('./group-report.js'), 'openGroupReport');
-  if (action === 'book') abrir(() => import('./book.js'), 'openBook');
-  if (action === 'subject') openSubject();
-  if (action === 'settings') openSettings();
+  if (action === 'exportar') openExportar();
   if (action === 'cuenta') openCuenta();
   if (action === 'escuela') { setVistaApp('escuela'); render(); }
   if (action === 'salir-demo') location.href = '/';
-  if (action === 'semestral') abrir(() => import('./semestral.js'), 'openSemestral');
-  if (action === 'new-file') {
-    if (confirm('Se reemplazará la lista actual y su asistencia guardada. Exporta antes si la necesitas. ¿Continuar?')) {
-      $('#file-input').click();
-    }
-  }
+});
+
+// Barra de abajo: cambia de pestaña.
+export function irA(vista) {
+  ui.vista = vista;
+  window.scrollTo(0, 0);
+  refresh();
+}
+$('#tabbar').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-vista]');
+  if (b) irA(b.dataset.vista);
 });
 
 // Pantalla inicial (sin Excel): entrar con la cuenta para bajar los datos.

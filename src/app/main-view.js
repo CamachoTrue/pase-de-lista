@@ -64,6 +64,20 @@ function pintarAcceso() {
 export function refresh() {
   const opt = $('#group-select').options[state.ui.group];
   if (opt) opt.textContent = glabel(group());
+  // Pestañas de abajo: Pasar lista, Calificaciones o Grupo.
+  const vista = ui.vista || 'lista';
+  document.querySelectorAll('#tabbar [data-vista]').forEach((b) => b.classList.toggle('on', b.dataset.vista === vista));
+  $('#lista-controles').hidden = vista !== 'lista';
+  $('#vista-calif').hidden = vista !== 'calif';
+  $('#vista-grupo').hidden = vista !== 'grupo';
+  if (vista !== 'lista') {
+    $('#card-view').hidden = true;
+    $('#list-view').hidden = true;
+    $('#compact-view').hidden = true;
+    const carga = vista === 'calif' ? import('./calificaciones.js').then((m) => m.renderCalif()) : import('./grupo.js').then((m) => m.renderGrupo());
+    carga.catch((e) => { console.error(e); $(`#vista-${vista}`).innerHTML = '<p class="hint">No se pudo abrir. Revisa tu conexión e inténtalo otra vez.</p>'; });
+    return;
+  }
   const t = tab();
   renderTabs();
   const att = typeOf(t) === 'asist';
@@ -99,7 +113,6 @@ $('#tabs').addEventListener('click', (e) => {
 });
 
 export function renderSummary() {
-  const g = group();
   const cat = tab();
   const t = typeOf(cat);
   if (t === 'num') {

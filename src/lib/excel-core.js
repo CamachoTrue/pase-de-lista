@@ -883,5 +883,5 @@ export {
     activos, parseWorkbook, exportWorkbook, groupDates, sheetLayout, worksOf, normalizeWorks, normalizeGroup, hasData, discDates, datesOf, shortDate,
     DEFAULT_GRADING, gradeParts, finalGrade, gradingOn, weightOf, round1, parseHeader, parseDateHeader, cellText,
     studentReport, exportStudent, groupReport, exportGroupReport,
-    enPeriodo, periodosListos, parcialDe, SEMESTRAL, semestral,
+    enPeriodo, periodosListos, parcialDe, cierreVigente, SEMESTRAL, semestral,
 };

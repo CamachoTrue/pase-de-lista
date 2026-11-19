@@ -7,9 +7,12 @@ import { save } from './state.js';
 export const cierreActivo = (g, tipo, n = null) =>
   (g.cierres || []).filter((c) => c.tipo === tipo && (c.parcial ?? null) === n && !c.reabierto_en).at(-1) || null;
 
-export function cerrar(g, tipo, n, calificaciones) {
+// criterios: copia de los porcentajes con que se cerró (para exportar ese parcial igual después,
+// aunque el siguiente parcial cambie de secciones o porcentajes).
+export function cerrar(g, tipo, n, calificaciones, criterios = null) {
   g.cierres = g.cierres || [];
-  const c = { tipo, parcial: n, calificaciones, cerrado_en: new Date().toISOString(), reabierto_en: null };
+  const c = { tipo, parcial: n, calificaciones, cerrado_en: new Date().toISOString(), reabierto_en: null,
+    ...(criterios ? { criterios: JSON.parse(JSON.stringify(criterios)) } : {}) };
   g.cierres.push(c);
   save();
   return c;

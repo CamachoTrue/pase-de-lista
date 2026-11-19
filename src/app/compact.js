@@ -1,13 +1,11 @@
 import { ASIST_ID } from '../lib/excel-core.js';
 import { confirmBulk, confirmChange } from './dialogs.js';
-import { doExport, openPreview } from './export.js';
 import { refresh, renderSummary } from './main-view.js';
 import { DISC_DEFAULT, FILL_REST, LABELS, OPTIONS, curWork, dayData, group, lista, optionOf, save, secById, state, tab, typeOf, workIdx, works } from './state.js';
 import { $, escapeHtml, normalize, toast } from './util.js';
 
 // ---------- Vista compacta (lecturas / trabajos) ----------
 export function renderCompact() {
-  const g = group();
   const cat = tab();
   const t = typeOf(cat);
   const sec = secById(cat);
@@ -259,5 +257,3 @@ $('#work-del').addEventListener('click', async () => {
   toast(`${name} eliminado`);
 });
 
-$('#compact-preview').addEventListener('click', openPreview);
-$('#compact-export').addEventListener('click', () => doExport($('#compact-export')));

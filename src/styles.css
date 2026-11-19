@@ -605,3 +605,51 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .aviso-acceso { display: block; width: 100%; margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--R); border-radius: 10px; background: var(--R-soft); color: var(--text); font: inherit; font-size: .85rem; text-align: left; cursor: pointer; }
 .aviso-acceso.mal { border-color: var(--F); background: var(--F-soft); }
 .aviso-acceso b { color: var(--primary); white-space: nowrap; }
+
+/* ---------- Barra de abajo: Pasar lista · Calificaciones · Grupo ---------- */
+#screen-main { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: flex; justify-content: center; gap: 4px; padding: 6px 8px; padding-bottom: max(6px, env(safe-area-inset-bottom));
+  background: var(--surface); border-top: 1px solid var(--border); }
+.tabbar button { flex: 1; max-width: 220px; display: flex; flex-direction: column; align-items: center; gap: 2px; border: none; background: none; color: var(--muted); font: inherit; font-size: .78rem; font-weight: 600; padding: 6px 4px; border-radius: 12px; cursor: pointer; }
+.tabbar button span { font-size: 1.15rem; line-height: 1; }
+.tabbar button.on { color: var(--primary); background: var(--A-soft); }
+#compact-view { padding-bottom: 12px; }
+
+/* Pestañas Calificaciones y Grupo */
+.vista { padding: 10px 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+.vista-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.vista-head h2 { margin: 0; font-size: 1.25rem; }
+.vista-head .hint { margin: 2px 0 0; }
+.calif-periodos { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.calif-card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--primary); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.calif-card .hint { margin: 0; }
+.calif-card.cerrado { border-left-color: var(--muted); }
+.calif-card.nuevo { border-left-color: var(--R); }
+.calif-card .btn { align-self: flex-start; }
+.calif-lista li { cursor: pointer; }
+.calif-ir { color: var(--primary); font-weight: 800; font-size: 1.2rem; padding-left: 4px; }
+.calif-sem td.name { min-width: 160px; }
+.grupo-sec { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.grupo-sec h3 { margin: 0; font-size: 1rem; }
+.grupo-sec .hint { margin: 0; }
+.grupo-sec > .btn { align-self: flex-start; }
+.grupo-materia { display: flex; gap: 8px; }
+.grupo-materia input, .grupo-busca { flex: 1; min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; }
+.grupo-criterios { list-style: none; margin: 0; padding: 0; }
+.grupo-criterios li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.grupo-criterios li small { display: block; color: var(--muted); font-size: .75rem; }
+.grupo-criterios li.total { border-bottom: none; font-weight: 700; }
+.grupo-criterios li.total.mal b, .mal-txt { color: var(--F); }
+.grupo-acc { flex-wrap: wrap; }
+.grupo-alumnos { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+.grupo-alumnos li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: .9rem; }
+.grupo-alumnos li:last-child { border-bottom: none; }
+.grupo-alumnos li .no { color: var(--muted); display: inline-block; min-width: 1.6em; text-align: right; }
+.grupo-alumnos li small { display: block; color: var(--muted); font-size: .75rem; margin-left: 1.9em; }
+.grupo-alumnos li.baja .nm { opacity: .6; }
+.exp-opciones { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.exp-op { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.exp-op:has(input:checked) { border-color: var(--primary); background: var(--A-soft); }
+.exp-op small { display: block; color: var(--muted); font-size: .8rem; }
+@media (min-width: 900px) { .vista { padding-left: 0; padding-right: 0; } .grupo-sec > .btn { align-self: flex-start; } }
+.calif-card .row, .grupo-acc { display: flex; flex-wrap: wrap; gap: 8px; } .calif-card .row .btn, .grupo-acc .btn { flex: 1 1 auto; width: auto; }

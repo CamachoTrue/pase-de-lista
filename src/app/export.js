@@ -1,20 +1,71 @@
-import { READ, STATUSES, cellText, exportWorkbook, groupDates, sheetLayout, worksOf } from '../lib/excel-core.js';
+import { READ, STATUSES, cellText, cierreVigente, enPeriodo, exportGroupReport, exportWorkbook, groupDates, periodosListos, sheetLayout, worksOf } from '../lib/excel-core.js';
 import { LABELS, gname, group, optionOf, secs, state } from './state.js';
 import { $, b64ToBuf, deliverFile, escapeHtml, loadExcel, toast } from './util.js';
 
 // ---------- Exportar ----------
-$('#export-btn').addEventListener('click', () => doExport($('#export-btn')));
-$('#done-export').addEventListener('click', () => doExport($('#done-export')));
-$('#preview-export').addEventListener('click', () => doExport($('#preview-export')));
+$('#done-export').addEventListener('click', () => openExportar());
+$('#preview-export').addEventListener('click', () => doExport($('#preview-export'), alcance));
+
+// ---------- Qué exportar: todo el semestre, un parcial o el resumen del grupo ----------
+let alcance = 'todo';
+const parciales = () => (periodosListos(state.periodos) ? state.periodos.parciales : []);
+// Grupos tal como se exportan: todo, o solo las fechas de un parcial (con los criterios con que se cerró).
+function preparar(groups, a) {
+  const p = parciales().find((x) => x.numero === a);
+  if (!p) return { groups, periodos: state.periodos };
+  return {
+    periodos: null,
+    groups: groups.map((g) => {
+      const v = enPeriodo(g, p.inicio, p.fin);
+      const c = cierreVigente(g, 'parcial', p.numero);
+      v.grading = (c && c.criterios) || g.grading;
+      return v;
+    }),
+  };
+}
+const fechaCortita = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+export function openExportar() {
+  const g = group();
+  const opc = [['todo', parciales().length ? 'Todo el semestre' : 'Todo lo capturado', parciales().length ? 'Todas las fechas, con columnas P1, P2, P3 y semestral' : 'Todas las fechas y la calificación']];
+  for (const p of parciales()) {
+    const c = cierreVigente(g, 'parcial', p.numero);
+    opc.push([p.numero, `Solo el parcial ${p.numero}`, `Del ${fechaCortita(p.inicio)} al ${fechaCortita(p.fin)}${c ? ' · cerrado' : ''}`]);
+  }
+  opc.push(['resumen', 'Resumen del grupo (semáforo)', `Solo ${gname(g)}: calificación, asistencia y riesgo de cada alumno`]);
+  if (!opc.some(([k]) => k === alcance)) alcance = 'todo';
+  $('#exp-opciones').innerHTML = opc.map(([k, t, sub]) => `<label class="exp-op"><input type="radio" name="exp" value="${k}" ${k === alcance ? 'checked' : ''}>
+    <span><b>${escapeHtml(t)}</b><small>${escapeHtml(sub)}</small></span></label>`).join('');
+  $('#exp-previa').hidden = alcance === 'resumen';
+  $('#exportar').showModal();
+}
+$('#exp-opciones').addEventListener('change', (e) => {
+  const v = e.target.value;
+  alcance = v === 'todo' || v === 'resumen' ? v : Number(v);
+  $('#exp-previa').hidden = alcance === 'resumen';
+});
+$('#exp-previa').addEventListener('click', () => { $('#exportar').close(); openPreview(alcance); });
+$('#exp-ok').addEventListener('click', async () => {
+  const btn = $('#exp-ok');
+  if (alcance === 'resumen') {
+    btn.disabled = true;
+    try {
+      const g = group();
+      await deliverFile(await exportGroupReport(await loadExcel(), g, g.grading), `Resumen ${gname(g)}.xlsx`);
+      toast('Excel generado');
+    } catch (err) { console.error(err); toast('Error al generar el Excel'); } finally { btn.disabled = false; }
+  } else await doExport(btn, alcance);
+  $('#exportar').close();
+});
 $('#done-preview').addEventListener('click', openPreview);
-$('#list-preview').addEventListener('click', openPreview);
 // ---------- Vista previa ----------
 // Se genera el mismo Excel que al exportar y se vuelve a leer, así lo que se ve es exactamente lo que se descarga.
-export async function openPreview() {
-  const g = group();
+export async function openPreview(a = alcance) {
+  alcance = a;
+  const prep = preparar([group()], a);
+  const g = prep.groups[0];
   let ws;
   try {
-    const out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), [g], state.codes, null, state.periodos);
+    const out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), [g], state.codes, null, prep.periodos);
     const wb = new (await loadExcel()).Workbook();
     await wb.xlsx.load(out);
     ws = wb.getWorksheet(g.sheet);
@@ -25,7 +76,7 @@ export async function openPreview() {
   }
 
   const dates = groupDates(g);
-  const layout = sheetLayout(g, g.grading, state.periodos);
+  const layout = sheetLayout(g, g.grading, prep.periodos);
   const byCol = new Map(layout.map((x) => [x.col, x]));
   const lastCol = Math.max(g.nameCol, ...layout.map((x) => x.col));
   const isCur = (c) => byCol.has(c) && byCol.get(c).date === state.ui.date;
@@ -78,7 +129,7 @@ export async function openPreview() {
   html += '</tbody>';
   $('#preview-table').innerHTML = html;
 
-  $('#preview-title').textContent = `Vista previa · ${gname(g)}`;
+  $('#preview-title').textContent = `Vista previa · ${gname(g)}${typeof a === 'number' ? ` · parcial ${a}` : ''}`;
   $('#preview-sub').textContent = layout.length
     ? `${g.students.length} alumnos · ${dates.length} día(s) · Por fecha: ${secs().filter((x) => x.type === 'asist' || x.type === 'sino').map((x) => x.name).join(' + ')}; las demás secciones aparte a la derecha`
     : 'Aún no hay registros en este grupo.';
@@ -101,16 +152,18 @@ export async function openPreview() {
   if (target) d.querySelector('.preview-scroll').scrollLeft = Math.max(0, target.offsetLeft - left - 40);
 }
 
-export async function doExport(btn) {
+export async function doExport(btn, a = 'todo') {
+  const txt = btn && btn.textContent;
   if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
   try {
-    const out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), state.groups, state.codes, null, state.periodos);
-    await deliverFile(out, state.fileName.replace(/\.xlsx$/i, '') + ' - asistencia.xlsx');
+    const prep = preparar(state.groups, a);
+    const out = await exportWorkbook(await loadExcel(), b64ToBuf(state.fileB64), prep.groups, state.codes, null, prep.periodos);
+    await deliverFile(out, state.fileName.replace(/\.xlsx$/i, '') + (typeof a === 'number' ? ` - parcial ${a}.xlsx` : ' - asistencia.xlsx'));
     toast('Excel generado');
   } catch (err) {
     console.error(err);
     toast('Error al generar el Excel');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Exportar Excel'; }
+    if (btn) { btn.disabled = false; btn.textContent = txt; }
   }
 }

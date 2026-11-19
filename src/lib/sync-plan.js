@@ -161,6 +161,7 @@ export function armarGrupo(g, { clase, secciones, inscripciones, trabajos, captu
     calificaciones: Object.fromEntries(Object.entries(aFila(c.calificaciones)).map(([row, v]) => [row, v && v.partes
       ? { ...v, partes: Object.fromEntries(Object.entries(v.partes).map(([k, x]) => [(local[k] || {}).id || k, x])) } : v])),
     reabierto_en: c.reabierto_en || null, nube_id: c.id, nube_reabierto: !!c.reabierto_en,
+    ...(c.criterios ? { criterios: { ...c.criterios, w: Object.fromEntries(Object.entries(c.criterios.w || {}).map(([k, v]) => [(local[k] || {}).id || k, v])) } } : {}),
   }));
   // Todo lo que llegó ya está en la nube: se marca como subido.
   const bajas = Object.fromEntries(inscripciones.filter((i) => i.baja).map((i) => [i.alumno_id, i.baja]));

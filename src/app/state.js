@@ -63,7 +63,7 @@ export const fixGrading = (gr) => JSON.parse(JSON.stringify({ ...DEFAULT_GRADING
 // Nombre del grupo para mostrar: hoja del Excel y, si el maestro la puso, la materia (p. ej. "V205 · Ética").
 export const gname = (g) => (g.subject ? `${g.sheet} · ${g.subject}` : g.sheet);
 // En el selector: con materia se omite el número de alumnos para que quepa el nombre.
-export const glabel = (g) => (g.subject ? gname(g) : `${g.sheet} · ${g.students.length} alumnos`);
+export const glabel = (g) => (g.subject ? gname(g) : `${g.sheet} · ${activos(g).length} alumnos`);
 export const STORE_KEY = `paseDeLista.v1${sufijoDemo}`;
 
 // ---------- Estado ----------
@@ -72,7 +72,7 @@ export let state = load();
 // Reemplaza todo el estado (al subir otro archivo).
 export function setState(s) { state = s; }
 // Estado de la pantalla que comparten varios módulos.
-export const ui = { view: 'card', cardIdx: 0, busy: false, studentRow: null };
+export const ui = { view: 'card', cardIdx: 0, busy: false, studentRow: null, vista: 'lista' };
 // Director: ¿ve su escuela o sus grupos? (se recuerda en este dispositivo)
 const VISTA = `app.vista${sufijoDemo}`;
 export const vistaApp = () => { try { return almacenApp().getItem(VISTA); } catch { return null; } };
