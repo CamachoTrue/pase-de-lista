@@ -1,6 +1,7 @@
 import { $, toast } from './util.js';
 import { setVistaApp, ui } from './state.js';
 import { refresh, render } from './main-view.js';
+import { alCambiarEstado, estado } from './sync.js';
 
 // ---------- Mi cuenta, barra de pestañas y diálogos ----------
 // La app tiene tres pestañas abajo: Pasar lista, Calificaciones y Grupo, y arriba «Mi cuenta». Las pantallas que se usan poco se cargan al abrirlas (la app abre más rápido).
@@ -35,3 +36,26 @@ $('#aviso-acceso').addEventListener('click', (e) => {
   if (e.currentTarget.dataset.ir === 'excel') $('#file-input').click();
   else openCuenta();
 });
+
+// Punto en el ícono de cuenta: si lo capturado ya está guardado en la cuenta.
+// Verde = guardado · azul = guardando · naranja = sin internet (se sube al volver) · rojo = hay un problema.
+const PUNTO = {
+  listo: ['ok', 'Todo guardado en tu cuenta'],
+  subiendo: ['sube', 'Guardando en tu cuenta…'],
+  pendiente: ['sube', 'Guardando en tu cuenta…'],
+  'sin-conexion': ['espera', 'Sin internet: se guarda en tu cuenta al volver la conexión'],
+  error: ['mal', 'No se pudo guardar en tu cuenta. Toca para ver por qué'],
+  'otra-cuenta': ['mal', 'Las listas de este celular son de otra cuenta'],
+  vencida: ['mal', 'Tu acceso venció'],
+};
+function pintarPunto(e) {
+  const [cls, txt] = PUNTO[e.fase] || ['', 'Mi cuenta'];
+  ['#menu-btn', '#esc-cuenta'].forEach((sel) => {
+    const b = $(sel);
+    b.dataset.nube = cls;
+    b.title = txt;
+    b.setAttribute('aria-label', `Mi cuenta. ${txt}`);
+  });
+}
+alCambiarEstado(pintarPunto);
+pintarPunto(estado);

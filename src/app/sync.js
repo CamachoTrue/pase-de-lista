@@ -17,10 +17,12 @@ const avisar = () => avisos.forEach((fn) => fn(estado));
 let timer = null;
 let corriendo = false;
 let otraVez = false;
-export function programar(ms = 4000) {
+let pendiente = false;
+export function programar(ms = 1500) {
   if (!haySesion()) return;
   clearTimeout(timer);
-  timer = setTimeout(sincronizar, ms);
+  pendiente = true;
+  timer = setTimeout(() => { pendiente = false; sincronizar(); }, ms);
 }
 
 export async function sincronizar() {
@@ -388,7 +390,7 @@ async function bajarClase(sb, g) {
   return true;
 }
 
-// Revisión ligera (una consulta): al volver a la app y cada 30 s mientras está abierta. Si otro
+// Revisión ligera (una consulta): al volver a la app y cada 15 s mientras está abierta. Si otro
 // dispositivo cambió algo, se sincroniza completo (sube lo de aquí y baja lo de allá).
 async function revisar() {
   if (!state || !state.groups || !haySesion() || !navigator.onLine || corriendo || document.hidden) return;
@@ -406,11 +408,21 @@ async function revisar() {
     if (ajustes || state.groups.some((g) => hayQueBajar(g, cambios[g.nube && g.nube.clase_id], este))) sincronizar();
   } catch { /* sin conexión: se intenta en la siguiente vuelta */ }
 }
-setInterval(revisar, 30000);
+setInterval(revisar, 15000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(revisar, 500); });
 
 // Cada cambio guardado programa una subida; también al volver el internet y al abrir la app.
-alGuardar(() => { ediciones++; programar(); });
+alGuardar(() => {
+  ediciones++;
+  // Se ve al instante que hay algo por guardar (punto en el ícono de cuenta) y se sube en segundo y medio.
+  if (haySesion() && estado.fase !== 'subiendo') { estado.fase = 'pendiente'; avisar(); }
+  programar();
+});
+// Al salir de la app (cambiar de app, bloquear el celular) se sube lo pendiente de inmediato:
+// el teléfono pausa la app y la espera de segundo y medio no alcanzaría a correr.
+const subirYa = () => { if (pendiente) { clearTimeout(timer); pendiente = false; sincronizar(); } };
+document.addEventListener('visibilitychange', () => { if (document.hidden) subirYa(); });
+window.addEventListener('pagehide', subirYa);
 window.addEventListener('online', () => programar(1000));
 window.addEventListener('cuadernillo-cambio', () => programar(1500));
 if (haySesion()) setTimeout(() => programar(500), 2500);

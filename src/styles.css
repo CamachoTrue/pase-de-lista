@@ -658,3 +658,11 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .exp-grupos { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 8px; font-size: .9rem; }
 .exp-grupos[hidden] { display: none; }
 .btn-cuenta { flex: none; width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); display: grid; place-items: center; padding: 0; }
+/* Punto de guardado en el ícono de cuenta */
+.btn-cuenta { position: relative; }
+.btn-cuenta[data-nube]:not([data-nube=""])::after { content: ''; position: absolute; right: 1px; top: 1px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--surface); }
+.btn-cuenta[data-nube="ok"]::after { background: var(--A); }
+.btn-cuenta[data-nube="sube"]::after { background: #3b82f6; animation: latido 1s ease-in-out infinite; }
+.btn-cuenta[data-nube="espera"]::after { background: #d4a017; }
+.btn-cuenta[data-nube="mal"]::after { background: var(--F); }
+@keyframes latido { 50% { opacity: .35; } }
