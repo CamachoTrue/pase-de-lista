@@ -37,3 +37,4 @@ td.dir-click { color: #1f7a4d; font-weight: 600; text-decoration: underline; tex
 .dir-h2 small { color: var(--muted); font-weight: 400; font-size: .85rem; }
 @media (max-width: 560px) { .dir-main { padding: 12px; } .dir-top { padding: 12px; } }
 .dir-top-acc a.btn { color: var(--text); }
+.dir-ejemplo { background: #fbf0dc; color: #7a4f0e; text-align: center; font-weight: 600; font-size: 13px; padding: 6px 12px; }

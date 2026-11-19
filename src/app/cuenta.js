@@ -54,7 +54,7 @@ async function renderCuenta() {
     ${p.escuela_id && !(state && state.groups && state.groups.length) ? '<div class="cuenta-bajar" data-bajar hidden></div>' : ''}`;
   if (p.rol === 'director' || p.rol === 'superadmin') html += '<a class="btn primary dir-link" href="/director" target="_blank" rel="noopener">Abrir panel de la escuela ↗</a>';
   if (p.rol === 'director') html += seccionPeriodos() + seccionMaestros();
-  if (p.rol === 'superadmin') html += seccionEscuelas();
+  if (p.rol === 'superadmin') html += seccionVerComo() + seccionEscuelas();
   body().innerHTML = html + btnSalir() + (p.rol === 'superadmin' ? '' : btnEliminar());
   pintarNube();
   programar(200);
@@ -290,6 +290,81 @@ async function guardarPeriodos(sb, f) {
   await sb.from('parciales').delete().eq('semestre_id', sem.id).in('numero', quitar);
 }
 
+// ---------- Superadmin: ver la app como cada rol (vista previa con datos de ejemplo) ----------
+function seccionVerComo() {
+  return `<section class="cuenta-sec">
+      <h3>Ver la app como…</h3>
+      <p class="hint">Para darte una idea o enseñarla: así ve <i>Mi cuenta</i> cada tipo de usuario. Son datos de ejemplo y no se guarda nada.</p>
+      <div class="ver-como">
+        <button class="btn" data-act="ver-como" data-rol="director">Director</button>
+        <button class="btn" data-act="ver-como" data-rol="maestro">Maestro de escuela</button>
+        <button class="btn" data-act="ver-como" data-rol="individual">Maestro independiente</button>
+      </div>
+      <a class="btn dir-link" href="/director?ejemplo=1" target="_blank" rel="noopener">Panel del director con escuela de ejemplo ↗</a>
+    </section>`;
+}
+
+const enDias = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+const EJEMPLO = {
+  director: { nombre: 'Mtra. Laura Gómez', correo: 'direccion@prepaejemplo.mx', rol: 'director', escuela: 'Preparatoria de Ejemplo', clave: 'EJEMPLO', paquete: 'empresarial' },
+  maestro: { nombre: 'Prof. Jorge Méndez', correo: 'jorge.mendez@prepaejemplo.mx', rol: 'maestro', escuela: 'Preparatoria de Ejemplo', clave: 'EJEMPLO', paquete: 'empresarial' },
+  individual: { nombre: 'Mtra. Ana Ruiz', correo: 'ana.ruiz@correo.com', rol: 'maestro', escuela: 'Mtra. Ana Ruiz', clave: 'I7K2Q9X', paquete: 'individual' },
+};
+const PUEDE = {
+  director: [
+    'Todo lo que hace un maestro, si también da clases.',
+    'Invitar maestros por enlace (WhatsApp) hasta las cuentas contratadas, y quitar invitaciones.',
+    'Poner las fechas de los 3 parciales del semestre para toda la escuela.',
+    'Abrir el panel de la escuela: alumnos, asistencia, promedios, semáforo de riesgo, maestros que no capturan y la ficha de cada alumno con todas sus materias.',
+  ],
+  maestro: [
+    'Subir su Excel con las listas: cada hoja es un grupo.',
+    'Pasar lista uno por uno o en lista completa (asistencia, falta, retardo, justificado), con o sin internet.',
+    'Calificar por secciones con porcentajes: lecturas, trabajos, disciplina, examen…',
+    'Ver parciales y calificación semestral (promedio o con examen final), cerrar y reabrir parciales.',
+    'Resumen por alumno y del grupo, exportar a Excel y ver el cuadernillo en PDF.',
+    'Todo se guarda en su cuenta y aparece en sus otros dispositivos.',
+  ],
+  individual: [
+    'Lo mismo que un maestro de escuela, pero sin director: él mismo pone sus parciales.',
+    'Se registra solo y tiene días de prueba gratis; después paga su suscripción.',
+    'No aparece en el panel de ninguna escuela.',
+  ],
+};
+const ROL_TXT = { director: 'director', maestro: 'maestro de escuela', individual: 'maestro independiente' };
+
+function renderVistaPrevia(tipo) {
+  const p = { ...EJEMPLO[tipo], escuela_id: 'ejemplo', activa: true, vence_el: tipo === 'individual' ? enDias(12) : null };
+  $('#cuenta-sub').textContent = `Vista previa · ${ROL_TXT[tipo]}`;
+  let html = `<div class="nube-estado espera vista-aviso"><span>Vista previa: así ve <i>Mi cuenta</i> un ${ROL_TXT[tipo]}. Datos de ejemplo; aquí no se guarda nada.</span>
+      <button class="link-btn" data-act="volver-panel">Volver a mi panel</button></div>
+    <div class="vista-previa">
+    <div class="cuenta-card">
+      <b>${escapeHtml(p.nombre)}</b><small>${escapeHtml(p.correo)}</small>
+      <span class="rol-badge">${ROL[p.rol]}</span>
+      <div class="cuenta-escuela">${escapeHtml(p.escuela)} · ${escapeHtml(p.clave)}</div>
+    </div>
+    ${avisoSuscripcion(p)}
+    <div class="nube-estado ok"><span>Todo guardado en tu cuenta ✓ · 8:15 a.m.</span><button class="link-btn" data-act="subir">Guardar ahora</button></div>`;
+  if (tipo === 'director') html += '<a class="btn primary dir-link" href="/director?ejemplo=1" target="_blank" rel="noopener">Abrir panel de la escuela ↗</a>' + seccionPeriodos() + seccionMaestros();
+  html += `<section class="cuenta-sec"><h3>Lo que puede hacer</h3><ul class="vista-puede">${PUEDE[tipo].map((t) => `<li>${t}</li>`).join('')}</ul></section>`;
+  body().innerHTML = html + btnSalir() + btnEliminar() + '</div>';
+  if (tipo !== 'director') return;
+  const f = body().querySelector('[data-form="periodos"]');
+  const y = new Date().getFullYear();
+  const per = [['p1', `${y}-08-25`, `${y}-09-26`], ['p2', `${y}-09-29`, `${y}-10-31`], ['p3', `${y}-11-03`, `${y}-12-12`]];
+  f.elements.semestre.value = `Ago–Dic ${y}`;
+  per.forEach(([k, i, fin]) => { f.elements[`${k}i`].value = i; f.elements[`${k}f`].value = fin; });
+  body().querySelector('[data-cupo]').textContent = '5 de 8 cuentas en uso (incluye invitaciones pendientes).';
+  body().querySelector('[data-invitaciones]').innerHTML = `<li class="titulo">Invitaciones pendientes</li>
+    <li><span class="nm">rosa.leyva@prepaejemplo.mx<small>vence ${fecha(new Date(Date.now() + 5 * 864e5).toISOString())}</small></span>
+    <button class="link-btn" data-act="compartir">Enviar</button><button class="link-btn danger-text" data-act="borrar-inv">Quitar</button></li>`;
+  const us = [['Mtra. Laura Gómez', 'direccion@prepaejemplo.mx', 'director'], ['Prof. Jorge Méndez', 'jorge.mendez@prepaejemplo.mx', 'maestro'],
+    ['Mtra. Sofía Navarro', 'sofia.navarro@prepaejemplo.mx', 'maestro'], ['Prof. Ricardo Soto', 'ricardo.soto@prepaejemplo.mx', 'maestro']];
+  body().querySelector('[data-usuarios]').innerHTML = '<li class="titulo">Cuentas</li>' + us.map(([n, c, r]) => `<li>
+      <span class="nm">${escapeHtml(n)}<small>${escapeHtml(c)} · ${ROL[r]}</small></span></li>`).join('');
+}
+
 // ---------- Superadmin: escuelas ----------
 function seccionEscuelas() {
   return `<section class="cuenta-sec">
@@ -398,6 +473,7 @@ async function copiar(texto) {
 $('#cuenta-body').addEventListener('submit', async (e) => {
   e.preventDefault();
   const f = e.target;
+  if (f.closest('.vista-previa')) { toast('Vista previa: aquí no se guarda nada'); return; }
   const err = f.querySelector('[data-error]');
   const btn = f.querySelector('[type=submit]');
   err.textContent = '';
@@ -493,6 +569,9 @@ $('#cuenta-body').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const act = b.dataset.act;
+  if (act === 'volver-panel') { renderCuenta(); return; }
+  if (act === 'ver-como') { renderVistaPrevia(b.dataset.rol); body().scrollTop = 0; return; }
+  if (b.closest('.vista-previa')) { toast('Vista previa: aquí no se hace nada'); return; }
   const token = (b.closest('[data-token]') || {}).dataset?.token;
   if (act === 'subir') sincronizar();
   if (act === 'registro') renderRegistro();

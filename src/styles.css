@@ -537,3 +537,7 @@ dialog.fullscreen[open] { display: flex; flex-direction: column; }
 .cuenta-eliminar { margin-top: 18px; color: var(--F, #c62f2f); border-color: currentColor; background: transparent; }
 .cuenta-legal { text-align: center; margin-top: 10px; }
 .cuenta-legal a { color: inherit; }
+
+.ver-como { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.vista-aviso { position: sticky; top: 0; z-index: 2; }
+.vista-puede { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }

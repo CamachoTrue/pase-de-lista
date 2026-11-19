@@ -19,7 +19,18 @@ let datos = null; // { clases, alumnos, maestros }
 let vista = 'resumen';
 let detalle = null; // clase_id o alumno_id abierto
 
+// Escuela de ejemplo (?ejemplo=1): datos inventados, sin entrar a ninguna cuenta.
+const EJEMPLO = new URLSearchParams(location.search).has('ejemplo');
+async function iniciarEjemplo() {
+  const { escuelaEjemplo } = await import('./ejemplo.js');
+  document.body.insertAdjacentHTML('afterbegin', '<div class="dir-ejemplo">Escuela de ejemplo · datos inventados para conocer el panel</div>');
+  $('#dir-sub').textContent = 'Preparatoria de Ejemplo · EJEMPLO';
+  datos = armar('ejemplo', escuelaEjemplo());
+  pintar();
+}
+
 async function iniciar() {
+  if (EJEMPLO) return iniciarEjemplo();
   try { sb = await nube(); } catch { $('#dir-main').innerHTML = '<p class="hint">Sin conexión. El panel necesita internet.</p>'; return; }
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return pedirEntrar();
@@ -80,33 +91,38 @@ async function cargar(escuela, nombre) {
       todas(() => sb.from('alumnos').select('id, nombre, clave').eq('escuela_id', escuela)),
       todas(() => sb.from('usuarios').select('id, nombre, correo, rol, activo').eq('escuela_id', escuela)),
     ]);
-    const res = Object.fromEntries(resumenes.map((r) => [r.clase_id, r]));
-    const maestro = Object.fromEntries(maestros.map((m) => [m.id, m]));
-    datos = {
-      escuela,
-      alumnos: Object.fromEntries(alumnos.map((a) => [a.id, a])),
-      maestros: maestros.filter((m) => m.rol === 'maestro' || clases.some((c) => c.maestro_id === m.id)),
-      clases: clases.map((c) => {
-        const r = res[c.id];
-        const al = r ? r.datos.alumnos || {} : {};
-        const escala = (r && r.datos.escala) || 10;
-        const filas = Object.values(al);
-        const cuenta = (e) => filas.filter((x) => x.e === e).length;
-        return {
-          id: c.id, grupo: c.grupos ? c.grupos.nombre : '', materia: c.materia, maestro: (maestro[c.maestro_id] || {}).nombre || '—',
-          maestro_id: c.maestro_id, escala, alumnos: al, n: filas.length,
-          promedio: avg(filas.map((x) => x.f).filter((v) => v != null)), asistencia: avg(filas.map((x) => x.a).filter((v) => v != null)),
-          rojo: cuenta('rojo'), amarillo: cuenta('amarillo'), verde: cuenta('verde'),
-          ultima: r ? r.ultima_captura : null, actualizado: r ? r.actualizado_en : null, semestre: r ? r.datos.semestre : '',
-        };
-      }).sort((a, b) => (a.grupo + a.materia).localeCompare(b.grupo + b.materia)),
-    };
+    datos = armar(escuela, { clases, resumenes, alumnos, maestros });
     $('#dir-recargar').hidden = false;
     pintar();
   } catch (e) {
     console.error(e);
     $('#dir-main').innerHTML = `<p class="hint">No se pudo cargar: ${esc(errorLegible(e))}</p>`;
   }
+}
+
+// Filas de la base de datos (o de la escuela de ejemplo) → lo que pinta el panel.
+function armar(escuela, { clases, resumenes, alumnos, maestros }) {
+  const res = Object.fromEntries(resumenes.map((r) => [r.clase_id, r]));
+  const maestro = Object.fromEntries(maestros.map((m) => [m.id, m]));
+  return {
+    escuela,
+    alumnos: Object.fromEntries(alumnos.map((a) => [a.id, a])),
+    maestros: maestros.filter((m) => m.rol === 'maestro' || clases.some((c) => c.maestro_id === m.id)),
+    clases: clases.map((c) => {
+      const r = res[c.id];
+      const al = r ? r.datos.alumnos || {} : {};
+      const escala = (r && r.datos.escala) || 10;
+      const filas = Object.values(al);
+      const cuenta = (e) => filas.filter((x) => x.e === e).length;
+      return {
+        id: c.id, grupo: c.grupos ? c.grupos.nombre : '', materia: c.materia, maestro: (maestro[c.maestro_id] || {}).nombre || '—',
+        maestro_id: c.maestro_id, escala, alumnos: al, n: filas.length,
+        promedio: avg(filas.map((x) => x.f).filter((v) => v != null)), asistencia: avg(filas.map((x) => x.a).filter((v) => v != null)),
+        rojo: cuenta('rojo'), amarillo: cuenta('amarillo'), verde: cuenta('verde'),
+        ultima: r ? r.ultima_captura : null, actualizado: r ? r.actualizado_en : null, semestre: r ? r.datos.semestre : '',
+      };
+    }).sort((a, b) => (a.grupo + a.materia).localeCompare(b.grupo + b.materia)),
+  };
 }
 
 // Calificación en escala de 10 (las clases pueden calificar sobre 10 o sobre 100).
