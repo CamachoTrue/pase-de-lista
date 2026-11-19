@@ -300,8 +300,9 @@ function seccionEscuelas() {
           <label class="field">Clave corta<input name="clave" required maxlength="10" placeholder="ESC01" class="mayus"></label>
           <label class="field">Cuentas<input name="cuentas" type="number" min="1" value="5" required></label>
         </div>
-        <label class="field">Correo del director<input name="correo" type="email" required></label>
-        <button class="btn primary" type="submit">Dar de alta e invitar al director</button>
+        <div class="cuenta-2col"><label class="field">Correo de quien invitas<input name="correo" type="email" required></label>
+          <label class="field">Como<select name="rol"><option value="director">Director</option><option value="maestro">Maestro</option></select></label></div>
+        <button class="btn primary" type="submit">Dar de alta e invitar</button>
         <p class="form-error" data-error></p>
       </form>
       <div data-nuevo></div>
@@ -338,6 +339,14 @@ async function cargarEscuelas(sb) {
               <button class="btn primary" type="submit">Guardar cambios</button>
               <p class="form-error" data-error></p>
             </form>
+            <form class="cuenta-form esc-form" data-form="esc-invitar">
+              <b>Invitar a esta escuela</b>
+              <div class="cuenta-2col"><label class="field">Correo<input name="correo" type="email" required></label>
+                <label class="field">Como<select name="rol"><option value="maestro">Maestro</option><option value="director">Director</option></select></label></div>
+              <button class="btn" type="submit">Crear invitación</button>
+              <p class="form-error" data-error></p>
+              <div data-enlace></div>
+            </form>
             <form class="cuenta-form esc-form" data-form="esc-pago">
               <b>Registrar pago</b>
               <div class="cuenta-2col"><label class="field">Monto (MXN)<input name="monto" inputmode="decimal" required value="${e.cuentas_contratadas * Number(precio || 0) * 6}"></label>
@@ -364,13 +373,12 @@ async function cargarEscuelas(sb) {
 }
 
 // Muestra el enlace de una invitación recién creada, listo para mandarlo por WhatsApp o correo.
-function mostrarEnlace(token, correo) {
-  const box = body().querySelector('[data-nuevo]');
+function mostrarEnlace(token, correo, box = body().querySelector('[data-nuevo]')) {
   box.innerHTML = `<div class="cuenta-enlace" data-token="${token}">
       <b>Invitación lista para ${escapeHtml(correo)}</b>
       <small>Mándale este enlace. Sirve una sola vez, solo con ese correo, y vence en 7 días.</small>
       <input readonly value="${enlace(token)}">
-      <div class="row"><button class="btn" data-act="copiar">Copiar</button><button class="btn primary" data-act="compartir">Enviar</button></div>
+      <div class="row"><button type="button" class="btn" data-act="copiar">Copiar</button><button type="button" class="btn primary" data-act="compartir">Enviar</button></div>
     </div>`;
 }
 
@@ -416,6 +424,13 @@ $('#cuenta-body').addEventListener('submit', async (e) => {
       toast('¡Listo! Tu cuenta quedó creada');
       await renderCuenta();
       programar(300);
+    } else if (f.dataset.form === 'esc-invitar') {
+      const correo = v('correo').toLowerCase();
+      const { data, error } = await sb.from('invitaciones')
+        .insert({ escuela_id: f.closest('[data-esc]').dataset.esc, correo, rol: v('rol') === 'director' ? 'director' : 'maestro' }).select('token').single();
+      if (error) throw error;
+      f.elements.correo.value = '';
+      mostrarEnlace(data.token, correo, f.querySelector('[data-enlace]'));
     } else if (f.dataset.form === 'esc-editar' || f.dataset.form === 'esc-pago') {
       const id = f.closest('[data-esc]').dataset.esc;
       if (f.dataset.form === 'esc-editar') {
@@ -456,7 +471,7 @@ $('#cuenta-body').addEventListener('submit', async (e) => {
       const { data: esc, error } = await sb.from('escuelas')
         .insert({ nombre: v('nombre'), clave, cuentas_contratadas: Number(v('cuentas')) || 1, paquete: 'empresarial' }).select('id').single();
       if (error) throw error;
-      const inv = await sb.from('invitaciones').insert({ escuela_id: esc.id, correo, rol: 'director' }).select('token').single();
+      const inv = await sb.from('invitaciones').insert({ escuela_id: esc.id, correo, rol: v('rol') === 'maestro' ? 'maestro' : 'director' }).select('token').single();
       if (inv.error) throw inv.error;
       f.reset();
       await cargarEscuelas(sb);
