@@ -9,7 +9,7 @@ import { alCambiarEstado, estado, programar, sincronizar } from './sync.js';
 import { save, setVistaApp, state } from './state.js';
 import { DEMO, PERFIL_DEMO } from '../lib/demo.js';
 import { bajarDeLaNube, clasesEnLaNube } from './bajar.js';
-import { render } from './main-view.js';
+import { render, vistaEscuela } from './main-view.js';
 
 const ROL = { superadmin: 'Administrador general', director: 'Director', maestro: 'Maestro' };
 const body = () => $('#cuenta-body');
@@ -130,12 +130,13 @@ function avisoSuscripcion(p) {
   return '';
 }
 
-// Director: su escuela y, solo si también da clases, sus grupos.
-const btnsDirector = () => `<button class="btn primary big" data-act="ir-escuela">Ir a mi escuela</button>
-    <p class="hint">Resumen de la escuela, maestros (invitar y dar o quitar acceso) y parciales.</p>
-    <section class="cuenta-sec"><h3>¿También das clases?</h3>
+// Director: solo el botón para ir a la otra pantalla (si ya está en su escuela, no se le ofrece ir a ella).
+const btnsDirector = () => (vistaEscuela()
+  ? `<section class="cuenta-sec"><h3>¿También das clases?</h3>
       <p class="hint">Si pasas lista a algún grupo, aquí tienes tus grupos como cualquier maestro.</p>
-      <button class="btn" data-act="ir-grupos">Ir a mis grupos</button></section>`;
+      <button class="btn" data-act="ir-grupos">Ir a mis grupos</button></section>`
+  : `<button class="btn primary big" data-act="ir-escuela">‹ Volver a mi escuela</button>
+    <p class="hint">Resumen de la escuela, maestros (invitar y dar o quitar acceso) y parciales.</p>`);
 
 // Rol guardado en el dispositivo: si cambia (entrar, salir, otra cuenta), la app cambia de pantalla.
 function cambiarRol(r) {
