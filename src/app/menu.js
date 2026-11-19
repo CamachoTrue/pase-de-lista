@@ -1,4 +1,3 @@
-import { openExportar, openPreview } from './export.js';
 import { $, toast } from './util.js';
 import { rolGuardado } from '../lib/nube.js';
 import { DEMO } from '../lib/demo.js';
@@ -26,8 +25,6 @@ menu.addEventListener('click', (e) => {
   const action = e.target.dataset.action;
   if (!action || action === 'close') return;
   menu.close();
-  if (action === 'exportar') openExportar();
-  if (action === 'previa') openPreview('todo');
   if (action === 'cuenta') openCuenta();
   if (action === 'escuela') { setVistaApp('escuela'); render(); }
   if (action === 'salir-demo') location.href = '/';
